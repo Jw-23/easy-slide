@@ -1,6 +1,6 @@
 # Easy Slide
 
-一个只在本地运行的演示文稿工作台。用类似 SwiftUI 的声明式 DSL，把数学论坛和工程汇报变成层次清晰的幻灯片。
+一个在浏览器本地处理内容的演示文稿工作台，可本地运行或静态托管。用类似 SwiftUI 的声明式 DSL，把数学论坛和工程汇报变成层次清晰的幻灯片。
 
 ## 本地运行
 
@@ -18,6 +18,12 @@ npm run build
 npm run preview
 npm test
 ```
+
+## Cloudflare 从仓库部署
+
+已提供 `wrangler.jsonc`，使用 **Workers Static Assets** 从 GitHub 自动构建部署。连接 `Jw-23/easy-slide` 时，目前请选择完整代码所在的 `feat/local-slide-studio` 分支；构建命令留空，部署命令使用 `npx wrangler deploy`。构建与 dist 目录已在配置中定义。
+
+详见 [Cloudflare 部署说明](docs/CLOUDFLARE.md)，本地可运行 `npm run cf:check` 验证，不需要发布到账户。
 
 ## 使用
 

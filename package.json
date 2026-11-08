@@ -9,7 +9,10 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "format": "prettier --write src tests docs *.ts *.json *.md index.html"
+    "format": "prettier --write src tests docs *.ts *.json *.md index.html",
+    "deploy": "wrangler deploy",
+    "cf:check": "wrangler deploy --dry-run",
+    "cf:dev": "wrangler dev --ip 127.0.0.1 --port 8787"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
@@ -37,6 +40,10 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "prettier": "^3.9.10",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "wrangler": "4.158.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
