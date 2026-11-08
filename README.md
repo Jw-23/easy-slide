@@ -19,6 +19,16 @@ npm run preview
 npm test
 ```
 
+## 安装应用与离线使用
+
+生产构建提供 PWA 安装清单、应用图标与 Service Worker。打开 HTTPS 网站或本机 `localhost` / `127.0.0.1` 地址后，点击工具栏的「安装应用」。Chrome / Edge 支持浏览器原生安装窗口；iPhone / iPad 在 Safari 分享菜单选择「添加到主屏幕」，macOS Safari 使用「文件 → 添加到程序坞」。不支持原生安装提示的浏览器会显示操作说明；ChatGPT 内嵌预览可先在独立浏览器标签页打开。
+
+首次联网加载并显示「离线资源已就绪」后，可断网重新打开、编辑、渲染公式和导出 PPTX。缓存包含应用代码与图标；工程和图片仍保存在当前浏览器的 IndexedDB。安装不会上传工程，也不会自动迁移其他浏览器或域名的草稿；重要工程应导出备份。
+
+发现新版本后显示「保存并更新」。点击后先保存当前草稿，再刷新当前窗口；其他已打开的窗口保留当前编辑状态，分别提示更新。保存失败时保留当前页面并提示导出工程。应用安装是否可用取决于浏览器与系统支持。
+
+`npm run dev` 不注册离线缓存，方便开发时立即查看修改。要在本机体验安装和离线行为，请执行 `npm run build && npm run preview`。
+
 ## Cloudflare 从仓库部署
 
 已提供 `wrangler.jsonc`，使用 **Workers Static Assets** 从 GitHub 自动构建部署。连接 `Jw-23/easy-slide` 时，目前请选择完整代码所在的 `feat/local-slide-studio` 分支；构建命令留空，部署命令使用 `npx wrangler deploy`。构建与 dist 目录已在配置中定义。
@@ -70,12 +80,15 @@ Slide(title: "从直觉到证明") {
 - [Slidev 动画](https://sli.dev/guide/animations)：页级过渡与逐步显示分离。
 - [PptxGenJS 文本 API](https://gitbrent.github.io/PptxGenJS/docs/api-text/)：生成原生 PowerPoint 文本。
 - [File System Access API](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)：经用户选择后读写本地目录。
+- [PWA 安装条件](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)与 [Vite PWA 更新提示](https://vite-pwa-org.netlify.app/guide/prompt-for-update)：安装清单、离线缓存和用户确认后的版本更新。
 
 ## 开发与验证
 
 React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢量公式；PptxGenJS + JSZip 导出；IndexedDB 自动保存。无应用后端。
 
 `npm test` 验证扁平/旧版 DSL 往返、带位置错误、代码补全、动画时间线、原生 PPTX 动画节点、模板布局边界与公式。`npm run test:e2e` 执行 Chromium 浏览器测试（首次运行需 `npx playwright install chromium`）。
+
+`npm run test:pwa` 构建生产产物并测试清单与图标、离线重新启动和 PPTX 导出、安装入口、版本等待与保存后更新、多窗口不强制刷新。测试用静态服务器及版本切换接口仅在本机测试中启用，不属于网站部署内容。应用图标源码为 `public/favicon.svg`，可选脚本 `python scripts/generate-pwa-icons.py` 生成 PNG 图标（仅运行该脚本时需要 Pillow）。
 
 ## 初始功能示例
 

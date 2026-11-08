@@ -1535,3 +1535,114 @@ textarea {
   max-height: 100px;
   margin: 12px auto 4px;
 }
+.pwa-update {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 210;
+  width: 280px;
+  background: #fff;
+  border: 1px solid #d9e6dd;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px #1d392320;
+  padding: 16px;
+  font-size: 12px;
+}
+.pwa-update > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #47745d;
+}
+.pwa-update > div > button {
+  margin-left: auto;
+}
+.pwa-update strong {
+  font-weight: 500;
+}
+.pwa-update p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #8a9d90;
+  margin: 9px 0 13px;
+}
+.pwa-update .pwa-problem {
+  color: #b47355;
+}
+.pwa-install-modal ul {
+  list-style: none;
+  padding: 0;
+  margin: 22px 0;
+}
+.pwa-install-modal li {
+  border-top: 1px solid #e4ebe6;
+  padding: 15px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pwa-install-modal li strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: #50745f;
+}
+.pwa-install-modal li span {
+  font-size: 11px;
+  color: #8d9f92;
+  line-height: 1.8;
+}
+.pwa-cache-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #edf4ef;
+  color: #64816d;
+  padding: 12px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+.pwa-external-link {
+  font-size: 12px;
+  color: #39755c;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 15px;
+}
+.app {
+  min-height: 100dvh;
+}
+@media (display-mode: standalone) {
+  .topbar {
+    padding-top: env(safe-area-inset-top);
+    min-height: 70px;
+    height: calc(70px + env(safe-area-inset-top));
+  }
+  .workspace {
+    height: calc(100dvh - 70px - env(safe-area-inset-top));
+  }
+}
+@media (max-width: 600px) {
+  .topbar {
+    height: auto;
+    min-height: 70px;
+    flex-wrap: wrap;
+    gap: 9px;
+    padding: 12px 14px;
+  }
+  .top-actions {
+    flex-wrap: wrap;
+  }
+  .top-actions button {
+    font-size: 10px;
+    padding: 6px;
+  }
+  .pwa-update {
+    width: min(280px, calc(100vw - 30px));
+    right: 15px;
+    bottom: 15px;
+  }
+  .pwa-install-modal {
+    padding: 35px 23px;
+  }
+}

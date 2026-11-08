@@ -31,7 +31,7 @@ Cloudflare 的 Git 集成会安装仓库锁定的依赖并在后续推送时自�
 
 - `wrangler.jsonc`：静态输出目录、构建命令、兼容日期与 SPA 回退。
 - `.node-version`、`.nvmrc`、package.json engines：使用兼容 Vite 和 Wrangler 的 Node 版本。
-- `public/_headers`：构建时复制到 dist；HTML 每次访问重新验证，带哈希的 assets 允许长期缓存。
+- `public/_headers`：构建时复制到 dist；HTML、安装清单和 Service Worker 每次访问重新验证，带哈希的 assets 与 Workbox 运行库允许长期缓存。
 - package-lock.json：锁定构建依赖。
 
 单页应用回退通过 `assets.not_found_handling` 完成：优先提供真实静态文件，其他页面导航回退到 index.html。`/?example=features` 等查询参数由前端读取。
@@ -58,6 +58,8 @@ npm run cf:dev
 若要手动发布，可在自己电脑上通过 `npx wrangler login` 登录，然后执行 `npm run deploy`。Git 集成部署无需把 Cloudflare token 写入仓库。
 
 ## 数据与浏览器
+
+Cloudflare 的 HTTPS 地址支持 PWA 安装。首次访问后缓存应用资源，安装入口位于工具栏。发布新版本后，旧页面联网检查更新，并提示「保存并更新」；只有用户点击后才保存草稿并刷新当前窗口，其他窗口不会被强制刷新。无需额外开启 Cloudflare 服务或增加 Worker 代码。不要为 `/sw.js` 或 `/manifest.webmanifest` 额外配置长期强缓存规则。
 
 线上依然将工程保存在访客浏览器。不同域名使用不同的 IndexedDB，因此从 ChatGPT Sites 换到 Cloudflare 时，可先在旧域名导出完整工程，再到新域名导入。
 

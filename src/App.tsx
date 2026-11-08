@@ -1,3 +1,4 @@
+import { PwaControls } from "./PwaControls";
 import { pageLayout, withLayout, pageContent } from "./dsl";
 import { MotionPanel } from "./MotionPanel";
 import { DslEditor } from "./DslEditor";
@@ -374,6 +375,10 @@ export default function App() {
           <span className="file-tag">.slide</span>
         </div>
         <div className="top-actions">
+          <PwaControls
+            beforeUpdate={() => saveDraft(project(), draftKey)}
+            canUpdate={ready && !busy}
+          />
           <button
             onClick={() => setModal("help")}
             className="icon-button"
