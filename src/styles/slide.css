@@ -1,0 +1,52 @@
+.missing-image {
+  display: grid;
+  place-items: center;
+  border: 2px dashed #afc8bb;
+  color: #799d87;
+  font-size: 22px;
+  background: #edf5ef;
+}
+.animate.fade {
+  animation: fade var(--duration) ease both;
+}
+.animate.slide {
+  animation: slide var(--duration) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate.zoom {
+  animation: zoom var(--duration) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes zoom {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+.animate.slide {
+  animation-timing-function: var(--easing);
+}
+.animate.fade,
+.animate.zoom {
+  animation-timing-function: var(--easing);
+}
+@keyframes slide {
+  from {
+    opacity: 0;
+    translate: var(--slide-offset, 4% 0);
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}

@@ -1,6 +1,13 @@
+import { minimalTextChange } from "./studio/source-edits";
 import { useEffect, useRef, useState } from "react";
 import { EditorView, keymap } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import {
+  Annotation,
+  Compartment,
+  EditorState,
+  Prec,
+  Transaction,
+} from "@codemirror/state";
 import { basicSetup } from "codemirror";
 import {
   autocompletion,
@@ -25,23 +32,37 @@ import {
   semanticHover,
 } from "./editor-language";
 import { BookOpen, Code2, MapPin, Sparkles } from "lucide-react";
+const externalChange = Annotation.define<boolean>();
 export function DslEditor({
   value,
   onChange,
   assets,
   onFormat,
   onHelp,
+  onUndo,
+  onRedo,
+  readOnly = false,
+  session,
 }: {
   value: string;
   onChange: (s: string) => void;
   assets: string[];
   onFormat: () => void;
   onHelp: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  readOnly?: boolean;
+  session?: { anchor: number; head: number; scrollTop: number };
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
     change = useRef(onChange),
-    assetRef = useRef(assets);
+    assetRef = useRef(assets),
+    undo = useRef(onUndo),
+    redo = useRef(onRedo),
+    readOnlyConfig = useRef(new Compartment());
+  undo.current = onUndo;
+  redo.current = onRedo;
   change.current = onChange;
   assetRef.current = assets;
   const [error, setError] = useState<DslError | null>(null);
@@ -74,6 +95,35 @@ export function DslEditor({
         doc: value,
         extensions: [
           basicSetup,
+          readOnlyConfig.current.of(EditorState.readOnly.of(readOnly)),
+          Prec.highest(
+            keymap.of([
+              {
+                key: "Mod-z",
+                run: () => {
+                  if (!undo.current) return false;
+                  undo.current();
+                  return true;
+                },
+              },
+              {
+                key: "Mod-Shift-z",
+                run: () => {
+                  if (!redo.current) return false;
+                  redo.current();
+                  return true;
+                },
+              },
+              {
+                key: "Mod-y",
+                run: () => {
+                  if (!redo.current) return false;
+                  redo.current();
+                  return true;
+                },
+              },
+            ]),
+          ),
           slideLanguage,
           signatureHelp,
           semanticHover,
@@ -135,14 +185,32 @@ export function DslEditor({
             ".cm-diagnostic": { fontSize: "12px", whiteSpace: "pre-wrap" },
           }),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) change.current(update.state.doc.toString());
+            if (
+              update.docChanged &&
+              !update.transactions.some((t) => t.annotation(externalChange))
+            )
+              change.current(update.state.doc.toString());
           }),
         ],
       }),
     });
     view.current = editor;
+    if (session) {
+      editor.dispatch({
+        selection: {
+          anchor: Math.min(session.anchor, value.length),
+          head: Math.min(session.head, value.length),
+        },
+      });
+      editor.scrollDOM.scrollTop = session.scrollTop;
+    }
     validate(value);
     return () => {
+      if (session) {
+        session.anchor = editor.state.selection.main.anchor;
+        session.head = editor.state.selection.main.head;
+        session.scrollTop = editor.scrollDOM.scrollTop;
+      }
       view.current = null;
       editor.destroy();
     };
@@ -151,9 +219,20 @@ export function DslEditor({
     const editor = view.current;
     if (editor && editor.state.doc.toString() !== value)
       editor.dispatch({
-        changes: { from: 0, to: editor.state.doc.length, insert: value },
+        changes: minimalTextChange(editor.state.doc.toString(), value),
+        annotations: [
+          externalChange.of(true),
+          Transaction.addToHistory.of(false),
+        ],
       });
   }, [value]);
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: readOnlyConfig.current.reconfigure(
+        EditorState.readOnly.of(readOnly),
+      ),
+    });
+  }, [readOnly]);
   const jump = () => {
     const editor = view.current;
     if (!editor || !error) return;
@@ -182,7 +261,7 @@ export function DslEditor({
           <button
             title="整理为扁平结构（会规范格式并移除注释）"
             className="icon-button"
-            disabled={!!error}
+            disabled={!!error || readOnly}
             onClick={onFormat}
           >
             <Code2 size={15} />
@@ -192,7 +271,6 @@ export function DslEditor({
           </button>
         </div>
       </div>
-      <p>Deck 与 Slide 并列书写 · Ctrl / ⌘ + Space 补全</p>
       <div className="code-editor-host" ref={host} />
       {error ? (
         <div className="editor-diagnostic" role="alert">

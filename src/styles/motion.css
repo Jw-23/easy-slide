@@ -1,0 +1,172 @@
+.motion-panel {
+  background: #fafcfb;
+  border: 1px solid #e1e9e3;
+  border-radius: 8px;
+  padding: 14px 15px;
+  margin-top: 6px;
+}
+.motion-toolbar {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.motion-toolbar > div {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.motion-toolbar strong {
+  font-size: 11px;
+  color: #5b7766;
+  font-weight: 500;
+}
+.motion-toolbar span {
+  font-size: 9px;
+  color: #a6b3aa;
+}
+.motion-toolbar button {
+  font-size: 9px;
+  padding: 5px 7px;
+  background: transparent;
+}
+.stage-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.stage-chips button {
+  font-size: 9px;
+  padding: 4px 7px;
+  border: 1px solid #dfebe2;
+  background: #f6f9f7;
+}
+.stage-chips button.selected {
+  color: #347254;
+  background: #e4f0e8;
+  border-color: #aecaba;
+}
+.stage-chips .edit-motion {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+}
+.cue-list {
+  max-height: 190px;
+  overflow: auto;
+}
+.cue-row {
+  display: flex;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  padding: 7px 0;
+  gap: 8px;
+  font-size: 9px;
+  text-align: left;
+}
+.cue-row.playing {
+  background: #eef5f0;
+}
+.cue-stage {
+  border: 1px solid #cbded0;
+  border-radius: 3px;
+  color: #69967a;
+  padding: 1px 4px;
+  min-width: 23px;
+  text-align: center;
+}
+.cue-label {
+  width: 110px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #718b79;
+}
+.cue-effect {
+  color: #9eafa3;
+  width: 50px;
+}
+.cue-track {
+  flex: 1;
+  height: 7px;
+  border-radius: 5px;
+  background: #e7efe9;
+  position: relative;
+  min-width: 30px;
+  overflow: hidden;
+}
+.cue-track i {
+  position: absolute;
+  height: 100%;
+  border-radius: 5px;
+  background: #83ae95;
+}
+.cue-time {
+  font: 8px monospace;
+  color: #9bac9f;
+  width: 88px;
+  text-align: right;
+}
+.motion-caption,
+.empty-motion {
+  font-size: 9px;
+  color: #a7b6ac;
+  margin-top: 9px;
+}
+.motion-settings {
+  display: flex;
+  gap: 8px;
+}
+.motion-settings label {
+  flex: 1;
+  min-width: 0;
+}
+.motion-settings select {
+  font-size: 10px;
+  padding: 8px 4px;
+}
+@media (max-width: 1100px) {
+  .cue-effect {
+    display: none;
+  }
+  .cue-label {
+    width: 80px;
+  }
+  .motion-toolbar > div > span {
+    display: none;
+  }
+}
+
+.motion-panel {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.motion-toolbar {
+  padding-right: 22px;
+}
+.motion-toolbar button,
+.stage-chips button,
+.cue-row {
+  font-size: 11px;
+}
+.cue-time {
+  font-size: 10px;
+}
+.cue-label,
+.cue-effect,
+.cue-time {
+  color: var(--muted);
+}
+@media (max-width: 600px) {
+  .cue-effect {
+    display: none;
+  }
+  .cue-label {
+    width: 75px;
+  }
+}

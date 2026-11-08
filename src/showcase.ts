@@ -3,20 +3,20 @@ import { parseDeck } from "./dsl";
 export const showcaseDeck = parseDeck(String.raw`
 Deck("Easy Slide 功能示例", author: "示例工程")
     .transition(.slide, duration: 650, direction: .left, easing: .easeOut)
-Theme(accent: "#23796e", background: "#fafbf9", color: "#1c3430", font: "Arial", material: .glass)
+Theme(preset: .aurora)
 
 let demoRate = 0.2
 let demoLoss = x => x ^ 2 / 2
 let demoRows = range(0, 6).map(k => row(k, (1 - demoRate) ^ k, demoLoss((1 - demoRate) ^ k)))
 let demoCosts = [120, 180, 95, 240]
 
-Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、材质与动画编排") {
+Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、主题与动画") {
     Cover {
         Text("20 页示例 · 在 DSL 面板中查看和修改源码").font(18)
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
-}.notes("此工程展示现有的全部组件与编排方式。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
+}.notes("此工程展示现有的全部组件与编排方式。上方主题菜单提供 10 套样式，切换时保留所有页面源码。Theme(preset: .aurora) 可在 DSL 中声明主题，页面和组件的显式颜色优先。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
 
 Slide(title: "页面与布局\n分别声明", eyebrow: "02 / STRUCTURE", subtitle: "Deck、Theme 与 Slide 并列；布局由独立组件负责") {
     Section {
@@ -43,7 +43,7 @@ Slide(title: "正文、引用与字号", eyebrow: "04 / FLOW", subtitle: "Flow �
         Text("一个页面只保留一个主要结论。正文解释依据，引用补充讨论角度。", title: "正文块")
             .font(25).frame(height: 150)
         Quote("局部信息在适当的结构假设下，能够导向全局结论。")
-            .font(29).foreground("#23796e").glass(opacity: 0.56).padding(24)
+            .font(29).glass(opacity: 0.56).padding(24)
     }
 }.notes("这里使用 Text 的 title 参数与 Quote。font 控制正文大小，foreground 控制颜色，frame 的固定高度优先分配空间，padding 控制内部留白。")
 
@@ -85,7 +85,7 @@ Slide(title: "本地图片与图文布局", eyebrow: "08 / IMAGE + ASSETS", subt
         }
     }
 }.transition(.zoom, duration: 700, easing: .spring)
-.notes("图表为随工程附带的 PNG，不依赖外部 URL。完整工程 JSON 包含 DSL 与图片；纯 .slide 文件不包含图片。选择文件夹后，可读取其中的图片与项目文件。示例图展示二次函数上的迭代轨迹，仅用于演示。")
+.notes("图表为随工程附带的 PNG，不依赖外部 URL。工程 ZIP 包含 DSL、配置与原始图片；纯 .slide 文件不包含图片。选择文件夹后，可读取其中的工程压缩包、解压后的工程或图片。示例图展示二次函数上的迭代轨迹，仅用于演示。")
 
 Slide(title: "自由组合布局容器", eyebrow: "09 / STACKS + GRID", subtitle: "HStack、VStack、Grid 与 Spacer 可嵌套使用") {
     HStack(spacing: 28) {
@@ -109,12 +109,12 @@ Slide(title: "叠层布局与材质边界", eyebrow: "10 / ZSTACK", subtitle: "�
         Image("assets/convergence.png").frame(x: 74, y: 250, width: 750, height: 370)
         Glass {
             Text("叠放的说明面板", title: "ZStack").font(25).frame(height: 95)
-            Text("网页实时模糊下层图表；PPTX 的面板纹理仅采样页面背景。").font(21)
+            Text("网页实时模糊下层图表；PPTX 按入场时序采样下层内容。").font(21)
         }.frame(x: 640, y: 290, width: 520, height: 270)
          .glass(blur: 24, opacity: 0.72, radius: 28)
          .appear(.slideRight, step: 1, duration: 650)
     }
-}.notes("ZStack 按声明顺序叠放内容。frame.x/y 是画布绝对坐标。网页 backdrop-filter 能模糊下层图表；PPTX 不支持实时背景模糊，导出的材质纹理基于页面背景生成，文字与公式仍保持独立。")
+}.notes("ZStack 按声明顺序叠放内容。frame.x/y 是画布绝对坐标。网页 backdrop-filter 能实时模糊下层图表；PPTX 将入场时下层内容采样为静态材质，后续点击的内容不会提前出现在材质中。文字与公式仍独立保留动画，文字可选择保留版式或可编辑模式。")
 
 Slide(title: "LaTeX 公式与命令补全", eyebrow: "11 / EQUATIONS", subtitle: "在 Equation 字符串中输入反斜杠，或按 Ctrl / ⌘ + Space") {
     Grid(columns: 2, spacing: 20) {
@@ -142,7 +142,7 @@ Slide(title: "用 DSL 计算表格数据", eyebrow: "13 / COMPUTED TABLE", subti
         Table(
             columns: [Column("迭代 k", width: 1, align: .center), Column("当前位置 x", width: 2, align: .right, format: "0.000"), Column("目标值 f(x)", width: 2, align: .right, format: "0.0000")],
             rows: demoRows
-        ).tableStyle(rowHeight: 44, zebra: true, borders: .all, headerFill: "#23796e", borderColor: "#cddfd5")
+        ).tableStyle(rowHeight: 44, zebra: true, borders: .all)
          .appear(.fade, step: 1, duration: 350).stagger(70)
     }
 }.notes("顶部 let 定义步长、损失函数和数据。range(0, 6) 不含终点，map 生成六行。Column 定义标题、宽度权重、对齐与数字格式。修改 demoRate 后，数据重新求值。样式编辑与布局切换会保留计算源码，PPTX 输出计算后的数值。")
@@ -211,7 +211,7 @@ Slide(title: "页面样式覆盖与无过渡", eyebrow: "18 / PAGE OVERRIDES", s
 Slide(title: "编辑、素材与工程文件", eyebrow: "19 / LOCAL WORKFLOW", subtitle: "示例中的操作均可在当前编辑器中完成") {
     Compare(spacing: 28) {
         Bullets(["DSL 补全：Ctrl / ⌘ + Space", "错误面板：行列位置、定位与建议", "粘贴图片：Ctrl / ⌘ + V", "素材面板：插入图片或连接文件夹"], title: "编辑与素材").font(21)
-        Bullets(["保存工程：Ctrl / ⌘ + S", "完整 JSON：DSL 与内嵌图片", "纯 .slide：只含声明式源码", "PPTX：文本、公式、材质与动画"], title: "保存与导出").font(21)
+        Bullets(["保存工程：Ctrl / ⌘ + S", "工程 ZIP：DSL、配置与全部图片", "纯 .slide：只含声明式源码", "PPTX：文本、公式、材质与动画"], title: "保存与导出").font(21)
     }
 }.notes("浏览器自动保存至 IndexedDB；重要内容请导出完整工程。工具栏的安装应用可将生产网站安装为 PWA；首次联网缓存完成后可离线编辑和导出，更新时先保存草稿。直接目录访问需要支持 File System Access 的浏览器及用户选择目录；连接目录后点击保存工程才会写入文件。备注只在编辑器显示，PPTX 中保存为演讲备注。")
 
@@ -221,5 +221,5 @@ Slide(title: "功能示例结束", eyebrow: "20 / REFERENCE", subtitle: "修改�
         Text("工具栏 → 安装应用；首次缓存完成后可离线编辑与导出。").font(18)
     }
 }.transition(.fade, duration: 550)
-.notes("本工程涵盖全部现有布局、内容类型、组合容器、修饰符和动画选项。素材图包含在工程 JSON 中。既有本地工程不会被新版示例自动覆盖；需要时从切换示例打开此功能示例。")
+.notes("本工程涵盖全部现有布局、内容类型、组合容器、修饰符和动画选项。素材图包含在工程 ZIP 中。既有本地工程不会被新版示例自动覆盖；需要时从切换示例打开此功能示例。")
 `);

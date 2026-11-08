@@ -17,7 +17,7 @@ test("AST completions preserve existing calls and labels and display the active 
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = await editAt(
     page,
     'Deck("AST")\nSlide(title:"A"){Text("A").fo¦nt(24)}',
@@ -59,7 +59,7 @@ test("callback and inferred array completions work in the actual editor", async 
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   await editAt(
     page,
     'let values=range(0,3).map((sample,index)=>sa¦)\nDeck("AST")\nSlide(title:"A"){Text("B")}',

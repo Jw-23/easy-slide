@@ -1,154 +1,173 @@
-import { backdropData, glassTexture, rasterSvg } from "./materials";
-import { timeline } from "./motion";
-import { pptxTiming, shapeIds } from "./pptx-motion";
+import { resolveTheme } from "./themes";
 import PptxGenJS from "pptxgenjs";
 import JSZip from "jszip";
-import { scene } from "./scene";
-import { mathSvg } from "./math";
+import { scene, TEXT_LINE_HEIGHT } from "./scene";
+import { timeline } from "./motion";
+import { pptxTiming, sceneShapeIds } from "./pptx-motion";
+import { renderExportLayers } from "./pptx-render";
+import { attachSvg, patchSlideMotion, deduplicateMedia } from "./pptx-package";
 import type { Deck } from "./dsl";
-export function download(blob: Blob, name: string) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-}
-export async function exportPptx(deck: Deck, assets: Record<string, string>) {
-  const pptx = new PptxGenJS();
-  pptx.defineLayout({ name: "EASY", width: 13.333333, height: 7.5 });
+export type PptxOptions = {
+  textMode?: "faithful" | "editable";
+  onProgress?: (page: number, total: number) => void;
+};
+import { download } from "./download";
+export { download } from "./download";
+/** Preserve every scene layer as an independently animated native PowerPoint shape. */
+export async function buildPptx(
+  deck: Deck,
+  assets: Record<string, string>,
+  options: PptxOptions = {},
+): Promise<Blob> {
+  const pptx = new PptxGenJS(),
+    faithful = options.textMode !== "editable";
+  pptx.defineLayout({ name: "EASY", width: 1280 / 96, height: 720 / 96 });
   pptx.layout = "EASY";
   pptx.title = deck.title;
   pptx.author = deck.author || "Easy Slide";
-  for (const [i, s] of deck.slides.entries()) {
-    const slide = pptx.addSlide();
-    slide.background = {
-      color: (s.background || deck.theme?.background || "#fafbf9").slice(1),
+  pptx.subject = "Easy Slide";
+  const pages: {
+    elements: ReturnType<typeof scene>;
+    active: boolean[];
+    vectors: Map<number, string>;
+  }[] = [];
+  for (const [index, s] of deck.slides.entries()) {
+    const page = pptx.addSlide();
+    page.background = {
+      color: resolveTheme(deck.theme, s.background).background.slice(1),
     };
-    for (const e of scene(deck, s, i)) {
-      const pos = { x: e.x / 96, y: e.y / 96, w: e.w / 96, h: e.h / 96 };
-      if (e.kind === "rect" && e.glass) {
-        slide.addImage({
-          data: await glassTexture(e, backdropData(deck, s)),
-          ...pos,
-          shadow: {
-            type: "outer",
-            color: "233c35",
-            opacity: 0.08,
-            blur: 12,
-            angle: 90,
-            offset: 3,
-          },
-        });
-      } else if (e.kind === "rect")
-        slide.addShape(
-          e.radius === 0 ? pptx.ShapeType.rect : pptx.ShapeType.roundRect,
-          {
-            ...pos,
-            rectRadius: 0.15,
-            fill: { color: e.fill!.slice(1) },
-            line: { color: e.fill!.slice(1), transparency: 100 },
-          },
-        );
-      else if (e.kind === "text")
-        slide.addText(e.text || "", {
-          ...pos,
-          fontFace: e.mono ? "Courier New" : deck.theme?.font || "Arial",
-          fontSize: (e.size || 24) * 0.75,
+    const elements = scene(deck, s, index),
+      layers = await renderExportLayers(deck, s, elements, assets),
+      vectors = new Map<number, string>();
+    for (const [i, e] of elements.entries()) {
+      const layer = layers[i];
+      if (!layer) continue;
+      const objectName = `easy-slide-element-${i}`;
+      if (e.kind === "text" && !faithful) {
+        const size = e.size ?? 24;
+        page.addText((layer.textLines ?? []).map((l) => l.text).join("\n"), {
+          x: e.x / 96,
+          y: e.y / 96,
+          w: e.w / 96,
+          h: e.h / 96,
+          objectName,
+          fontFace: e.mono
+            ? "Courier New"
+            : resolveTheme(deck.theme)
+                .font.split(",")[0]
+                .replace(/["']/g, "")
+                .trim(),
+          fontSize: size * 0.75,
           color: e.color?.slice(1),
           bold: e.bold,
           align: e.align || "left",
-          margin: 0,
-          breakLine: false,
           valign: "top",
-          fit: "shrink",
-          paraSpaceAfter: 8,
+          margin: 0,
+          lineSpacing: size * 0.75 * TEXT_LINE_HEIGHT,
+          paraSpaceAfter: 0,
+          paraSpaceBefore: 0,
           lang: "zh-CN",
+          wrap: false,
         });
-      else {
-        const data = e.data
-          ? await rasterSvg(e.data)
-          : e.kind === "equation"
-            ? mathSvg(e.text || "", e.color || "#192c2a")
-            : assets[e.src || ""];
-        if (!data)
-          throw new Error(`第 ${i + 1} 页：缺少图片 ${e.src || "或公式无效"}`);
-        // SVG viewBox and raster dimensions preserve the same contain geometry used in preview.
-        let w = 1,
-          h = 1;
-        if (e.kind === "equation") {
-          const raw = atob(data.split(",")[1]);
-          const v = raw
-            .match(/viewBox="([^"]+)"/)?.[1]
-            .split(" ")
-            .map(Number);
-          if (v) {
-            w = v[2];
-            h = v[3];
-          }
-        } else {
-          const img = new Image();
-          img.src = data;
-          await img.decode();
-          w = img.naturalWidth;
-          h = img.naturalHeight;
-        }
-        slide.addImage({
-          data,
-          ...pptxgenjsContain(w, h, pos.x, pos.y, pos.w, pos.h),
+      } else if (e.kind === "rect" && !e.glass && !faithful) {
+        page.addShape(
+          (e.radius ?? 0) > 0 ? pptx.ShapeType.roundRect : pptx.ShapeType.rect,
+          {
+            x: e.x / 96,
+            y: e.y / 96,
+            w: e.w / 96,
+            h: e.h / 96,
+            objectName,
+            rectRadius: Math.min(e.radius ?? 0, e.w / 2, e.h / 2) / 96,
+            fill: { color: (e.fill || "#ffffff").slice(1) },
+            line: { color: (e.fill || "#ffffff").slice(1), transparency: 100 },
+          },
+        );
+      } else {
+        page.addImage({
+          data: layer.data,
+          x: layer.x / 96,
+          y: layer.y / 96,
+          w: layer.w / 96,
+          h: layer.h / 96,
+          objectName,
+          altText: e.text || e.src || e.kind,
         });
+        if (layer.svg) vectors.set(i, layer.svg);
       }
     }
-    slide.addNotes(s.notes || "");
+    page.addNotes(s.notes || "");
+    pages.push({ elements, active: layers.map(Boolean), vectors });
+    options.onProgress?.(index + 1, deck.slides.length);
+    // Let the browser release per-slide decoded textures before processing the next page.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
-  const raw = await pptx.write({ outputType: "arraybuffer" });
-  const zip = await JSZip.loadAsync(raw as ArrayBuffer);
-  for (const [i, s] of deck.slides.entries()) {
+  const raw = await pptx.write({ outputType: "arraybuffer" }),
+    zip = await JSZip.loadAsync(raw as ArrayBuffer);
+  for (const [i, page] of pages.entries()) {
     const path = `ppt/slides/slide${i + 1}.xml`,
-      file = zip.file(path);
-    if (!file) continue;
-    const type = s.transition || deck.transition || "fade",
-      duration = s.duration ?? deck.duration ?? 600;
-    const direction = { left: "l", right: "r", up: "u", down: "d" }[
-      s.direction || deck.direction || "left"
-    ];
-    const effect =
-      type === "slide"
-        ? `<p:push dir="${direction}"/>`
-        : type === "zoom"
-          ? '<p:zoom dir="in"/>'
-          : "<p:fade/>";
-    let xml = await file.async("string");
-    if (type !== "none")
+      relPath = `ppt/slides/_rels/slide${i + 1}.xml.rels`;
+    let xml = await zip.file(path)!.async("string"),
+      relationships = await zip.file(relPath)!.async("string");
+    const ids = sceneShapeIds(xml, page.elements.length);
+    page.active.forEach((visible, index) => {
+      if (visible && ids[index] === null)
+        throw Error(`第 ${i + 1} 页：PPTX 元素 ${index} 未能导出`);
+    });
+    for (const [element, data] of page.vectors) {
+      const file = `easy-slide-vector-${i + 1}-${element}.svg`,
+        base64 = data.slice(data.indexOf(",") + 1);
+      zip.file(`ppt/media/${file}`, base64, { base64: true });
+      ({ xml, relationships } = attachSvg(
+        xml,
+        relationships,
+        element,
+        `../media/${file}`,
+      ));
+    }
+    if (!faithful) {
+      // Native text uses the measured browser breaks, no automatic shrinking or hidden reflow.
       xml = xml.replace(
-        "</p:clrMapOvr>",
-        `</p:clrMapOvr><p:transition xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" p14:dur="${duration}" spd="${duration > 700 ? "slow" : duration < 400 ? "fast" : "med"}">${effect}</p:transition>`,
+        /<a:bodyPr\b([^>]*?)(\/?)>/g,
+        (_, attributes, close) =>
+          `<a:bodyPr${attributes.replace(/\s(?:wrap|vertOverflow|horzOverflow)="[^"]*"/g, "")} wrap="none" vertOverflow="clip" horzOverflow="clip"${close}>`,
       );
-    const timing = pptxTiming(timeline(scene(deck, s, i)), shapeIds(xml));
-    if (timing) xml = xml.replace("</p:sld>", timing + "</p:sld>");
+    }
+    const textIds = faithful
+      ? []
+      : page.elements.flatMap((e, j) =>
+          e.kind === "text" && ids[j] !== null ? [ids[j]!] : [],
+        );
+    xml = patchSlideMotion(
+      xml,
+      deck,
+      deck.slides[i],
+      pptxTiming(timeline(page.elements), ids, textIds),
+    );
     zip.file(path, xml);
+    zip.file(relPath, relationships);
   }
-  download(
-    await zip.generateAsync({
-      type: "blob",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    }),
-    deck.title + ".pptx",
-  );
+  const types = await zip.file("[Content_Types].xml")!.async("string");
+  if (!/Extension="svg"/.test(types))
+    zip.file(
+      "[Content_Types].xml",
+      types.replace(
+        "</Types>",
+        '<Default Extension="svg" ContentType="image/svg+xml"/></Types>',
+      ),
+    );
+  await deduplicateMedia(zip);
+  return zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  });
 }
-function pptxgenjsContain(
-  iw: number,
-  ih: number,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
+export async function exportPptx(
+  deck: Deck,
+  assets: Record<string, string>,
+  options: PptxOptions = {},
 ) {
-  const scale = Math.min(w / iw, h / ih);
-  return {
-    x: x + (w - iw * scale) / 2,
-    y: y + (h - ih * scale) / 2,
-    w: iw * scale,
-    h: ih * scale,
-  };
+  download(await buildPptx(deck, assets, options), deck.title + ".pptx");
 }

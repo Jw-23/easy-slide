@@ -1,13 +1,18 @@
+import { resolveTheme } from "./themes";
 import type { Deck, Slide } from "./dsl";
 import type { Element } from "./scene";
 export function svgData(svg: string): string {
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
 }
 export function backdropData(deck: Deck, s: Slide): string {
-  const bg = s.background || deck.theme?.background || "#fafbf9",
-    accent = deck.theme?.accent || "#16766d";
+  const {
+    background: bg,
+    accent,
+    glow,
+    glowSecondary,
+  } = resolveTheme(deck.theme, s.background);
   return svgData(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><defs><radialGradient id="a"><stop stop-color="${accent}" stop-opacity=".26"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient><radialGradient id="b"><stop stop-color="#a5b9ed" stop-opacity=".21"/><stop offset="1" stop-color="#a5b9ed" stop-opacity="0"/></radialGradient><radialGradient id="c"><stop stop-color="#eed7bb" stop-opacity=".20"/><stop offset="1" stop-color="#eed7bb" stop-opacity="0"/></radialGradient></defs><rect width="1280" height="720" fill="${bg}"/><ellipse cx="1100" cy="180" rx="560" ry="420" fill="url(#a)"/><ellipse cx="270" cy="720" rx="620" ry="400" fill="url(#b)"/><ellipse cx="650" cy="0" rx="400" ry="240" fill="url(#c)"/></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><defs><radialGradient id="a"><stop stop-color="${accent}" stop-opacity=".26"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient><radialGradient id="b"><stop stop-color="${glow}" stop-opacity=".21"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient><radialGradient id="c"><stop stop-color="${glowSecondary}" stop-opacity=".20"/><stop offset="1" stop-color="${glowSecondary}" stop-opacity="0"/></radialGradient></defs><rect width="1280" height="720" fill="${bg}"/><ellipse cx="1100" cy="180" rx="560" ry="420" fill="url(#a)"/><ellipse cx="270" cy="720" rx="620" ry="400" fill="url(#b)"/><ellipse cx="650" cy="0" rx="400" ry="240" fill="url(#c)"/></svg>`,
   );
 }
 const images = new Map<string, Promise<HTMLImageElement>>();

@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { resolveTheme } from "./themes";
+import { memo, useMemo, useLayoutEffect, useRef, useState } from "react";
 import type { Deck, Slide } from "./dsl";
-import { scene, type Element } from "./scene";
+import { scene, TEXT_LINE_HEIGHT, type Element } from "./scene";
 import { mathSvg } from "./math";
 import { timeline, easingCss, entranceFrames } from "./motion";
 function SceneElement({
@@ -82,7 +83,7 @@ function SceneElement({
       fontWeight: e.bold ? 650 : 400,
       textAlign: e.align || "left",
       whiteSpace: "pre-wrap",
-      lineHeight: 1.42,
+      lineHeight: TEXT_LINE_HEIGHT,
       fontFamily: e.mono ? "monospace" : undefined,
       overflow: "hidden",
       overflowWrap: "anywhere",
@@ -112,7 +113,7 @@ function SceneElement({
     </div>
   );
 }
-export function SlideView({
+function SlideViewContent({
   deck,
   slide,
   index,
@@ -131,19 +132,28 @@ export function SlideView({
 }) {
   const ref = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(1);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!ref.current) return;
+    setScale(ref.current.clientWidth / 1280);
     const ro = new ResizeObserver((entries) =>
       setScale(entries[0].contentRect.width / 1280),
     );
     ro.observe(ref.current);
     return () => ro.disconnect();
   }, []);
-  const elements = scene(deck, slide, index),
-    cues = timeline(elements),
-    starts = new Map(
-      cues.flatMap((c) => c.elements.map((i) => [i, c.start] as const)),
-    );
+  const elements = useMemo(
+    () => scene(deck, slide, index),
+    [deck.theme, deck.title, deck.author, slide, index],
+  );
+  const starts = useMemo(
+    () =>
+      new Map(
+        timeline(elements).flatMap((c) =>
+          c.elements.map((i) => [i, c.start] as const),
+        ),
+      ),
+    [elements],
+  );
   const transition = slide.transition || deck.transition || "fade";
   const direction = slide.direction || deck.direction || "left";
   const offset = { left: "4% 0", right: "-4% 0", up: "0 4%", down: "0 -4%" }[
@@ -157,8 +167,8 @@ export function SlideView({
         style={
           {
             transform: `scale(${scale})`,
-            background: slide.background || deck.theme?.background || "#fafbf9",
-            fontFamily: deck.theme?.font || "Arial, sans-serif",
+            background: resolveTheme(deck.theme, slide.background).background,
+            fontFamily: resolveTheme(deck.theme).font,
             "--duration": `${slide.duration ?? deck.duration ?? 600}ms`,
             "--easing": easingCss[slide.easing || deck.easing || "easeOut"],
             "--slide-offset": offset,
@@ -179,3 +189,21 @@ export function SlideView({
     </div>
   );
 }
+
+export const SlideView = memo(
+  SlideViewContent,
+  (a, b) =>
+    a.slide === b.slide &&
+    a.index === b.index &&
+    a.assets === b.assets &&
+    a.step === b.step &&
+    a.epoch === b.epoch &&
+    a.animate === b.animate &&
+    a.deck.theme === b.deck.theme &&
+    a.deck.title === b.deck.title &&
+    a.deck.author === b.deck.author &&
+    a.deck.transition === b.deck.transition &&
+    a.deck.duration === b.deck.duration &&
+    a.deck.easing === b.deck.easing &&
+    a.deck.direction === b.deck.direction,
+);

@@ -92,7 +92,8 @@ describe("deterministic timeline", () => {
       xml = pptxTiming(cues, ids);
     expect(xml).toContain('delay="900"');
     expect(xml).toContain('dur="700"');
-    expect(xml).toContain('filter="zoom(in)"');
+    expect(xml).toContain("#ppt_w*0.88");
+    expect(xml).toContain('nodeType="clickEffect"');
     for (const c of cues)
       for (const i of c.elements) expect(xml).toContain(`spid="${ids[i]}"`);
     const nodeIds = [...xml.matchAll(/<p:cTn id="(\d+)"/g)].map((m) => m[1]);

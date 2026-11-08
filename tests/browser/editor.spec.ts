@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import JSZip from "jszip";
 import { readFile } from "node:fs/promises";
+import { importProjectArchive, ARCHIVE_FILE } from "../../src/project-archive";
 test("edit, persist, stage content, export and reimport a portable project", async ({
   page,
 }) => {
@@ -20,12 +21,12 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   ).toBeVisible();
   await page.reload();
   await expect(page.locator(".preview-wrap")).toContainText("本地测试标题");
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   const backup = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
-  const source = JSON.parse(
-    await readFile((await (await backup).path())!, "utf8"),
+  const source = (
+    await importProjectArchive(await readFile((await (await backup).path())!))
   ).source;
   await editor.fill('Deck("broken") {}');
   await expect(page.locator(".editor-diagnostic")).toContainText("1–200");
@@ -41,19 +42,28 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   const projectDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
   const p = await projectDownload;
-  const project = JSON.parse(await readFile((await p.path())!, "utf8"));
+  expect(p.suggestedFilename()).toMatch(/\.easy-slide\.zip$/);
+  const archive = await readFile((await p.path())!);
+  const project = await importProjectArchive(archive);
   expect(project.format).toBe("easy-slide");
+  await page.locator("input[type=file]").first().setInputFiles({
+    name: "roundtrip.easy-slide.zip",
+    mimeType: "application/zip",
+    buffer: archive,
+  });
+  await expect(page.locator(".preview-wrap")).toContainText("本地测试标题");
   await page
     .locator("input[type=file]")
     .first()
     .setInputFiles({
-      name: "roundtrip.easy-slide.json",
+      name: "legacy.easy-slide.json",
       mimeType: "application/json",
       buffer: Buffer.from(JSON.stringify(project)),
     });
-  await expect(page.locator(".preview-wrap")).toContainText("本地测试标题");
+  await expect(page.getByRole("status")).toContainText("工程已导入");
   await page.getByRole("button", { name: "导出", exact: true }).click();
   const dl = page.waitForEvent("download");
+  await page.getByRole("radio", { name: "可编辑文字" }).check();
   await page.getByRole("button", { name: /PowerPoint/ }).click();
   const file = await dl;
   const zip = await JSZip.loadAsync(await readFile((await file.path())!));
@@ -81,7 +91,10 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   expect(errors).toEqual([]);
   await page.screenshot({ path: "test-results/editor.png", fullPage: true });
 });
-test("clipboard images survive full project export", async ({ page }) => {
+test("ZIP project restores clipboard images in a clean browser and rejects missing assets without replacing it", async ({
+  page,
+  browser,
+}) => {
   await page.goto("/");
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
@@ -97,13 +110,61 @@ test("clipboard images survive full project export", async ({ page }) => {
     window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt }));
   });
   await expect(page.getByRole("status")).toContainText("1 张图片");
-  await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
   await expect(page.locator(".asset-list img")).toHaveCount(2);
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
-  const p = JSON.parse(await readFile((await (await dl).path())!, "utf8"));
+  const exported = await dl,
+    archive = await readFile((await exported.path())!);
+  const p = await importProjectArchive(archive);
   expect(Object.values(p.assets)[0]).toMatch(/^data:image\/png;base64,/);
   expect(p.source).toContain("pasted.png");
+  const fresh = await browser.newContext();
+  const imported = await fresh.newPage();
+  await imported.goto("/");
+  await expect(
+    imported.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await imported.locator("input[type=file]").first().setInputFiles({
+    name: exported.suggestedFilename(),
+    mimeType: "application/zip",
+    buffer: archive,
+  });
+  await expect(imported.getByRole("status")).toContainText("工程已导入");
+  await imported.locator(".tabs").getByRole("tab", { name: "素材" }).click();
+  await expect(imported.locator(".asset-list img")).toHaveCount(2);
+  await expect(
+    imported.locator('.preview-wrap img[alt$="pasted.png"]'),
+  ).toBeVisible();
+  await imported.waitForFunction(() =>
+    [...document.querySelectorAll<HTMLImageElement>(".asset-list img")].every(
+      (i) => i.complete && i.naturalWidth > 0,
+    ),
+  );
+  const broken = await JSZip.loadAsync(archive),
+    image = Object.keys(p.assets).find((k) => k.endsWith("pasted.png"))!;
+  broken.remove(image);
+  await imported
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "missing-image.zip",
+      mimeType: "application/zip",
+      buffer: await broken.generateAsync({ type: "nodebuffer" }),
+    });
+  await expect(imported.getByRole("alert")).toContainText(image);
+  await expect(imported.locator(".asset-list img")).toHaveCount(2);
+  await expect(
+    imported.locator('.preview-wrap img[alt$="pasted.png"]'),
+  ).toBeVisible();
+  await expect(
+    imported.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await imported.reload();
+  await expect(
+    imported.locator('.preview-wrap img[alt$="pasted.png"]'),
+  ).toBeVisible();
+  await fresh.close();
 });
 test("folder access loads assets and writes a self contained project locally", async ({
   page,
@@ -113,7 +174,7 @@ test("folder access loads assets and writes a self contained project locally", a
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
   await page.evaluate(() => {
-    const written: Record<string, string> = {};
+    const written: Record<string, number[]> = {};
     (window as any).__written = written;
     const missing = () => new DOMException("Missing", "NotFoundError");
     const directory = {
@@ -123,8 +184,12 @@ test("folder access loads assets and writes a self contained project locally", a
         return {
           async createWritable() {
             return {
-              async write(text: string) {
-                written[name] = text;
+              async write(value: string | Blob) {
+                written[name] = [
+                  ...(typeof value === "string"
+                    ? new TextEncoder().encode(value)
+                    : new Uint8Array(await value.arrayBuffer())),
+                ];
               },
               async close() {},
             };
@@ -135,18 +200,29 @@ test("folder access loads assets and writes a self contained project locally", a
     };
     (window as any).showDirectoryPicker = async () => directory;
   });
-  await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
+  await page.getByRole("button", { name: "工程", exact: true }).click();
   await page
-    .getByRole("button", { name: "打开本地文件夹", exact: true })
+    .getByRole("menuitem", { name: "打开本地文件夹", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("已连接文件夹");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("已保存到");
   const result = await page.evaluate(() => (window as any).__written);
-  expect(JSON.parse(result["project.easy-slide.json"]).format).toBe(
-    "easy-slide",
+  const savedProject = await importProjectArchive(
+    new Uint8Array(result[ARCHIVE_FILE]),
   );
-  expect(result["slides.slide"]).toContain("Deck(");
+  expect(savedProject.format).toBe("easy-slide");
+  expect(savedProject.source).toContain("Deck(");
+  await page.getByRole("button", { name: "导出", exact: true }).click();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: /工程压缩包/ }).click();
+  const exported = await download;
+  expect(exported.suggestedFilename()).toMatch(/\.zip$/);
+  expect(
+    (await importProjectArchive(await readFile((await exported.path())!)))
+      .assets,
+  ).toEqual(savedProject.assets);
 });
 test("all runtime requests stay local, including math rendering and help", async ({
   page,
@@ -172,7 +248,7 @@ test("flat authoring offers completion, located diagnostics and timed playback",
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   await editor.fill('Deck("提示")\nSlide(.content, title: "测试") {\n    Te');
   await page.keyboard.press("Control+Space");
@@ -245,7 +321,7 @@ test("independent layouts, LaTeX completion and glass export work together", asy
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   await editor.fill('Deck("公式")\nSlide(title:"公式提示"){Equation(#"\\fr');
   await page.keyboard.press("Control+Space");
@@ -290,6 +366,7 @@ Slide(title:"公式与结论", eyebrow:"RESULTS") {
   await expect(pane).toHaveCSS("backdrop-filter", /blur\(24px\)/);
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出", exact: true }).click();
+  await page.getByRole("radio", { name: "可编辑文字" }).check();
   await page.getByRole("button", { name: /PowerPoint/ }).click();
   const file = await download;
   const zip = await JSZip.loadAsync(await readFile((await file.path())!));
@@ -358,16 +435,18 @@ test("the full startup tour renders without missing assets or clipped text and c
         animations: "disabled",
       });
   }
-  await page.getByRole("button", { name: "切换示例", exact: true }).click();
+  await page.getByRole("button", { name: "工程", exact: true }).click();
+  await page.getByRole("menuitem", { name: "切换示例", exact: true }).click();
   await page.locator(".template-card").filter({ hasText: "数学论坛" }).click();
   await page
     .locator(".modal")
     .getByRole("button", { name: "切换示例", exact: true })
     .click();
   await expect(page.locator(".slide-item")).toHaveCount(7);
-  await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
   await expect(page.locator(".asset-list img")).toHaveCount(0);
-  await page.getByRole("button", { name: "切换示例", exact: true }).click();
+  await page.getByRole("button", { name: "工程", exact: true }).click();
+  await page.getByRole("menuitem", { name: "切换示例", exact: true }).click();
   await page.locator(".template-card").filter({ hasText: "功能示例" }).click();
   await page
     .locator(".modal")
@@ -382,7 +461,9 @@ test("the full startup tour renders without missing assets or clipped text and c
   await expect(page.locator(".slide-item")).toHaveCount(20);
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
-  const p = JSON.parse(await readFile((await (await dl).path())!, "utf8"));
+  const p = await importProjectArchive(
+    await readFile((await (await dl).path())!),
+  );
   expect(p.assets["assets/convergence.png"]).toMatch(
     /^data:image\/png;base64,/,
   );
@@ -427,7 +508,7 @@ test("calculated table updates, survives visual edits and exports aligned data",
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   const source = `Deck("计算报表")
 let rate = 0.2
@@ -450,12 +531,12 @@ Slide(title:"计算表格") {
   await expect(page.locator(".preview-wrap")).toContainText("0.250");
   await page
     .locator(".tabs")
-    .getByRole("button", { name: "页面", exact: true })
+    .getByRole("tab", { name: "页面", exact: true })
     .click();
   await page
     .getByRole("textbox", { name: "页标题", exact: true })
     .fill("改过标题");
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   await expect(editor).toContainText("let rate = 0.5");
   await expect(editor).toContainText("rows:data");
   await editor.fill(source.replace("rows:data", "rows: [[1 / 0]]"));
@@ -466,6 +547,7 @@ Slide(title:"计算表格") {
   await editor.fill(source.replace("let rate = 0.2", "let rate = 0.5"));
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出", exact: true }).click();
+  await page.getByRole("radio", { name: "可编辑文字" }).check();
   await page.getByRole("button", { name: /PowerPoint/ }).click();
   const zip = await JSZip.loadAsync(await readFile((await (await dl).path())!));
   const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");

@@ -21,7 +21,7 @@
 
 Cloudflare 的 Git 集成会安装仓库锁定的依赖并在后续推送时自动部署。Wrangler 版本已固定在 package.json 和 package-lock.json 中。
 
-基础编辑器与 Cloudflare 配置已经合并到 `main`。PWA 更新合并前，需选择 `feat/local-slide-studio` 体验安装与离线功能；合并后可使用 `main`。创建项目时若使用其他名称，应同时修改 wrangler.jsonc 的 name，以保持一致。
+生产环境通常使用 `main`；预览尚未合并的功能时，可选择 `feat/local-slide-studio`，合并后切回 `main`。创建项目时若使用其他名称，应同时修改 wrangler.jsonc 的 name，以保持一致。
 
 首次连接 GitHub 需要你在 Cloudflare 页面授权仓库访问。仓库配置本身不会代替账户授权或创建 Cloudflare 项目。
 

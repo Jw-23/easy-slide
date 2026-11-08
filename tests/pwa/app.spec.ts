@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import JSZip from "jszip";
 import { readFile } from "node:fs/promises";
+import { importProjectArchive } from "../../src/project-archive";
 async function cached(page: import("@playwright/test").Page) {
   await page.goto("/?example=features");
   await expect(page.locator(".slide-item")).toHaveCount(20);
@@ -63,6 +64,18 @@ test("browser recognises the manifest, icons and offline app shell", async ({
   await offline.locator(".slide-item").nth(12).click();
   await expect(offline.locator(".preview-wrap")).toContainText("0.640");
   await offline.getByRole("button", { name: "导出", exact: true }).click();
+  const archiveDownload = offline.waitForEvent("download");
+  await offline.getByRole("button", { name: /工程压缩包/ }).click();
+  const archive = await archiveDownload;
+  expect(archive.suggestedFilename()).toMatch(/\.easy-slide\.zip$/);
+  const project = await importProjectArchive(
+    await readFile((await archive.path())!),
+  );
+  expect(project.assets["assets/convergence.png"]).toMatch(
+    /^data:image\/png;base64,/,
+  );
+  expect(project.source).toContain("离线保存的工程");
+  await offline.getByRole("button", { name: "导出", exact: true }).click();
   const dl = offline.waitForEvent("download");
   await offline.getByRole("button", { name: /PowerPoint/ }).click();
   const zip = await JSZip.loadAsync(await readFile((await (await dl).path())!));
@@ -104,7 +117,7 @@ test("unsupported native prompts show installation instructions and cache readin
   await expect(guide).toBeVisible();
   await expect(guide).toContainText("添加到主屏幕");
   await expect(guide).toContainText("离线资源已就绪");
-  await page.getByRole("button", { name: "关闭安装说明" }).click();
+  await page.getByRole("button", { name: "关闭窗口" }).click();
   await expect(guide).toHaveCount(0);
 });
 test("a waiting version updates only after saving and leaves other windows open", async ({
