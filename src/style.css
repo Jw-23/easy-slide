@@ -775,6 +775,28 @@ textarea {
   max-height: 130px;
   overflow: auto;
 }
+.dsl-signature {
+  max-width: min(640px, 80vw);
+  padding: 10px 13px;
+  font:
+    11px/1.8 SFMono-Regular,
+    Consolas,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #667f75;
+}
+.dsl-signature strong {
+  color: #176e59;
+  background: #eaf4ed;
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+.dsl-signature p {
+  margin: 5px 0 0;
+  color: #56745f;
+  font-size: 11px;
+}
 .dsl-validation.invalid {
   color: #b76a50;
   background: #fff5ed;

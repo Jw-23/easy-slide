@@ -86,6 +86,8 @@ Slide(title: "从直觉到证明") {
 
 React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢量公式；PptxGenJS + JSZip 导出；IndexedDB 自动保存。无应用后端。
 
+编辑器补全使用独立的容错 AST，与运行时共享词法器和运算优先级；静态分析负责词法作用域、数组/回调/用户函数类型、参数与修饰符筛选、签名帮助和悬停说明。每份不可变文档缓存一次分析，单纯移动光标复用语法树；补全不执行 DSL 表达式。详见 [编辑体验](docs/DSL.md#编辑体验与错误提示)。
+
 `npm test` 验证扁平/旧版 DSL 往返、带位置错误、代码补全、动画时间线、原生 PPTX 动画节点、模板布局边界与公式。`npm run test:e2e` 执行 Chromium 浏览器测试（首次运行需 `npx playwright install chromium`）。
 
 `npm run test:pwa` 构建生产产物并测试清单与图标、离线重新启动和 PPTX 导出、安装入口、版本等待与保存后更新、多窗口不强制刷新。测试用静态服务器及版本切换接口仅在本机测试中启用，不属于网站部署内容。应用图标源码为 `public/favicon.svg`，可选脚本 `python scripts/generate-pwa-icons.py` 生成 PNG 图标（仅运行该脚本时需要 Pillow）。

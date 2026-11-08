@@ -23,7 +23,7 @@ export type Cursor = {
   take: (value?: string) => Token;
   fail: (message: string, token?: Token) => never;
 };
-const binary: Record<string, number> = {
+export const binaryPrecedence: Record<string, number> = {
   "||": 1,
   "&&": 2,
   "==": 3,
@@ -40,6 +40,7 @@ const binary: Record<string, number> = {
   "^": 7,
   "**": 7,
 };
+const binary = binaryPrecedence;
 export function parseExpression(c: Cursor): Expr {
   let depth = 0;
   function expr(min = 0): Expr {

@@ -5,48 +5,44 @@ import {
 } from "@codemirror/autocomplete";
 import { latexCommands } from "./latex-commands";
 import { mathSvg } from "./math";
+import { astPath, parseEditorAst, type AstNode } from "./editor-ast";
 export function equationContext(
   source: string,
   pos: number,
+  root?: AstNode,
 ): { from: number; to: number; raw: boolean } | null {
-  const stack: string[] = [];
-  let i = 0;
-  while (i < source.length && i <= pos) {
-    if (source.slice(i, i + 2) === "//") {
-      const end = source.indexOf("\n", i);
-      i = end === -1 ? source.length : end + 1;
-      continue;
-    }
-    if (source[i] === '"' || source.slice(i, i + 2) === '#"') {
-      const raw = source[i] === "#";
-      if (raw) i++;
-      const triple = source.slice(i, i + 3) === '"""',
-        open = triple ? '"""' : '"',
-        end = open + (raw ? "#" : "");
-      i += open.length;
-      const from = i;
-      while (i < source.length && !source.startsWith(end, i)) {
-        if (!raw && source[i] === "\\") i += 2;
-        else i++;
-      }
-      if (pos >= from && pos <= i && stack[stack.length - 1] === "Equation")
-        return { from, to: i, raw };
-      i += end.length;
-      continue;
-    }
-    if (source[i] === "(") {
-      const name = source.slice(0, i).match(/([A-Za-z_]\w*)\s*$/)?.[1] || "";
-      stack.push(name);
-    } else if (source[i] === ")") stack.pop();
-    i++;
+  try {
+    const path = astPath(root ?? parseEditorAst(source).root, pos);
+    const literal = [...path]
+      .reverse()
+      .find((n) => n.kind === "literal" && n.token?.kind === "string");
+    const token = literal?.token,
+      arg = literal?.parent,
+      call = arg?.parent;
+    if (
+      token &&
+      pos >= token.contentFrom! &&
+      pos <= token.contentTo! &&
+      arg?.kind === "argument" &&
+      call?.name === "Equation" &&
+      (arg.name === "text" || (!arg.name && call.args?.[0] === arg))
+    )
+      return {
+        from: token.contentFrom!,
+        to: token.contentTo!,
+        raw: !!token.raw,
+      };
+  } catch {
+    /* Oversized or invalid documents still retain the normal editor. */
   }
   return null;
 }
 export function completeLatex(
   context: CompletionContext,
+  suppliedRange?: { from: number; to: number; raw: boolean },
 ): CompletionResult | null {
   const source = context.state.doc.toString(),
-    range = equationContext(source, context.pos);
+    range = suppliedRange ?? equationContext(source, context.pos);
   if (!range) return null;
   const prefix = source.slice(range.from, context.pos),
     command = prefix.match(/\\[A-Za-z]*$/);
