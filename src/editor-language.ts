@@ -1,13 +1,23 @@
-import { tokenize } from "./tokens";
-import { calculationNames } from "./expressions";
-import { completeLatex } from "./latex";
 import { StreamLanguage } from "@codemirror/language";
 import {
   snippetCompletion,
+  type Completion,
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
-import { effects, easings, layouts, layoutComponents } from "./dsl";
+import { StateField } from "@codemirror/state";
+import { showTooltip, hoverTooltip, type Tooltip } from "@codemirror/view";
+import { analyzeDocument, type CallContext } from "./editor-analysis";
+import {
+  compatible,
+  signatures,
+  signatureText,
+  typeLabel,
+  unknown,
+  type ParameterSpec,
+  type Signature,
+} from "./editor-schema";
+import { completeLatex, equationContext } from "./latex";
 export const slideLanguage = StreamLanguage.define({
   startState: () => ({ end: "" }),
   token(stream, state) {
@@ -45,296 +55,408 @@ export const slideLanguage = StreamLanguage.define({
     return "punctuation";
   },
 });
-const declarations = [
-  ["let", "let ${name} = ${value}", "定义局部或全局常量"],
-  [
-    "Column",
-    'Column("${标题}", width: ${1}, align: .${right}, format: "${0.00}")',
-    "表格列：标题、宽度权重、对齐、数字格式",
-  ],
-  ["Deck", 'Deck("${名称}", author: "${作者}")', "工程配置，与 Slide 并列书写"],
-  ["Theme", 'Theme(accent: "${#16766d}", background: "#fafbf9")', "全局主题"],
-  [
-    "Slide",
-    'Slide(title: "${标题}") {\n    ${}\n}',
-    "添加一页，默认内容区自动布局",
-  ],
-  ...Object.entries(layoutComponents).map(([preset, name]) => [
-    name,
-    name + " {\n    ${}\n}",
-    "独立布局组件 · " + preset,
-  ]),
-  ["Glass", "Glass {\n    ${}\n}", "毛玻璃内容面板"],
-  ["Text", 'Text("${正文}")', "正文文字"],
-  ["Bullets", 'Bullets(["${要点一}", "${要点二}"])', "项目列表"],
-  ["Equation", 'Equation(#"${E = mc^2}"#)', "LaTeX 原始字符串，反斜杠无需转义"],
-  ["Image", 'Image("${assets/image.png}")', "工程内图片相对路径"],
-  ["Metric", 'Metric("${99.95%}", label: "${可用性}")', "醒目指标"],
-  ["Quote", 'Quote("${引用}")', "引用文字"],
-  ["Code", 'Code("${代码}")', "等宽代码块"],
-  [
-    "Table",
-    'Table([["${列一}", "${列二}"], ["${内容}", "${内容}"]])',
-    "二维文本表格",
-  ],
-  ["HStack", "HStack(spacing: ${24}) {\n    ${}\n}", "水平布局"],
-  ["VStack", "VStack(spacing: ${24}) {\n    ${}\n}", "垂直布局"],
-  ["ZStack", "ZStack {\n    ${}\n}", "叠层布局"],
-  ["Grid", "Grid(columns: ${2}, spacing: 24) {\n    ${}\n}", "网格布局"],
-  ["Spacer", "Spacer", "留白"],
-];
-const modifiers = [
-  [
-    "tableStyle",
-    'tableStyle(zebra: ${true}, borders: .${horizontal}, headerFill: "${#23796e}")',
-    "表头、斑马纹、边框与行高",
-  ],
-  [
-    "glass",
-    "glass(blur: ${24}, opacity: ${0.68}, radius: ${28})",
-    "毛玻璃材质",
-  ],
-  ["stagger", "stagger(${120})", "列表/表格逐项或容器子项交错入场，单位毫秒"],
-  ["font", "font(${24})", "文字大小（像素）"],
-  ["foreground", 'foreground("${#16766d}")', "文字颜色"],
-  ["background", 'background("${#eef2ef}")', "背景颜色"],
-  [
-    "frame",
-    "frame(width: ${480}, height: ${320})",
-    "固定尺寸；还支持画布绝对 x/y",
-  ],
-  ["padding", "padding(${24})", "内边距"],
-  ["title", 'title("${标题}")', "块标题"],
-  ["notes", 'notes("${演讲思路}")', "页面演讲备注"],
-  ["step", "step(${1})", "第几次点击触发，0 表示进入页面时"],
-  [
-    "appear",
-    "appear(.${rise}, step: ${1}, order: ${0}, delay: ${0}, duration: ${600}, easing: .${easeOut})",
-    "入场编排：点击阶段、组内顺序、延迟、时长、缓动",
-  ],
-  [
-    "transition",
-    "transition(.${slide}, duration: ${650}, direction: .${left}, easing: .${easeOut})",
-    "页面过渡：效果、方向、时长、缓动",
-  ],
-];
-const parameters: Record<string, string[]> = {
-  Deck: ["author", "version"],
-  Theme: ["accent", "background", "color", "font", "material"],
-  glass: ["blur", "opacity", "radius"],
-  Split: ["spacing"],
-  Cards: ["columns", "spacing"],
-  Compare: ["spacing"],
-  Slide: ["title", "subtitle", "eyebrow", "notes", "id"],
-  appear: ["step", "order", "delay", "duration", "easing"],
-  transition: ["duration", "direction", "easing"],
-  frame: ["x", "y", "width", "height"],
-  Grid: ["columns", "spacing"],
-  HStack: ["spacing"],
-  VStack: ["spacing"],
-  Text: ["title"],
-  Bullets: ["title"],
-  Metric: ["title", "label", "text"],
-  Image: ["title"],
-  Table: [
-    "columns",
-    "rows",
-    "headers",
-    "header",
-    "rowHeight",
-    "zebra",
-    "borders",
-    "headerFill",
-    "headerColor",
-    "stripeColor",
-    "borderColor",
-    "cellPadding",
-  ],
-  Column: ["width", "align", "format"],
-  tableStyle: [
-    "header",
-    "rowHeight",
-    "zebra",
-    "borders",
-    "headerFill",
-    "headerColor",
-    "stripeColor",
-    "borderColor",
-    "cellPadding",
-  ],
-};
+
+const optionFor = (s: Signature, boost = 0): Completion =>
+  snippetCompletion(s.snippet, {
+    label: s.name,
+    type:
+      s.category === "modifier" || s.category === "method"
+        ? "method"
+        : "function",
+    detail: s.detail,
+    info: signatureText(s) + "\n" + s.detail,
+    boost,
+  });
+function argumentTemplate(p: ParameterSpec) {
+  if (p.snippet) return p.snippet;
+  if (p.enums) return ".${" + p.enums[0] + "}";
+  if (p.type.kind === "string") return '"${文字}"';
+  if (p.type.kind === "boolean") return "${true}";
+  if (p.type.kind === "array") return "${[]}";
+  const value =
+    (
+      {
+        duration: 600,
+        delay: 0,
+        order: 0,
+        step: 1,
+        width: 1,
+        height: 320,
+        columns: 2,
+        spacing: 24,
+        rowHeight: 40,
+        cellPadding: 12,
+        version: 1,
+        opacity: 0.68,
+        blur: 24,
+        radius: 28,
+      } as Record<string, number>
+    )[p.name] ?? 0;
+  return "${" + value + "}";
+}
 export function completeDsl(
   context: CompletionContext,
   assets: string[] = [],
 ): CompletionResult | null {
-  const latex = completeLatex(context);
-  if (latex) return latex;
-  const word = context.matchBefore(/[A-Za-z_]\w*/);
+  const model = analyzeDocument(context.state.doc),
+    pos = context.pos;
+  const token = model.tokenAt(pos);
+  if (token?.kind === "comment" && pos > token.from && pos <= token.to)
+    return null;
+  const path = model.path(pos),
+    ctx = model.callContext(pos),
+    literal = model.stringAt(pos);
+  if (literal) {
+    const range = equationContext(model.source, pos, model.ast.root);
+    if (range) return completeLatex(context, range);
+    // A string belongs to its direct argument; nested str()/format() calls do not inherit Image's role.
+    const owner = [...path]
+      .reverse()
+      .find((n) => n.kind === "literal" && n.token === literal);
+    if (owner?.parent?.kind !== "argument") return null;
+    const kind = ctx?.parameter?.stringKind;
+    let values: string[] = [];
+    if (kind === "asset") values = assets;
+    if (kind === "format")
+      values = ["0", "0.00", "0.000", "0.0%", "0.00%", ".2f", ".3f"];
+    if (kind === "color")
+      values = [
+        ...new Set([
+          "#23786b",
+          "#16766d",
+          "#fafbf9",
+          "#263b59",
+          ...model.ast.tokens
+            .filter(
+              (t) => t.kind === "string" && /^#[0-9a-f]{6}$/i.test(t.value),
+            )
+            .map((t) => t.value),
+        ]),
+      ];
+    if (!values.length) return null;
+    return {
+      from: literal.contentFrom!,
+      to: literal.contentTo!,
+      options: values.map((label) => ({
+        label,
+        apply: literal.raw ? label : JSON.stringify(label).slice(1, -1),
+        type: "text",
+        detail:
+          kind === "asset"
+            ? "工程素材"
+            : kind === "format"
+              ? "数字格式"
+              : "颜色",
+      })),
+    };
+  }
+  // Never interpret text inside a closed string's delimiters as a declaration.
+  if (token?.kind === "string" && pos < token.to) return null;
   if (
-    !word &&
-    !context.explicit &&
-    context.state.sliceDoc(context.pos - 1, context.pos) !== "."
+    path.some(
+      (n) =>
+        n.kind === "parameter" ||
+        (n.kind === "binding" &&
+          pos >= n.from + 3 &&
+          pos < (n.equals ?? n.to + 1)),
+    )
   )
     return null;
-  const from = word?.from ?? context.pos,
-    prefix = context.state.sliceDoc(0, from),
-    near = prefix.slice(-180);
-  let enums: readonly string[] | undefined;
-  if (/align:\s*\.$/.test(near)) enums = ["left", "center", "right"];
-  else if (/borders:\s*\.$/.test(near)) enums = ["none", "horizontal", "all"];
-  else if (/material:\s*\.$/.test(near)) enums = ["glass", "solid"];
-  else if (/easing:\s*\.$/.test(near)) enums = easings;
-  else if (/direction:\s*\.$/.test(near))
-    enums = ["left", "right", "up", "down"];
-  else if (/\.appear\(\s*\.$/.test(near)) enums = effects;
-  else if (/\.transition\(\s*\.$/.test(near))
-    enums = ["fade", "slide", "zoom", "none"];
-  else if (/Slide\(\s*\.$/.test(near)) enums = layouts;
-  if (enums)
-    return {
-      from,
-      options: enums.map((label) => ({
+  const word =
+    token?.kind === "id" && pos > token.from && pos <= token.to
+      ? token
+      : undefined;
+  const from = word?.from ?? pos,
+    to = word?.to ?? pos;
+  const previous = model.source[pos - 1];
+  if (
+    !context.explicit &&
+    !word &&
+    ![".", "(", ",", ":", "["].includes(previous) &&
+    !(ctx && ctx.argument.children[0].kind === "missing")
+  )
+    return null;
+  const existingCall =
+    !!word && ["(", "{"].includes(model.source.slice(to).trimStart()[0]);
+  const result = (options: Completion[]): CompletionResult => ({
+    from,
+    to,
+    options: existingCall
+      ? options.map((o) =>
+          ["function", "method"].includes(o.type ?? "") &&
+          !o.label.includes("=>")
+            ? { ...o, apply: o.label }
+            : o,
+        )
+      : options,
+    validFor: /^[A-Za-z_]\w*$/,
+  });
+  const member = model.memberAt(pos);
+  if (member) {
+    const type = model.infer(member.receiver!);
+    if (type.kind === "array")
+      return result([
+        ...["map", "filter", "reduce"].map((n) =>
+          optionFor(signatures.get(n)!),
+        ),
+        { label: "length", type: "property", detail: "Number · 数组长度" },
+      ]);
+    if (type.kind === "string")
+      return result([
+        { label: "length", type: "property", detail: "Number · 文字长度" },
+      ]);
+    if (type.kind === "component")
+      return result(
+        [...signatures.values()]
+          .filter(
+            (s) =>
+              s.category === "modifier" && s.receivers?.includes(type.name!),
+          )
+          .map((s) => optionFor(s)),
+      );
+    return result([]);
+  }
+  const enumNode = [...path].reverse().find((n) => n.kind === "enum");
+  if (enumNode && ctx?.parameter?.enums)
+    return result(
+      ctx.parameter.enums.map((label) => ({
         label,
         type: "enum",
-        info: "可用枚举值",
-      })),
-    };
-  const arrayCall = () => {
-    try {
-      const tokens = tokenize(prefix.slice(0, -1)).slice(0, -1);
-      let balance = 0;
-      for (let i = tokens.length - 1; i >= 0; i--) {
-        if (tokens[i].value === ")") balance++;
-        else if (tokens[i].value === "(" && --balance === 0)
-          return [
-            "range",
-            "repeat",
-            "concat",
-            "zip",
-            "transpose",
-            "map",
-            "filter",
-          ].includes(tokens[i - 1]?.value);
-      }
-    } catch {}
-    return false;
-  };
-  if (
-    prefix.endsWith(".") &&
-    (/\b[a-z_]\w*\.$/.test(prefix) ||
-      /let [^\n]*\)\.$/.test(prefix) ||
-      arrayCall())
-  )
-    return {
-      from,
-      options: [
-        snippetCompletion("map(${x} => ${x})", {
-          label: "map",
-          type: "method",
-          info: "将每项映射为新数据",
-        }),
-        snippetCompletion("filter(${x} => ${x} > 0)", {
-          label: "filter",
-          type: "method",
-          info: "按条件筛选",
-        }),
-        snippetCompletion("reduce((${acc}, ${x}) => ${acc} + ${x}, ${0})", {
-          label: "reduce",
-          type: "method",
-          info: "归约为一个值",
-        }),
-        { label: "length", type: "property", info: "数组或文字长度" },
-      ],
-    };
-  if (prefix.endsWith("."))
-    return {
-      from,
-      options: modifiers.map(([label, template, info]) =>
-        snippetCompletion(template, {
-          label,
-          type: "method",
-          detail: "修饰符",
-          info,
-        }),
-      ),
-    };
-  const image = context.state
-    .sliceDoc(Math.max(0, from - 50), context.pos)
-    .match(/Image\("([^"\n]*)$/);
-  if (image && assets.length)
-    return {
-      from: context.pos - image[1].length,
-      options: assets.map((label) => ({
-        label,
-        type: "text",
-        info: "本地工程素材",
-      })),
-    };
-  const call = prefix.match(/([A-Za-z_]\w*)\([^()]*$/)?.[1];
-  const options = declarations.map(([label, template, info]) =>
-    snippetCompletion(template, {
-      label,
-      type: "function",
-      detail: info,
-      info,
-    }),
-  );
-  const specs: Record<string, string> = {
-    range: "range(${0}, ${6})",
-    repeat: "repeat(${0}, ${5})",
-    pow: "pow(${x}, ${2})",
-    round: "round(${x}, ${2})",
-    fixed: "fixed(${x}, ${3})",
-    percent: "percent(${x}, ${1})",
-    format: 'format(${x}, "${0.000}")',
-    clamp: "clamp(${x}, ${0}, ${1})",
-    Column:
-      'Column("${标题}", width: ${1}, align: .${right}, format: "${0.00}")',
-  };
-  options.push(
-    ...calculationNames
-      .filter((n) => n !== "Column")
-      .map((label) =>
-        snippetCompletion(specs[label] || label + "(${value})", {
-          label,
-          type: "function",
-          detail: "计算函数",
-          info: "本地解释计算；数组下标从 0 开始，range 不包含终点",
-        }),
-      ),
-  );
-  const variables = [
-    ...new Set(
-      [
-        ...context.state
-          .sliceDoc(0, context.pos)
-          .matchAll(/\blet\s+([A-Za-z_]\w*)\s*=/g),
-      ].map((m) => m[1]),
-    ),
-  ];
-  options.push(
-    ...variables.map((label) => ({
-      label,
-      type: "variable",
-      detail: "已声明常量",
-    })),
-  );
-  options.push(
-    ...["true", "false", "null"].map((label) => ({
-      label,
-      type: "keyword",
-      detail: "标量值",
-    })),
-  );
-  if (call && parameters[call])
-    options.unshift(
-      ...parameters[call].map((label) => ({
-        label: label + ":",
-        apply: label + ": ",
-        type: "property",
-        detail: `${call} 参数`,
-        info: "点击查看或补全参数；时间单位均为毫秒",
+        detail: ctx.parameter!.detail,
+        info: `${ctx.signature.name} · ${ctx.parameter!.name}`,
       })),
     );
-  return { from, options, validFor: /^[A-Za-z_]\w*$/ };
+  if (enumNode) return result([]);
+
+  const argument = ctx?.argument,
+    value = argument?.children[0];
+  const atLabel =
+    ctx &&
+    (argument!.name
+      ? pos < argument!.colon!
+      : value &&
+        ["identifier", "missing"].includes(value.kind) &&
+        path.slice(path.indexOf(argument!) + 1).every((n) => n === value));
+  const options: Completion[] = [];
+  if (atLabel) {
+    const used = new Set(
+      ctx.call.args!.filter((a) => a !== argument && a.name).map((a) => a.name),
+    );
+    const positional = ctx.call.args!.filter(
+      (a) => a !== argument && !a.name && a.children[0].kind !== "missing",
+    );
+    ctx.signature.params
+      .filter((p) => !p.named)
+      .slice(0, positional.length)
+      .forEach((p) => used.add(p.name));
+    for (const param of ctx.signature.params.filter(
+      (p) => p.named && !used.has(p.name),
+    )) {
+      const info = `${param.detail}\n类型：${typeLabel(param.type)}${param.enums ? " · " + param.enums.map((v) => "." + v).join(" / ") : ""}`;
+      options.push(
+        argument!.colon !== undefined
+          ? {
+              label: param.name + ":",
+              apply: param.name,
+              type: "property",
+              detail: param.detail,
+              info,
+              boost: 60,
+            }
+          : snippetCompletion(param.name + ": " + argumentTemplate(param), {
+              label: param.name + ":",
+              type: "property",
+              detail: param.detail,
+              info,
+              boost: 60,
+            }),
+      );
+    }
+    if (argument!.name) return result(options);
+  }
+  if (
+    ctx?.parameter?.enums &&
+    value &&
+    ["identifier", "missing"].includes(value.kind)
+  )
+    options.push(
+      ...ctx.parameter.enums.map((label) => ({
+        label: "." + label,
+        apply: "." + label,
+        type: "enum",
+        detail: ctx.parameter!.detail,
+        boost: 45,
+      })),
+    );
+  const inExpression = path.some(
+    (n) =>
+      n.kind === "binding" ||
+      n.kind === "argument" ||
+      n.kind === "array" ||
+      n.kind === "lambda" ||
+      n.kind === "binary",
+  );
+  const expected = model.expectedAt(pos);
+  if (inExpression) {
+    const visible = model.visibleSymbols(pos);
+    for (const symbol of visible) {
+      const type = model.symbolType(symbol);
+      const details: Completion = {
+        label: symbol.name,
+        type: type.kind === "function" ? "function" : "variable",
+        detail: model.symbolDescription(symbol),
+        info: `${symbol.name}: ${typeLabel(type)}\n仅提示当前作用域中已经定义的名称。`,
+        boost:
+          25 +
+          model.expectedBoost(
+            type.kind === "function" && expected.kind !== "function"
+              ? (type.result ?? unknown)
+              : type,
+            expected,
+          ),
+      };
+      options.push(
+        type.kind === "function" && expected.kind !== "function"
+          ? snippetCompletion(
+              symbol.name +
+                "(" +
+                (type.params ?? [])
+                  .map(
+                    (_, index) =>
+                      "${" +
+                      (symbol.node.initializer?.params?.[index]?.name ??
+                        `arg${index + 1}`) +
+                      "}",
+                  )
+                  .join(", ") +
+                ")",
+              details,
+            )
+          : details,
+      );
+    }
+    const shadowed = new Set(visible.map((s) => s.name));
+    for (const spec of signatures.values())
+      if (spec.category === "calculation" && !shadowed.has(spec.name))
+        options.push(
+          optionFor(spec, model.expectedBoost(spec.result, expected)),
+        );
+    for (const [label, type] of [
+      ["true", { kind: "boolean" }],
+      ["false", { kind: "boolean" }],
+      ["null", { kind: "null" }],
+    ] as const)
+      if (compatible(type, expected))
+        options.push({ label, type: "keyword", detail: typeLabel(type) });
+    if (expected.kind === "function")
+      options.unshift(
+        snippetCompletion("${x} => ${x}", {
+          label: "x => …",
+          type: "function",
+          detail: "回调函数",
+          boost: 80,
+        }),
+      );
+    return result(options);
+  }
+  // Body ownership determines which declarations are valid. Deck's legacy body is a root scope.
+  const block = [...path].reverse().find((n) => n.kind === "block");
+  const root = !block || block.parent?.name === "Deck";
+  const existing = new Set(
+    model.ast.root.children
+      .map((n) => model.infer(n))
+      .filter((t) => t.kind === "component")
+      .map((t) => t.name),
+  );
+  const fragment =
+    !block && !existing.has("Deck") && !!word && word.value !== "Deck";
+  const declarations = [...signatures.values()].filter((s) =>
+    fragment
+      ? ["root", "view", "container"].includes(s.category)
+      : root
+        ? s.category === "root" && (s.name === "Slide" || !existing.has(s.name))
+        : ["view", "container"].includes(s.category),
+  );
+  options.push(...declarations.map((s) => optionFor(s)));
+  const hasContent = block?.children.some(
+    (n) => n.kind !== "binding" && n.to < pos,
+  );
+  if (root || !hasContent)
+    options.push(
+      snippetCompletion("let ${name} = ${value}", {
+        label: "let",
+        type: "keyword",
+        detail: "定义当前作用域中的常量",
+      }),
+    );
+  return result(options);
 }
+
+function signatureDom(ctx: CallContext) {
+  const dom = document.createElement("div");
+  dom.className = "dsl-signature";
+  dom.setAttribute("role", "note");
+  const title = document.createElement("div");
+  title.append(ctx.signature.name + "(");
+  ctx.signature.params.forEach((p, index) => {
+    if (index) title.append(", ");
+    const item = document.createElement(
+      p === ctx.parameter ? "strong" : "span",
+    );
+    item.textContent = `${p.name}${p.optional ? "?" : ""}: ${typeLabel(p.type)}`;
+    title.append(item);
+  });
+  title.append(")");
+  dom.append(title);
+  const help = document.createElement("p");
+  help.textContent = ctx.parameter
+    ? `${ctx.parameter.name} · ${ctx.parameter.detail}${ctx.parameter.enums ? " · " + ctx.parameter.enums.map((v) => "." + v).join(" / ") : ""}`
+    : ctx.signature.detail;
+  dom.append(help);
+  return dom;
+}
+export const signatureHelp = StateField.define<Tooltip | null>({
+  create: () => null,
+  update(value, transaction) {
+    if (!transaction.docChanged && !transaction.selection) return value;
+    const state = transaction.state,
+      pos = state.selection.main.head;
+    if (!state.selection.main.empty) return null;
+    const model = analyzeDocument(state.doc),
+      token = model.tokenAt(pos);
+    if (token?.kind === "comment") return null;
+    const ctx = model.callContext(pos);
+    return ctx
+      ? { pos, above: true, create: () => ({ dom: signatureDom(ctx) }) }
+      : null;
+  },
+  provide: (field) => showTooltip.from(field),
+});
+export const semanticHover = hoverTooltip((view, pos) => {
+  const model = analyzeDocument(view.state.doc),
+    token = model.tokenAt(pos);
+  if (token?.kind !== "id") return null;
+  const symbol = model.symbolAt(pos);
+  const spec = signatures.get(token.value);
+  const ctx = model.callContext(pos);
+  const param =
+    ctx?.argument.name === token.value && pos < ctx.argument.colon!
+      ? ctx.parameter
+      : undefined;
+  if (!symbol && !spec && !param) return null;
+  return {
+    pos: token.from,
+    end: token.to,
+    above: true,
+    create: () => {
+      const dom = document.createElement("div");
+      dom.className = "dsl-signature";
+      dom.textContent = symbol
+        ? `${symbol.name}: ${model.symbolDescription(symbol)}`
+        : param
+          ? `${ctx!.signature.name}.${param.name}: ${typeLabel(param.type)}\n${param.detail}`
+          : signatureText(spec!) + "\n" + spec!.detail;
+      return { dom };
+    },
+  };
+});

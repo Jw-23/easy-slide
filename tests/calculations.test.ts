@@ -149,6 +149,7 @@ it("completes computation functions, visible constants, columns and array method
       new CompletionContext(EditorState.create({ doc }), doc.length, true),
     )?.options.map((o) => o.label) || [];
   expect(labels("let rate=0.2\nTable(rows: ra")).toContain("rate");
+  expect(labels("let rows=[[1]]\nTable(rows: ro")).toContain("rows");
   expect(labels("Table(rows: range(0,6).")).toContain("map");
   expect(labels('Column("x", align: .')).toContain("right");
   expect(labels("Table(rows:[],borders:.")).toContain("horizontal");

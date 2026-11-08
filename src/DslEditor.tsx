@@ -18,7 +18,12 @@ import {
 import { tags } from "@lezer/highlight";
 import { parseDeck } from "./dsl";
 import { DslError } from "./diagnostics";
-import { completeDsl, slideLanguage } from "./editor-language";
+import {
+  completeDsl,
+  slideLanguage,
+  signatureHelp,
+  semanticHover,
+} from "./editor-language";
 import { BookOpen, Code2, MapPin, Sparkles } from "lucide-react";
 export function DslEditor({
   value,
@@ -70,6 +75,8 @@ export function DslEditor({
         extensions: [
           basicSetup,
           slideLanguage,
+          signatureHelp,
+          semanticHover,
           indentUnit.of("    "),
           keymap.of([
             ...completionKeymap,
