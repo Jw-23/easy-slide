@@ -38,7 +38,14 @@ import {
   type Layout,
   type Project,
 } from "./dsl";
-import { initialSource, mathDeck, engineeringDeck } from "./examples";
+import {
+  initialSource,
+  initialAssets,
+  showcaseDeck,
+  exampleAssetsFor,
+  mathDeck,
+  engineeringDeck,
+} from "./examples";
 import { SlideView } from "./SlideView";
 import { download, exportPptx } from "./export";
 import {
@@ -53,7 +60,9 @@ import {
 } from "./storage";
 export default function App() {
   const [source, setSource] = useState(initialSource),
-    [assets, setAssets] = useState<Record<string, string>>({}),
+    [assets, setAssets] = useState<Record<string, string>>({
+      ...initialAssets,
+    }),
     [index, setIndex] = useState(0),
     [tab, setTab] = useState<"design" | "dsl" | "assets">("design"),
     [modal, setModal] = useState<"export" | "help" | "templates" | null>(null),
@@ -68,7 +77,7 @@ export default function App() {
     [busy, setBusy] = useState(false),
     [folder, setFolder] = useState<FolderHandle | null>(null),
     [confirm, setConfirm] = useState<Deck | null>(null);
-  const lastDeck = useRef(mathDeck),
+  const lastDeck = useRef(showcaseDeck),
     importRef = useRef<HTMLInputElement>(null),
     imageRef = useRef<HTMLInputElement>(null);
   let error = "";
@@ -947,6 +956,17 @@ export default function App() {
                 <p>选择适合你的场景，替换为自己的内容。</p>
                 <div
                   className="template-card"
+                  onClick={() => template(showcaseDeck)}
+                >
+                  <BookOpen />
+                  <div>
+                    <h3>功能示例</h3>
+                    <p>18 页 · 全部组件、LaTeX、素材、材质与动画</p>
+                  </div>
+                  <ArrowUpRight />
+                </div>
+                <div
+                  className="template-card"
                   onClick={() => template(mathDeck)}
                 >
                   <span>∑</span>
@@ -1038,7 +1058,13 @@ Slide(title: "一个清晰的结论") {
         <div className="modal-backdrop">
           <section className="modal">
             <h2>
-              切换到{confirm === mathDeck ? "数学论坛" : "工程汇报"}示例？
+              切换到
+              {confirm === showcaseDeck
+                ? "功能示例"
+                : confirm === mathDeck
+                  ? "数学论坛"
+                  : "工程汇报"}
+              ？
             </h2>
             <p>这会替换当前工程，请先保存需要保留的内容。</p>
             <div className="confirm-actions">
@@ -1048,7 +1074,7 @@ Slide(title: "一个清晰的结论") {
                 className="primary"
                 onClick={() => {
                   setSource(serialize(confirm));
-                  setAssets({});
+                  setAssets(exampleAssetsFor(confirm));
                   setIndex(0);
                   setFolder(null);
                   setConfirm(null);

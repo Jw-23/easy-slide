@@ -70,3 +70,14 @@ Slide(title: "从直觉到证明") {
 React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢量公式；PptxGenJS + JSZip 导出；IndexedDB 自动保存。无应用后端。
 
 `npm test` 验证扁平/旧版 DSL 往返、带位置错误、代码补全、动画时间线、原生 PPTX 动画节点、模板布局边界与公式。`npm run test:e2e` 执行 Chromium 浏览器测试（首次运行需 `npx playwright install chromium`）。
+
+## 初始功能示例
+
+首次启动打开 18 页「功能示例」。已有本地草稿优先恢复；通过「切换示例 → 功能示例」可打开新版示例，替换前仍可导出当前工程。
+
+- 1–8 页：八种独立布局、正文与引用、玻璃面板、指标、对比、里程碑和内嵌图片。
+- 9–12 页：组合容器、叠层与精确定位、LaTeX 分式/积分/矩阵/分段函数、代码和表格。
+- 13–16 页：全部入场效果、四种缓动、点击阶段与先后顺序、样式修饰符和页面覆盖。
+- 17–18 页：编辑、素材、工程保存与导出操作参考。
+
+每页备注解释对应源码与操作方式。PNG 图表随工程导出，不依赖远程地址；可选开发脚本 `python scripts/generate-example-chart.py` 重建图表源码（仅运行该脚本时需要 matplotlib 与 numpy，网站运行不需要 Python）。

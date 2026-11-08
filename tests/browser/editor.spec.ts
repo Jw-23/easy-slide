@@ -10,7 +10,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".slide-item")).toHaveCount(7);
+  await expect(page.locator(".slide-item")).toHaveCount(18);
   await page
     .getByRole("textbox", { name: "页标题", exact: true })
     .fill("本地测试标题");
@@ -59,7 +59,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   const zip = await JSZip.loadAsync(await readFile((await file.path())!));
   expect(
     Object.keys(zip.files).filter((x) => /^ppt\/slides\/slide\d+.xml$/.test(x)),
-  ).toHaveLength(7);
+  ).toHaveLength(18);
   const first = await zip.file("ppt/slides/slide1.xml")!.async("string");
   expect(first).toContain("本地测试标题");
   expect(first).toContain("<p:transition");
@@ -98,7 +98,7 @@ test("clipboard images survive full project export", async ({ page }) => {
   });
   await expect(page.getByRole("status")).toContainText("1 张图片");
   await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
-  await expect(page.locator(".asset-list img")).toHaveCount(1);
+  await expect(page.locator(".asset-list img")).toHaveCount(2);
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
   const p = JSON.parse(await readFile((await (await dl).path())!, "utf8"));
@@ -313,4 +313,77 @@ Slide(title:"公式与结论", eyebrow:"RESULTS") {
     path: "test-results/glass-latex-layout.png",
     fullPage: true,
   });
+});
+test("the full startup tour renders without missing assets or clipped text and can be reopened", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  for (let i = 0; i < 18; i++) {
+    await page.locator(".slide-item").nth(i).click();
+    await expect(page.locator(".preview-wrap .missing-image")).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page
+          .locator(".preview-wrap img")
+          .evaluateAll((images) =>
+            images.every(
+              (i) =>
+                (i as HTMLImageElement).complete &&
+                (i as HTMLImageElement).naturalWidth > 0,
+            ),
+          ),
+      )
+      .toBe(true);
+    const overflow = await page.locator(".preview-wrap").evaluate((root) =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>('div[style*="overflow: hidden"]'),
+      )
+        .filter(
+          (e) => e.textContent?.trim() && e.scrollHeight > e.clientHeight + 2,
+        )
+        .map((e) => ({
+          text: e.textContent,
+          height: e.clientHeight,
+          required: e.scrollHeight,
+        })),
+    );
+    expect(overflow, `startup tour page ${i + 1}`).toEqual([]);
+    if ([0, 7, 12].includes(i))
+      await page.locator(".preview-wrap .slide-frame").screenshot({
+        path: `test-results/tour-${i + 1}.png`,
+        animations: "disabled",
+      });
+  }
+  await page.getByRole("button", { name: "切换示例", exact: true }).click();
+  await page.locator(".template-card").filter({ hasText: "数学论坛" }).click();
+  await page
+    .locator(".modal")
+    .getByRole("button", { name: "切换示例", exact: true })
+    .click();
+  await expect(page.locator(".slide-item")).toHaveCount(7);
+  await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await expect(page.locator(".asset-list img")).toHaveCount(0);
+  await page.getByRole("button", { name: "切换示例", exact: true }).click();
+  await page.locator(".template-card").filter({ hasText: "功能示例" }).click();
+  await page
+    .locator(".modal")
+    .getByRole("button", { name: "切换示例", exact: true })
+    .click();
+  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(page.locator(".asset-list img")).toHaveCount(1);
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".slide-item")).toHaveCount(18);
+  const dl = page.waitForEvent("download");
+  await page.getByRole("button", { name: "保存工程", exact: true }).click();
+  const p = JSON.parse(await readFile((await (await dl).path())!, "utf8"));
+  expect(p.assets["assets/convergence.png"]).toMatch(
+    /^data:image\/png;base64,/,
+  );
 });

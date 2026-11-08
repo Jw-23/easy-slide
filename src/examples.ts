@@ -1,4 +1,7 @@
 import type { Deck } from "./dsl";
+import { showcaseDeck } from "./showcase";
+import { exampleAssets } from "./example-assets";
+export { showcaseDeck };
 import { serialize, withLayout } from "./dsl";
 export const mathDeck: Deck = {
   version: 1,
@@ -147,7 +150,7 @@ export const mathDeck: Deck = {
 };
 export const engineeringDeck: Deck = {
   version: 1,
-  title: "把想法，交付为现实",
+  title: "平台工程汇报",
   author: "工程平台组",
   theme: { accent: "#4269d0", background: "#f8faff", color: "#1b2740" },
   transition: "fade",
@@ -156,7 +159,7 @@ export const engineeringDeck: Deck = {
     {
       layout: "cover",
       eyebrow: "ENGINEERING REVIEW / Q4 2026",
-      title: "把想法，\n交付为现实。",
+      title: "平台工程\n阶段汇报",
       subtitle: "平台性能与可靠性 · 阶段工程汇报",
       blocks: [{ type: "text", text: "工程平台组 / 2026.11", size: 18 }],
     },
@@ -252,7 +255,7 @@ export const engineeringDeck: Deck = {
     },
     {
       layout: "section",
-      title: "让下一次交付，\n更从容。",
+      title: "讨论与后续计划",
       subtitle: "讨论与反馈",
       eyebrow: "THANK YOU",
       blocks: [],
@@ -297,8 +300,37 @@ mathDeck.slides[2].blocks = mathDeck.slides[2].blocks.map((b) => {
     step,
   } as import("./dsl").Block;
 });
+engineeringDeck.slides[2].blocks = engineeringDeck.slides[2].blocks.map(
+  (b, i) => ({
+    type: "glass",
+    glass: { opacity: i === 0 ? 0.58 : 0.7 },
+    children: [{ ...b, step: undefined }],
+    step: i,
+    appear: { effect: i === 0 ? "slideLeft" : "slideRight", duration: 600 },
+  }),
+);
+engineeringDeck.slides[4].blocks[0].stagger = 120;
+engineeringDeck.slides[4].blocks[0].appear = { effect: "fade", duration: 450 };
+engineeringDeck.slides.forEach((s) => {
+  s.notes =
+    s.notes ||
+    "工程汇报示例；指标为演示数据。进入 DSL 面板可修改布局组件、面板材质和动画参数。";
+});
 for (const deck of [mathDeck, engineeringDeck]) {
   deck.theme = { ...deck.theme, material: "glass" };
   deck.slides = deck.slides.map((s) => withLayout(s, s.layout || "content"));
 }
-export const initialSource = serialize(mathDeck);
+export function exampleAssetsFor(deck: Deck): Record<string, string> {
+  const result: Record<string, string> = {};
+  const collect = (blocks: import("./dsl").Block[]) => {
+    for (const b of blocks) {
+      if (b.type === "image" && b.src && exampleAssets[b.src])
+        result[b.src] = exampleAssets[b.src];
+      collect(b.children || []);
+    }
+  };
+  deck.slides.forEach((s) => collect(s.blocks));
+  return result;
+}
+export const initialSource = serialize(showcaseDeck);
+export const initialAssets = exampleAssetsFor(showcaseDeck);

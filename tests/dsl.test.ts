@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { parseDeck, serialize, validateProject, pageContent } from "../src/dsl";
-import { mathDeck, engineeringDeck } from "../src/examples";
+import { mathDeck, engineeringDeck, showcaseDeck } from "../src/examples";
 import { scene } from "../src/scene";
 import { mathSvg } from "../src/math";
 describe("DSL compilation", () => {
   it("round-trips both scene templates without losing notes or formulas", () => {
-    for (const deck of [mathDeck, engineeringDeck])
+    for (const deck of [mathDeck, engineeringDeck, showcaseDeck])
       expect(parseDeck(serialize(deck))).toEqual(deck);
   });
   it("validates layouts, scalar types and offline image references", () => {
@@ -21,7 +21,7 @@ describe("DSL compilation", () => {
     }
   });
   it("keeps every generated scene element within the canvas", () => {
-    for (const d of [mathDeck, engineeringDeck])
+    for (const d of [mathDeck, engineeringDeck, showcaseDeck])
       d.slides.forEach((s, i) =>
         scene(d, s, i).forEach((e) => {
           expect(e.x).toBeGreaterThanOrEqual(0);
