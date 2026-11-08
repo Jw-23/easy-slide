@@ -22,6 +22,8 @@ npm test
 ## 使用
 
 - 左侧选择页面，右侧修改标题、布局、主题和过渡；DSL 面板编辑完整内容。
+- 右侧「默认卡片材质」可切换毛玻璃与纯色。网页实时模糊，PPTX 烘焙材质纹理，前景文字和公式保持独立。
+- Equation 内输入反斜杠补全 LaTeX，提供排版预览、占位符与公式诊断。
 - 内置数学论坛与工程汇报示例。切换前可导出当前工程。
 - `Ctrl / ⌘ + V` 粘贴图片，或从素材面板添加。支持 PNG、JPG、WebP、GIF，每张最多 20MB。
 - 编辑自动存入此浏览器的 IndexedDB；保存状态在画布下方显示。浏览器数据可能被清理，重要内容请导出完整工程。
@@ -34,7 +36,7 @@ npm test
 
 ## DSL
 
-详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；不执行 DSL 中的脚本或组件。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。仅在组合布局时嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
+详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；不执行 DSL 中的脚本或组件。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。布局通过独立 Cover / Split / Cards / Flow 等组件组合，也可嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
 
 ```swift
 Deck("一个清晰的结论", author: "研究组")
@@ -42,11 +44,13 @@ Deck("一个清晰的结论", author: "研究组")
 
 Theme(accent: "#16766d")
 
-Slide(.split, title: "从直觉到证明") {
-    Bullets(["提出问题", "建立模型", "验证结论"])
-        .appear(.rise, step: 1, order: 0, duration: 500)
-    Equation(#"x_{k+1} = x_k - \eta \nabla f(x_k)"#)
-        .appear(.zoom, step: 1, order: 1, delay: 150, duration: 700)
+Slide(title: "从直觉到证明") {
+    Split {
+        Bullets(["提出问题", "建立模型", "验证结论"])
+            .appear(.rise, step: 1, order: 0, duration: 500)
+        Equation(#"x_{k+1} = x_k - \eta \nabla f(x_k)"#)
+            .appear(.zoom, step: 1, order: 1, delay: 150, duration: 700)
+    }
 }.notes("先解释假设，再给出结论")
 ```
 

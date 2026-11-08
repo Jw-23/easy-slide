@@ -60,6 +60,20 @@ function SceneElement({
   let content: React.ReactNode;
   if (e.kind === "rect") {
     style.background = e.fill;
+    if (e.glass) {
+      const opacity = e.glass.opacity ?? 0.68;
+      const hex = e.fill || "#ffffff";
+      const rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      Object.assign(style, {
+        background: `rgba(${rgb.join(",")},${opacity})`,
+        backdropFilter: `blur(${e.glass.blur ?? 24}px) saturate(130%)`,
+        WebkitBackdropFilter: `blur(${e.glass.blur ?? 24}px) saturate(130%)`,
+        border: "1.5px solid rgba(255,255,255,.65)",
+        boxShadow:
+          "0 14px 40px rgba(35,60,53,.08), inset 0 1px 0 rgba(255,255,255,.6)",
+        borderRadius: e.glass.radius ?? 28,
+      });
+    }
     style.borderRadius = e.radius;
   } else if (e.kind === "text") {
     Object.assign(style, {
@@ -75,13 +89,14 @@ function SceneElement({
     content = e.text;
   } else {
     const src =
-      e.kind === "equation"
+      e.data ||
+      (e.kind === "equation"
         ? mathSvg(e.text || "", e.color || "#192c2a")
-        : assets[e.src || ""];
+        : assets[e.src || ""]);
     content = src ? (
       <img
         src={src}
-        alt={e.kind === "equation" ? e.text : e.src}
+        alt={e.kind === "equation" ? e.text : e.src || ""}
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
       />
     ) : (

@@ -1,5 +1,5 @@
 import type { Deck } from "./dsl";
-import { serialize } from "./dsl";
+import { serialize, withLayout } from "./dsl";
 export const mathDeck: Deck = {
   version: 1,
   title: "从局部，到无限",
@@ -285,4 +285,20 @@ mathDeck.slides[5].blocks.forEach((b, i) => {
 engineeringDeck.slides[1].blocks.forEach((b, i) => {
   b.appear = { effect: "rise", order: i, duration: 450, easing: "easeOut" };
 });
+mathDeck.slides[0].blocks[1].glass = { blur: 28, opacity: 0.62, radius: 28 };
+mathDeck.slides[0].blocks[1].padding = 26;
+mathDeck.slides[2].blocks = mathDeck.slides[2].blocks.map((b) => {
+  const { appear, step, ...content } = b;
+  return {
+    type: "glass",
+    glass: {},
+    children: [content],
+    appear,
+    step,
+  } as import("./dsl").Block;
+});
+for (const deck of [mathDeck, engineeringDeck]) {
+  deck.theme = { ...deck.theme, material: "glass" };
+  deck.slides = deck.slides.map((s) => withLayout(s, s.layout || "content"));
+}
 export const initialSource = serialize(mathDeck);

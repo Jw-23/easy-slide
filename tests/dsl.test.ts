@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseDeck, serialize, validateProject } from "../src/dsl";
+import { parseDeck, serialize, validateProject, pageContent } from "../src/dsl";
 import { mathDeck, engineeringDeck } from "../src/examples";
 import { scene } from "../src/scene";
 import { mathSvg } from "../src/math";
@@ -83,7 +83,7 @@ Deck("研究") {
   }.padding(20).foreground("#16766d")
  }.notes("讨论")
 }.transition(.slide, duration: 650)`);
-    expect(d.slides[0].blocks[0].children?.[1].text).toBe("\\frac{a}{b}");
+    expect(pageContent(d.slides[0])[0].children?.[1].text).toBe("\\frac{a}{b}");
     const e = scene(d, d.slides[0], 0);
     expect(e.find((x) => x.text === "标题")).toMatchObject({
       x: 94,

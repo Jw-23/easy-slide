@@ -8,15 +8,19 @@ Deck("从局部，到无限", author: "林知远 · 数学论坛")
 
 Theme(accent: "#16766d", background: "#fafbf9")
 
-Slide(.cover, title: "从局部，到无限。", subtitle: "一个关于最优解的故事") {
-    Text("林知远 / 应用数学研究组").font(18)
+Slide(title: "从局部，到无限。", subtitle: "一个关于最优解的故事") {
+    Cover {
+        Text("林知远 / 应用数学研究组").font(18)
+    }
 }
 
-Slide(.split, title: "每一步，都更接近答案") {
-    Bullets(["计算梯度", "选择步长", "迭代收敛"], title: "关键思路")
-        .appear(.rise, step: 1, order: 0, duration: 500)
-    Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
-        .appear(.zoom, step: 1, order: 1, delay: 150, duration: 700, easing: .easeOut)
+Slide(title: "每一步，都更接近答案") {
+    Split {
+        Bullets(["计算梯度", "选择步长", "迭代收敛"], title: "关键思路")
+            .appear(.rise, step: 1, order: 0, duration: 500)
+        Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
+            .appear(.zoom, step: 1, order: 1, delay: 150, duration: 700, easing: .easeOut)
+    }
 }.notes("先给出直觉，再引入公式")
 ```
 
@@ -39,33 +43,35 @@ Slide(.split, title: "每一步，都更接近答案") {
 
 `Deck("名称", author: "作者")` 为唯一工程头，必须位于首个声明。可选 `version: 1`，默认为 1。之后为一个可选 `Theme` 和 1–200 个 `Slide`。
 
-`Theme` 可设置 `accent`、`background`、`color`、`font`。颜色为 `"#RRGGBB"`。字体需本机安装。
+`Theme` 可设置 `accent`、`background`、`color`、`font`、`material`。颜色为 `"#RRGGBB"`。字体需本机安装。
 
-`Slide(.布局, title: "标题", eyebrow: "页眉", subtitle: "副标题") { ... }`。
+`Slide(title: "标题", eyebrow: "页眉", subtitle: "副标题") { 布局组件 { 内容 } }`。Slide 只负责页面元数据与页级过渡，不接收布局参数。
 
 | 布局        | 适用内容                                     |
 | ----------- | -------------------------------------------- |
-| `.cover`    | 大标题、摘要、署名，建议一个文字块和一个公式 |
-| `.section`  | 章节、结束页                                 |
-| `.content`  | 正文纵向分配；自由组合时可仅放一个容器       |
-| `.split`    | 双栏，适合 2 块                              |
-| `.grid`     | 最多三列自动换行，推荐 3–6 块                |
-| `.compare`  | 双栏卡片对比                                 |
-| `.timeline` | 横向里程碑卡片                               |
-| `.image`    | 双栏图文                                     |
+| `Cover`     | 大标题、摘要、署名，建议一个文字块和一个公式 |
+| `Section`   | 章节、结束页                                 |
+| `Flow`      | 正文纵向分配；自由组合时可仅放一个容器       |
+| `Split`     | 双栏，适合 2 块                              |
+| `Cards`     | 最多三列自动换行，推荐 3–6 块                |
+| `Compare`   | 双栏卡片对比                                 |
+| `Timeline`  | 横向里程碑卡片                               |
+| `ImageText` | 双栏图文                                     |
 
 页面修饰符：`.notes("讲述思路")`、`.background("#fafbf9")`、`.foreground("#192c2a")`、`.transition(...)`。
 
 ## 动画编排
 
 ```swift
-Slide(.grid, title: "依次揭示三个结论") {
-    Metric("01", label: "方向")
-        .appear(.rise, step: 1, order: 0, duration: 500)
-    Metric("02", label: "步长")
-        .appear(.fade, step: 1, order: 1, delay: 100, duration: 400)
-    Metric("03", label: "收敛")
-        .appear(.zoom, step: 2, duration: 600, easing: .spring)
+Slide(title: "依次揭示三个结论") {
+    Cards {
+        Metric("01", label: "方向")
+            .appear(.rise, step: 1, order: 0, duration: 500)
+        Metric("02", label: "步长")
+            .appear(.fade, step: 1, order: 1, delay: 100, duration: 400)
+        Metric("03", label: "收敛")
+            .appear(.zoom, step: 2, duration: 600, easing: .spring)
+    }
 }
 ```
 
@@ -93,7 +99,7 @@ Slide(.grid, title: "依次揭示三个结论") {
 ```swift
 Deck("演示").transition(.slide, duration: 650, direction: .left, easing: .easeOut)
 
-Slide(.content, title: "下一页") {
+Slide(title: "下一页") {
     Text("内容")
 }.transition(.zoom, duration: 800, easing: .spring)
 ```
@@ -152,11 +158,45 @@ Table([["事项", "状态"], ["基准测试", "已完成"]])
 ### 列表、表格与容器的逐项交错
 
 ```swift
-Slide(.content, title: "依次展开思路") {
+Slide(title: "依次展开思路") {
     Bullets(["提出问题", "建立模型", "验证结论"])
         .appear(.rise, step: 1, duration: 500)
         .stagger(120)
 }
 ```
 
-`.stagger(120)` 让后一个子项比前一个晚 120ms 启动，可相互重叠。适用于 Bullets 列表条目、Table 表格行，以及 HStack / VStack / Grid / ZStack 的直接子项。与 order 不同，stagger 不等待前项完成。与 delay 叠加，范围 0–10000ms；同时作用于网页与 PPTX。
+`.stagger(120)` 让后一个子项比前一个晚 120ms 启动，可相互重叠。适用于 Bullets 列表条目、Table 表格行，以及布局组件、Glass、HStack / VStack / Grid / ZStack 的直接子项。与 order 不同，stagger 不等待前项完成。与 delay 叠加，范围 0–10000ms；同时作用于网页与 PPTX。
+
+## 独立布局组件与毛玻璃
+
+布局不再是 Slide 的选项。例如 `Slide(title: "对比") { Split { ... } }`。布局组件可以相互嵌套、接收 `.padding()`、`.frame()`、`.appear()` 等通用修饰符。Cover / Section 作为页面唯一根布局时负责大标题；其他组合在常规标题下排版。无布局组件时，页面将顶层内容默认纵向等分。
+
+`Cards(columns: 3, spacing: 24)` 设置卡片列数与间距；Split、Compare、ImageText 设置 spacing；Flow 纵向排列，Timeline 横向排列里程碑卡片。右侧「布局组件」按钮替换根布局组件，保留内部内容。
+
+```swift
+Deck("研究报告")
+Theme(accent: "#256e76", material: .glass)
+
+Slide(title: "主要结论") {
+    Split(spacing: 32) {
+        Glass {
+            Bullets(["局部信息决定方向", "合适步长保证稳定"])
+        }
+        Glass {
+            Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
+        }.glass(blur: 28, opacity: 0.64, radius: 30)
+    }
+}
+```
+
+`Glass { ... }` 是独立面板组件，默认纵向排列内容、内边距 28px；也可在任意内容或布局上使用 `.glass(blur: 24, opacity: 0.68, radius: 28)`。blur 为 0–80px，opacity 为 0–1，radius 为 0–100px。Theme 的 `.glass` 材质为卡片布局添加面板与低对比渐变背景；`.solid` 使用纯色面板。右侧「默认卡片材质」可切换主题材质。
+
+网页使用真实 backdrop-filter。PowerPoint 不支持实时背景模糊，因此导出把渐变背景与毛玻璃面板纹理烘焙成图片；前景文字保持可编辑，公式保持 SVG，入场动画保留。纹理模糊采样的是页面背景，不会动态重新模糊后续移动或修改的内容，也不会采样叠层中其他图片/文字。更改材质后重新导出即可更新纹理。
+
+## LaTeX 补全与诊断
+
+在 Equation 的字符串里输入反斜杠，会补全分式、积分、求和、希腊字母、集合、矩阵、分段函数等命令；提示附有排版预览与用途。也可使用 Ctrl / ⌘ + Space 主动唤起。接受补全后用 Tab 在分子、分母等占位符间切换。
+
+支持 `Equation(#"\frac{a}{b}"#)` 原始字符串，也支持需要双写反斜杠的普通字符串。未知命令、不匹配括号等会显示在 Equation 声明所在位置，并尽可能给出相近命令。出错时保留最后有效预览；不能导出包含错误公式的工程。
+
+旧版 `Slide(.split, ...)` 仍可读取，保存/整理后统一写成独立 Split 组件。

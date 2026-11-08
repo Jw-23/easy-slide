@@ -1,3 +1,4 @@
+import { pageLayout, withLayout, pageContent } from "./dsl";
 import { MotionPanel } from "./MotionPanel";
 import { DslEditor } from "./DslEditor";
 import { timeline } from "./motion";
@@ -121,6 +122,13 @@ export default function App() {
   }
   function changeSlide(p: Record<string, unknown>) {
     if (error) return;
+    if (
+      p.blocks &&
+      slide.blocks.length === 1 &&
+      slide.blocks[0].type === "layout" &&
+      !(p.blocks as import("./dsl").Block[]).some((b) => b.type === "layout")
+    )
+      p.blocks = [{ ...slide.blocks[0], children: p.blocks }];
     update({
       ...deck,
       slides: deck.slides.map((s, i) => (i === active ? { ...s, ...p } : s)),
@@ -257,7 +265,7 @@ export default function App() {
       if (insert) {
         changeSlide({
           blocks: [
-            ...slide.blocks,
+            ...pageContent(slide),
             ...Object.keys(added).map((src) => ({ type: "image", src })),
           ],
         });
@@ -397,7 +405,7 @@ export default function App() {
                 </div>
                 <div className="slide-label">
                   {s.title.replaceAll("\n", "")}
-                  <small>{layoutLabels[s.layout]}</small>
+                  <small>{layoutLabels[pageLayout(s)]}</small>
                 </div>
               </button>
             ))}
@@ -440,7 +448,7 @@ export default function App() {
                   {String(active + 1).padStart(2, "0")}
                   <span className="slash">/</span>
                   {String(deck.slides.length).padStart(2, "0")}
-                  <i /> {layoutLabels[slide.layout]}
+                  <i /> {layoutLabels[pageLayout(slide)]}
                 </span>
                 <div>
                   <button
@@ -546,7 +554,7 @@ export default function App() {
           {tab === "design" ? (
             <div className="inspector-content">
               <div className="section-heading">
-                <span>页面布局</span>
+                <span>布局组件</span>
                 <span>LAYOUT</span>
               </div>
               <div className="layout-grid">
@@ -555,9 +563,16 @@ export default function App() {
                     key={l}
                     disabled={!!error}
                     className={
-                      "layout-option " + (l === slide.layout ? "chosen" : "")
+                      "layout-option " +
+                      (l === pageLayout(slide) ? "chosen" : "")
                     }
-                    onClick={() => changeSlide({ layout: l })}
+                    onClick={() => {
+                      const updated = withLayout(slide, l);
+                      changeSlide({
+                        blocks: updated.blocks,
+                        layout: undefined,
+                      });
+                    }}
                   >
                     <div className={"layout-mini " + l}>
                       <i />
@@ -565,7 +580,7 @@ export default function App() {
                       <i />
                     </div>
                     <span>{layoutLabels[l]}</span>
-                    {l === slide.layout && <Check size={11} />}
+                    {l === pageLayout(slide) && <Check size={11} />}
                   </button>
                 ))}
               </div>
@@ -663,6 +678,26 @@ export default function App() {
                 <span>演示主题</span>
                 <span>THEME</span>
               </div>
+              <label>
+                默认卡片材质
+                <select
+                  aria-label="默认卡片材质"
+                  value={deck.theme?.material || "solid"}
+                  disabled={!!error}
+                  onChange={(e) =>
+                    update({
+                      ...deck,
+                      theme: {
+                        ...deck.theme,
+                        material: e.target.value as "glass" | "solid",
+                      },
+                    })
+                  }
+                >
+                  <option value="glass">毛玻璃</option>
+                  <option value="solid">纯色</option>
+                </select>
+              </label>
               <div className="theme-row">
                 <label>
                   强调色
@@ -754,7 +789,7 @@ export default function App() {
                       if (!error) {
                         changeSlide({
                           blocks: [
-                            ...slide.blocks,
+                            ...pageContent(slide),
                             { type: "image", src: key },
                           ],
                         });
@@ -938,24 +973,26 @@ export default function App() {
                 <span className="overline">EASY SLIDE DSL / V1</span>
                 <h2>DSL 语法指南</h2>
                 <p>
-                  用类似 SwiftUI
-                  的声明式语法描述演示文稿，支持嵌套布局与链式修饰符。所有尺寸使用
-                  1280 × 720 画布像素。
+                  用类似 SwiftUI 的声明式语法描述演示文稿，Slide
+                  只声明页面，布局使用独立组件。所有尺寸使用 1280 × 720
+                  画布像素。
                 </p>
                 <pre>{`Deck("我的研究").transition(.slide, duration: 650)
 Theme(accent: "#16766d")
 
-Slide(.split, title: "一个清晰的结论") {
+Slide(title: "一个清晰的结论") {
+  Split {
     Bullets(["提出问题", "建立模型", "验证结果"])
         .appear(.rise, step: 1, order: 0, duration: 500)
     Equation(#"E = mc^2"#)
         .appear(.zoom, step: 1, order: 1,
                 delay: 150, duration: 700, easing: .easeOut)
+  }
 }.notes("先解释直觉，再展示公式")`}</pre>
                 <h3>八种布局</h3>
                 <p>
-                  cover 封面 · section 章节 · content 正文 · split 双栏 · grid
-                  卡片 · compare 对比 · timeline 时间线 · image 图文
+                  Cover 封面 · Section 章节 · Flow 正文 · Split 双栏 · Cards
+                  卡片 · Compare 对比 · Timeline 时间线 · ImageText 图文
                 </p>
                 <h3>八类内容</h3>
                 <p>

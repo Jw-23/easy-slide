@@ -1,10 +1,11 @@
+import { completeLatex } from "./latex";
 import { StreamLanguage } from "@codemirror/language";
 import {
   snippetCompletion,
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
-import { effects, easings, layouts } from "./dsl";
+import { effects, easings, layouts, layoutComponents } from "./dsl";
 export const slideLanguage = StreamLanguage.define({
   startState: () => ({ end: "" }),
   token(stream, state) {
@@ -46,9 +47,15 @@ const declarations = [
   ["Theme", 'Theme(accent: "${#16766d}", background: "#fafbf9")', "全局主题"],
   [
     "Slide",
-    'Slide(.${content}, title: "${标题}") {\n    ${}\n}',
+    'Slide(title: "${标题}") {\n    ${}\n}',
     "添加一页，默认内容区自动布局",
   ],
+  ...Object.entries(layoutComponents).map(([preset, name]) => [
+    name,
+    name + " {\n    ${}\n}",
+    "独立布局组件 · " + preset,
+  ]),
+  ["Glass", "Glass {\n    ${}\n}", "毛玻璃内容面板"],
   ["Text", 'Text("${正文}")', "正文文字"],
   ["Bullets", 'Bullets(["${要点一}", "${要点二}"])', "项目列表"],
   ["Equation", 'Equation(#"${E = mc^2}"#)', "LaTeX 原始字符串，反斜杠无需转义"],
@@ -68,6 +75,11 @@ const declarations = [
   ["Spacer", "Spacer", "留白"],
 ];
 const modifiers = [
+  [
+    "glass",
+    "glass(blur: ${24}, opacity: ${0.68}, radius: ${28})",
+    "毛玻璃材质",
+  ],
   ["stagger", "stagger(${120})", "列表/表格逐项或容器子项交错入场，单位毫秒"],
   ["font", "font(${24})", "文字大小（像素）"],
   ["foreground", 'foreground("${#16766d}")', "文字颜色"],
@@ -94,7 +106,11 @@ const modifiers = [
 ];
 const parameters: Record<string, string[]> = {
   Deck: ["author", "version"],
-  Theme: ["accent", "background", "color", "font"],
+  Theme: ["accent", "background", "color", "font", "material"],
+  glass: ["blur", "opacity", "radius"],
+  Split: ["spacing"],
+  Cards: ["columns", "spacing"],
+  Compare: ["spacing"],
   Slide: ["title", "subtitle", "eyebrow", "notes", "id"],
   appear: ["step", "order", "delay", "duration", "easing"],
   transition: ["duration", "direction", "easing"],
@@ -111,6 +127,8 @@ export function completeDsl(
   context: CompletionContext,
   assets: string[] = [],
 ): CompletionResult | null {
+  const latex = completeLatex(context);
+  if (latex) return latex;
   const word = context.matchBefore(/[A-Za-z_]\w*/);
   if (
     !word &&
@@ -122,7 +140,8 @@ export function completeDsl(
     prefix = context.state.sliceDoc(0, from),
     near = prefix.slice(-180);
   let enums: readonly string[] | undefined;
-  if (/easing:\s*\.$/.test(near)) enums = easings;
+  if (/material:\s*\.$/.test(near)) enums = ["glass", "solid"];
+  else if (/easing:\s*\.$/.test(near)) enums = easings;
   else if (/direction:\s*\.$/.test(near))
     enums = ["left", "right", "up", "down"];
   else if (/\.appear\(\s*\.$/.test(near)) enums = effects;

@@ -1,3 +1,4 @@
+import { backdropData, glassTexture, rasterSvg } from "./materials";
 import { timeline } from "./motion";
 import { pptxTiming, shapeIds } from "./pptx-motion";
 import PptxGenJS from "pptxgenjs";
@@ -25,7 +26,20 @@ export async function exportPptx(deck: Deck, assets: Record<string, string>) {
     };
     for (const e of scene(deck, s, i)) {
       const pos = { x: e.x / 96, y: e.y / 96, w: e.w / 96, h: e.h / 96 };
-      if (e.kind === "rect")
+      if (e.kind === "rect" && e.glass) {
+        slide.addImage({
+          data: await glassTexture(e, backdropData(deck, s)),
+          ...pos,
+          shadow: {
+            type: "outer",
+            color: "233c35",
+            opacity: 0.08,
+            blur: 12,
+            angle: 90,
+            offset: 3,
+          },
+        });
+      } else if (e.kind === "rect")
         slide.addShape(pptx.ShapeType.roundRect, {
           ...pos,
           rectRadius: 0.15,
@@ -47,8 +61,9 @@ export async function exportPptx(deck: Deck, assets: Record<string, string>) {
           lang: "zh-CN",
         });
       else {
-        const data =
-          e.kind === "equation"
+        const data = e.data
+          ? await rasterSvg(e.data)
+          : e.kind === "equation"
             ? mathSvg(e.text || "", e.color || "#192c2a")
             : assets[e.src || ""];
         if (!data)

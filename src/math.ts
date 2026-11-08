@@ -1,3 +1,5 @@
+import { closest } from "./diagnostics";
+import { latexCommands } from "./latex-commands";
 import { mathjax } from "mathjax-full/js/mathjax.js";
 import { TeX } from "mathjax-full/js/input/tex.js";
 import { SVG } from "mathjax-full/js/output/svg.js";
@@ -9,18 +11,49 @@ RegisterHTMLHandler(adaptor);
 const doc = mathjax.document("", {
   InputJax: new TeX({
     packages: AllPackages.filter(
-      (p) => !["require", "autoload", "html"].includes(p),
+      (p) =>
+        !["require", "autoload", "html", "noerrors", "noundefined"].includes(p),
     ),
   }),
   OutputJax: new SVG({ fontCache: "none" }),
 });
 const cache = new Map<string, string>();
+const errors = new Map<string, string | null>();
+export function mathError(tex: string): string | null {
+  if (!errors.has(tex)) mathSvg(tex, "#192c2a");
+  return errors.get(tex) || null;
+}
+function explainMath(message: string): string {
+  const command = message.match(
+    /Undefined control sequence\s*\\([A-Za-z]+)/,
+  )?.[1];
+  const suggestion = command
+    ? closest(
+        command,
+        latexCommands.map((x) => x[0]),
+      )
+    : undefined;
+  return (
+    "LaTeX：" + message + (suggestion ? `；是否想写 \\${suggestion}？` : "")
+  );
+}
 export function mathSvg(tex: string, color: string): string {
   const key = tex + color;
   if (cache.has(key)) return cache.get(key)!;
   try {
     const node = doc.convert(tex, { display: true });
     let svg = adaptor.innerHTML(node);
+    if (
+      svg.includes('data-mml-node="merror"') ||
+      svg.includes("data-mjx-error=")
+    ) {
+      const msg =
+        svg.match(/data-mjx-error="([^"]+)"/)?.[1] ||
+        "公式包含无效命令或不匹配的括号";
+      errors.set(tex, explainMath(msg));
+      return "";
+    }
+    errors.set(tex, null);
     const match = svg.match(/viewBox="([^"]+)"/);
     const dims = match?.[1].split(" ").map(Number);
     if (!dims) throw Error("公式无法渲染");
@@ -33,7 +66,8 @@ export function mathSvg(tex: string, color: string): string {
       "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
     cache.set(key, result);
     return result;
-  } catch {
+  } catch (e) {
+    errors.set(tex, explainMath((e as Error).message));
     return "";
   }
 }

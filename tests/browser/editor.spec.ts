@@ -33,7 +33,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   await editor.fill(source);
   await page.locator(".slide-item").nth(2).click();
   await page.getByRole("button", { name: "演示", exact: true }).click();
-  const formula = page.locator(".presentation img").locator("..");
+  const formula = page.locator('.presentation img[alt^="x_"]').locator("..");
   await expect(formula).toHaveCSS("opacity", "0");
   await page.keyboard.press("Space");
   await expect(formula).toHaveCSS("opacity", "1");
@@ -160,7 +160,7 @@ test("all runtime requests stay local, including math rendering and help", async
       remote.push(r.url());
   });
   await page.goto("/");
-  await expect(page.locator(".preview-wrap img")).toBeVisible();
+  await expect(page.locator('.preview-wrap img[alt^="x_"]')).toBeVisible();
   await page.getByRole("button", { name: "DSL 使用指南" }).click();
   await expect(page.locator(".help-modal")).toBeVisible();
   expect(remote).toEqual([]);
@@ -235,6 +235,82 @@ Slide(.content, title: "定义出现顺序") {
   await page.keyboard.press("Escape");
   await page.screenshot({
     path: "test-results/flat-dsl-editor.png",
+    fullPage: true,
+  });
+});
+test("independent layouts, LaTeX completion and glass export work together", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  await editor.fill('Deck("公式")\nSlide(title:"公式提示"){Equation(#"\\fr');
+  await page.keyboard.press("Control+Space");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText(
+    "\\frac",
+  );
+  await page
+    .locator(".cm-tooltip-autocomplete li")
+    .filter({ hasText: "\\frac" })
+    .first()
+    .click();
+  await expect(editor).toContainText("\\frac{分子}{分母}");
+  await editor.fill('Deck("公式")\nSlide(title:"公式提示"){Equation("\\\\fr');
+  await page.keyboard.press("Control+Space");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText(
+    "\\frac",
+  );
+  await page
+    .locator(".cm-tooltip-autocomplete li")
+    .filter({ hasText: "\\frac" })
+    .first()
+    .click();
+  await expect(editor).toContainText("\\\\frac{分子}{分母}");
+  await editor.fill(
+    'Deck("公式")\nSlide(title:"公式提示"){Equation(#"\\frca{a}{b}"#)}',
+  );
+  await expect(page.locator(".editor-diagnostic")).toContainText("LaTeX");
+  await expect(page.locator(".editor-diagnostic")).toContainText("frac");
+  await editor.fill(`Deck("毛玻璃研究报告")
+Theme(accent:"#256e76", material:.glass)
+Slide(title:"公式与结论", eyebrow:"RESULTS") {
+ Split(spacing:32) {
+  Glass {Bullets(["局部梯度决定方向", "步长控制收敛速度"],title:"主要结论")}
+  Glass {Equation(#"x_{k+1}=x_k-\\eta\\nabla f(x_k)"#)}.glass(blur:28,opacity:0.64,radius:30)
+ }
+}`);
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
+  await expect(page.locator(".preview-wrap")).toContainText("公式与结论");
+  const pane = page
+    .locator('.preview-wrap div[style*="backdrop-filter"]')
+    .first();
+  await expect(pane).toHaveCSS("backdrop-filter", /blur\(24px\)/);
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出", exact: true }).click();
+  await page.getByRole("button", { name: /PowerPoint/ }).click();
+  const file = await download;
+  const zip = await JSZip.loadAsync(await readFile((await file.path())!));
+  const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+  expect(xml).toContain("局部梯度决定方向");
+  expect(xml).toContain("<p:pic>");
+  expect(
+    Object.keys(zip.files).filter(
+      (x) => x.startsWith("ppt/media/") && x.endsWith(".png"),
+    ).length,
+  ).toBeGreaterThanOrEqual(3);
+  const error = await page.evaluate(
+    (x) =>
+      new DOMParser()
+        .parseFromString(x, "application/xml")
+        .querySelector("parsererror")?.textContent,
+    xml,
+  );
+  expect(error).toBeUndefined();
+  await page.screenshot({
+    path: "test-results/glass-latex-layout.png",
     fullPage: true,
   });
 });

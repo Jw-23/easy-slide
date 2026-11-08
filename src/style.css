@@ -1521,3 +1521,17 @@ textarea {
   color: #9ca9a1;
   font-size: 10px;
 }
+.latex-completion-preview {
+  max-width: 340px;
+  padding: 10px 12px;
+  color: #6c8375;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.latex-completion-preview img {
+  display: block;
+  max-width: 300px;
+  min-width: 50px;
+  max-height: 100px;
+  margin: 12px auto 4px;
+}

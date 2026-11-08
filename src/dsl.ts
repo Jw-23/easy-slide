@@ -1,3 +1,4 @@
+import { mathError } from "./math";
 import { DslError, closest } from "./diagnostics";
 import { readSyntax, type Call } from "./syntax";
 export const layouts = [
@@ -37,7 +38,20 @@ export type Motion = {
   duration?: number;
   easing?: (typeof easings)[number];
 };
+export type GlassStyle = { blur?: number; opacity?: number; radius?: number };
+export const layoutComponents: Record<Layout, string> = {
+  cover: "Cover",
+  section: "Section",
+  content: "Flow",
+  split: "Split",
+  grid: "Cards",
+  compare: "Compare",
+  timeline: "Timeline",
+  image: "ImageText",
+};
 export type Block = {
+  preset?: Layout;
+  glass?: GlassStyle;
   appear?: Motion;
   stagger?: number;
   type:
@@ -53,7 +67,9 @@ export type Block = {
     | "vstack"
     | "zstack"
     | "grid"
-    | "spacer";
+    | "spacer"
+    | "layout"
+    | "glass";
   text?: string;
   title?: string;
   items?: string[];
@@ -76,7 +92,8 @@ export type Block = {
 };
 export type Slide = {
   id?: string;
-  layout: Layout;
+  /** Legacy input only; canonical DSL uses dedicated layout components. */
+  layout?: Layout;
   title: string;
   eyebrow?: string;
   subtitle?: string;
@@ -98,6 +115,7 @@ export type Deck = {
     background?: string;
     color?: string;
     font?: string;
+    material?: "glass" | "solid";
   };
   transition?: "fade" | "slide" | "zoom" | "none";
   duration?: number;
@@ -125,7 +143,8 @@ export function validateDeck(input: unknown): Deck {
     fail("slides 需要包含 1–200 页");
   for (const [i, s] of d.slides.entries()) {
     const p = `第 ${i + 1} 页`;
-    if (!s || !layouts.includes(s.layout)) fail(`${p}：未知 layout`);
+    if (!s || (s.layout !== undefined && !layouts.includes(s.layout)))
+      fail(`${p}：未知 layout`);
     if (typeof s.title !== "string") fail(`${p}：title 必须是文本`);
     if (s.blocks === undefined) s.blocks = [];
     if (!Array.isArray(s.blocks) || s.blocks.length > 30)
@@ -160,6 +179,8 @@ export function validateDeck(input: unknown): Deck {
           "zstack",
           "grid",
           "spacer",
+          "layout",
+          "glass",
         ].includes(b.type)
       )
         fail(`${p}：未知内容 type`);
@@ -169,6 +190,10 @@ export function validateDeck(input: unknown): Deck {
           typeof (b as any)[key] !== "string"
         )
           fail(`${p}：${key} 必须是文本（数字请加引号）`);
+      if (b.type === "equation" && typeof b.text === "string") {
+        const issue = mathError(b.text);
+        if (issue) fail(issue);
+      }
       if (
         b.items !== undefined &&
         (!Array.isArray(b.items) ||
@@ -213,13 +238,30 @@ export function validateDeck(input: unknown): Deck {
           b.src.includes(".."))
       )
         fail(`${p}：图片请使用 assets/ 相对路径`);
+      if (b.type === "layout" && (!b.preset || !layouts.includes(b.preset)))
+        fail(`${p}：未知布局组件`);
+      if (b.glass) {
+        for (const k of ["blur", "opacity", "radius"] as const) {
+          const v = b.glass[k],
+            max = k === "opacity" ? 1 : k === "blur" ? 80 : 100;
+          if (v !== undefined && (!Number.isFinite(v) || v < 0 || v > max))
+            fail(`${p}：glass.${k} 范围 0–${max}`);
+        }
+      }
       if (b.stagger !== undefined) {
         if (!Number.isFinite(b.stagger) || b.stagger < 0 || b.stagger > 10000)
           fail(`${p}：stagger 范围 0–10000 毫秒`);
         if (
-          !["bullets", "table", "hstack", "vstack", "zstack", "grid"].includes(
-            b.type,
-          )
+          ![
+            "bullets",
+            "table",
+            "hstack",
+            "vstack",
+            "zstack",
+            "grid",
+            "layout",
+            "glass",
+          ].includes(b.type)
         )
           fail(`${p}：stagger 仅支持列表、表格和布局容器`);
       }
@@ -261,6 +303,11 @@ export function validateDeck(input: unknown): Deck {
       if (s[k] !== undefined && typeof s[k] !== "string")
         fail(`${p}：${k} 必须是文本`);
   }
+  if (
+    d.theme?.material !== undefined &&
+    !["glass", "solid"].includes(d.theme.material)
+  )
+    fail("theme.material 支持 .glass / .solid");
   if (d.theme) {
     if (typeof d.theme !== "object" || Array.isArray(d.theme))
       fail("theme 必须为对象");
@@ -325,9 +372,11 @@ function at<T>(c: Call, fn: () => T): T {
       c.to,
       c.line,
       c.col,
-      detail.includes("未知")
-        ? "检查拼写；按 Ctrl / ⌘ + Space 查看可用声明与参数。"
-        : "请根据提示修改此声明。尺寸、时长和顺序均使用非负数字。",
+      detail.includes("LaTeX")
+        ? '检查命令拼写与花括号；建议使用 #"..."# 原始字符串。在公式中输入反斜杠呼出 LaTeX 补全。'
+        : detail.includes("未知")
+          ? "检查拼写；按 Ctrl / ⌘ + Space 查看可用声明与参数。"
+          : "请根据提示修改此声明。尺寸、时长和顺序均使用非负数字。",
     );
   }
 }
@@ -351,6 +400,10 @@ const blockNames: Record<string, Block["type"]> = {
   ZStack: "zstack",
   Grid: "grid",
   Spacer: "spacer",
+  Glass: "glass",
+  ...Object.fromEntries(
+    Object.values(layoutComponents).map((n) => [n, "layout" as const]),
+  ),
 };
 const names = Object.fromEntries(
   Object.entries(blockNames).map(([k, v]) => [v, k]),
@@ -404,6 +457,9 @@ const apply = (
       } else if (kind === "block" && m.name === "padding") {
         plain(m, []);
         target.padding = m.args[0];
+      } else if (kind === "block" && m.name === "glass") {
+        plain(m, ["blur", "opacity", "radius"]);
+        target.glass = { ...m.named };
       } else if (kind === "block" && m.name === "frame") {
         plain(m, ["x", "y", "width", "height"]);
         for (const [k, v] of Object.entries(m.named))
@@ -412,9 +468,9 @@ const apply = (
         fail(
           `${kind} 不支持修饰符 .${m.name}${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"]) ? `，是否想写 .${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"])}？` : ""}`,
         );
-      if (m.args.length !== (m.name === "frame" ? 0 : 1))
+      if (m.args.length !== (["frame", "glass"].includes(m.name) ? 0 : 1))
         fail(
-          `.${m.name} ${m.name === "frame" ? "仅接受命名参数" : "需要一个未命名参数"}`,
+          `.${m.name} ${["frame", "glass"].includes(m.name) ? "仅接受命名参数" : "需要一个未命名参数"}`,
         );
       if (kind === "block")
         validateDeck({
@@ -447,6 +503,11 @@ function compileBlock(c: Call): Block {
       "columns",
     ]);
     const b: Record<string, unknown> = { type, ...c.named };
+    if (type === "layout")
+      b.preset = Object.entries(layoutComponents).find(
+        ([, name]) => name === c.name,
+      )![0];
+    if (type === "glass") b.glass = {};
     if (c.named.spacing !== undefined) {
       b.gap = c.named.spacing;
       delete b.spacing;
@@ -463,7 +524,9 @@ function compileBlock(c: Call): Block {
               ? "rows"
               : "text";
     if (c.args.length) b[field] = c.args[0];
-    if (["hstack", "vstack", "zstack", "grid"].includes(type))
+    if (
+      ["hstack", "vstack", "zstack", "grid", "layout", "glass"].includes(type)
+    )
       b.children = c.children.map(compileBlock);
     else if (c.children.length) fail(`${c.name} 不能嵌套内容`);
     apply(b, c.modifiers, "block");
@@ -491,19 +554,25 @@ export function parseDeck(source: string): Deck {
     for (const c of root.children) {
       at(c, () => {
         if (c.name === "Theme") {
-          plain(c, ["accent", "background", "color", "font"]);
+          plain(c, ["accent", "background", "color", "font", "material"]);
           if (c.args.length || c.children.length || c.modifiers.length)
             fail("Theme 只接受命名参数");
           if (d.theme) fail("Theme 不可重复");
           d.theme = c.named;
         } else if (c.name === "Slide") {
           plain(c, ["title", "eyebrow", "subtitle", "notes", "id"]);
-          if (c.args.length !== 1) fail("Slide 需要一个 .布局");
+          if (c.args.length > 1)
+            fail("Slide 只接受命名参数，布局请使用 Split / Cards 等组件");
           const s: Record<string, unknown> = {
-            layout: c.args[0],
             ...c.named,
             blocks: c.children.map(compileBlock),
           };
+          if (c.args.length) {
+            if (!layouts.includes(c.args[0] as Layout)) fail("未知 layout");
+            s.blocks = [
+              { type: "layout", preset: c.args[0], children: s.blocks },
+            ];
+          }
           apply(s, c.modifiers, "slide");
           (d.slides as unknown[]).push(s);
         } else fail(`顶层不支持 ${c.name}，请使用 Theme 或 Slide`);
@@ -520,6 +589,14 @@ export function parseDeck(source: string): Deck {
 const str = (v: unknown) => JSON.stringify(v);
 function modifiers(b: Block): string {
   let out = "";
+  if (b.glass && b.type !== "glass")
+    out += `.glass(${Object.entries(b.glass)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ")})`;
+  if (b.type === "glass" && b.glass && Object.keys(b.glass).length)
+    out += `.glass(${Object.entries(b.glass)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ")})`;
   if (b.stagger !== undefined) out += `.stagger(${b.stagger})`;
   if (b.size !== undefined) out += `.font(${b.size})`;
   if (b.color) out += `.foreground(${str(b.color)})`;
@@ -562,7 +639,9 @@ function writeBlock(b: Block, indent: string): string {
   if (b.gap !== undefined) args.push(`spacing: ${b.gap}`);
   if (b.columns !== undefined) args.push(`columns: ${b.columns}`);
   let result =
-    indent + names[b.type] + (args.length ? "(" + args.join(", ") + ")" : "");
+    indent +
+    (b.type === "layout" ? layoutComponents[b.preset!] : names[b.type]) +
+    (args.length ? "(" + args.join(", ") + ")" : "");
   if (b.children)
     result +=
       " {\n" +
@@ -591,19 +670,24 @@ export function serialize(d: Deck): string {
     parts.push(
       "Theme(" +
         Object.entries(d.theme)
-          .map(([k, v]) => `${k}: ${str(v)}`)
+          .map(([k, v]) => `${k}: ${k === "material" ? "." + v : str(v)}`)
           .join(", ") +
         ")",
     );
   for (const s of d.slides) {
-    const args = [`.${s.layout}`, `title: ${str(s.title)}`];
+    const args = [`title: ${str(s.title)}`];
     for (const k of ["eyebrow", "subtitle", "id"] as const)
       if (s[k] !== undefined) args.push(`${k}: ${str(s[k])}`);
     let t =
       "Slide(" +
       args.join(", ") +
       ") {\n" +
-      s.blocks.map((b) => writeBlock(b, "    ")).join("\n") +
+      (s.layout
+        ? [{ type: "layout", preset: s.layout, children: s.blocks } as Block]
+        : s.blocks
+      )
+        .map((b) => writeBlock(b, "    "))
+        .join("\n") +
       "\n}";
     if (s.background) t += `.background(${str(s.background)})`;
     if (s.color) t += `.foreground(${str(s.color)})`;
@@ -612,4 +696,37 @@ export function serialize(d: Deck): string {
     parts.push(t);
   }
   return parts.join("\n\n") + "\n";
+}
+
+export function pageLayout(s: Slide): Layout {
+  return s.blocks[0]?.type === "layout"
+    ? s.blocks[0].preset || "content"
+    : s.layout || "content";
+}
+export function pageContent(s: Slide): Block[] {
+  return s.blocks.length === 1 && s.blocks[0].type === "layout"
+    ? s.blocks[0].children || []
+    : s.blocks;
+}
+export function withLayout(s: Slide, preset: Layout): Slide {
+  const { layout, ...rest } = s;
+  void layout;
+  return {
+    ...rest,
+    blocks: [
+      {
+        ...(s.blocks.length === 1 && s.blocks[0].type === "layout"
+          ? s.blocks[0]
+          : {}),
+        type: "layout",
+        preset,
+        children: pageContent(s),
+      },
+    ],
+  };
+}
+export function addPageBlock(s: Slide, b: Block): Block[] {
+  if (s.blocks.length === 1 && s.blocks[0].type === "layout")
+    return [{ ...s.blocks[0], children: [...(s.blocks[0].children || []), b] }];
+  return [...s.blocks, b];
 }

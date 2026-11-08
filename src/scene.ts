@@ -1,6 +1,10 @@
-import type { Block, Deck, Slide, Motion } from "./dsl";
+import { backdropData } from "./materials";
+import { pageLayout } from "./dsl";
+import type { Block, Deck, Slide, Motion, GlassStyle } from "./dsl";
 export type Element = {
   kind: "text" | "rect" | "image" | "equation";
+  glass?: GlassStyle;
+  data?: string;
   x: number;
   y: number;
   w: number;
@@ -68,20 +72,26 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     radius = 22,
     step = 0,
   ) => push({ kind: "rect", x, y, w, h, fill, radius, step });
-  text(s.eyebrow || "EASY SLIDE", 72, 48, 1100, 24, 14, accent, true);
-  const cover = ["cover", "section"].includes(s.layout);
+  const glassBlocks = (bs: Block[]): boolean =>
+    bs.some(
+      (b) => b.glass || b.type === "glass" || glassBlocks(b.children || []),
+    );
+  if (deck.theme?.material === "glass" || glassBlocks(s.blocks))
+    push({
+      kind: "image",
+      data: backdropData(deck, s),
+      x: 0,
+      y: 0,
+      w: 1280,
+      h: 720,
+      step: 0,
+    });
+  if (s.eyebrow) text(s.eyebrow, 72, 48, 1100, 24, 13, accent, true);
+  const preset = pageLayout(s);
+  const cover = ["cover", "section"].includes(preset);
   if (cover) {
     rect(72, 119, 44, 4, accent, 2);
-    text(
-      s.title,
-      72,
-      155,
-      s.layout === "cover" ? 760 : 1136,
-      250,
-      68,
-      fg,
-      true,
-    );
+    text(s.title, 72, 155, preset === "cover" ? 760 : 1136, 250, 68, fg, true);
     if (s.subtitle) text(s.subtitle, 76, 430, 1000, 70, 25, muted);
   } else {
     text(s.title, 72, 104, 1136, 80, 42, fg, true);
@@ -125,18 +135,43 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     const step = b.step || 0,
       c = b.color || fg;
     if (card) {
-      rect(x, y, w, h, panel, 24, step);
+      if (deck.theme?.material === "glass" || b.glass)
+        push({
+          kind: "rect",
+          x,
+          y,
+          w,
+          h,
+          fill: dark ? "#24312f" : "#ffffff",
+          radius: b.glass?.radius ?? 28,
+          glass: b.glass || {},
+          step,
+        });
+      else rect(x, y, w, h, panel, 24, step);
       x += 30;
       y += 28;
       w -= 60;
       h -= 56;
     }
+    if (!card && b.glass)
+      push({
+        kind: "rect",
+        x,
+        y,
+        w,
+        h,
+        fill: dark ? "#24312f" : "#ffffff",
+        radius: b.glass.radius ?? 28,
+        glass: b.glass,
+        step,
+      });
     if (b.background) rect(x, y, w, h, b.background, 12, step);
-    if (b.padding) {
-      x += b.padding;
-      y += b.padding;
-      w = Math.max(0, w - 2 * b.padding);
-      h = Math.max(0, h - 2 * b.padding);
+    const padding = b.padding ?? (b.type === "glass" && !card ? 28 : 0);
+    if (padding) {
+      x += padding;
+      y += padding;
+      w = Math.max(0, w - 2 * padding);
+      h = Math.max(0, h - 2 * padding);
     }
     if (b.title) {
       text(b.title, x, y, w, 44, 23, c, true, step);
@@ -144,7 +179,20 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       h -= 54;
     }
     if (b.type === "spacer") return;
-    if (["hstack", "vstack", "zstack", "grid"].includes(b.type)) {
+    if (b.type === "layout") {
+      renderLayout(
+        b.preset || "content",
+        b.children || [],
+        x,
+        y,
+        w,
+        h,
+        b === s.blocks[0] && s.blocks.length === 1,
+        b,
+      );
+      return;
+    }
+    if (["hstack", "vstack", "zstack", "grid", "glass"].includes(b.type)) {
       const children = b.children || [],
         gap = b.gap ?? 24;
       const child = (
@@ -230,7 +278,17 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     } else if (b.type === "image") {
       push({ kind: "image", src: b.src, x, y, w, h, step });
     } else if (b.type === "metric") {
-      text(b.value || "", x, y, w, 100, b.size || 66, accent, true, step);
+      text(
+        b.value || "",
+        x,
+        y,
+        w,
+        100,
+        Math.min(b.size || 66, w / Math.max(1, (b.value || "").length * 0.6)),
+        accent,
+        true,
+        step,
+      );
       if (b.label) text(b.label, x, y + 110, w, 50, 22, c, true, step);
       if (b.text)
         text(
@@ -332,55 +390,108 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       );
     } else text(b.text || "", x, y, w, h, b.size || 24, c, false, step);
   }
-  const bs = s.blocks,
-    n = bs.length;
-  if (cover) {
-    bs.forEach((b, i) =>
+  function renderLayout(
+    preset: import("./dsl").Layout,
+    bs: Block[],
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    root = false,
+    owner?: Block,
+  ) {
+    const n = bs.length,
+      gap = owner?.gap ?? 24;
+    function place(
+      b: Block,
+      i: number,
+      bx: number,
+      by: number,
+      bw: number,
+      bh: number,
+      card = false,
+    ) {
+      block(
+        {
+          ...b,
+          color: b.color || owner?.color,
+          size: b.size ?? owner?.size,
+          step: Math.max(b.step || 0, owner?.step || 0),
+          appear:
+            owner?.stagger === undefined
+              ? b.appear
+              : {
+                  ...(b.appear || activeMotion || { effect: "rise" }),
+                  delay:
+                    (b.appear?.delay ?? activeMotion?.delay ?? 0) +
+                    i * owner.stagger,
+                },
+        },
+        bx,
+        by,
+        Math.max(0, bw),
+        Math.max(0, bh),
+        card,
+      );
+    }
+    if (root && ["cover", "section"].includes(preset)) {
+      bs.forEach((b, i) =>
+        place(
+          b,
+          i,
+          b.type === "equation" ? 760 : 76,
+          b.type === "equation" ? 250 : 548,
+          b.type === "equation" ? 430 : 1050,
+          b.type === "equation" ? 155 : 70,
+        ),
+      );
+    } else if (["split", "compare", "image"].includes(preset)) {
+      const rows = Math.ceil(n / 2) || 1,
+        cw = (w - gap) / 2,
+        ch = (h - gap * (rows - 1)) / rows;
+      bs.forEach((b, i) =>
+        place(
+          b,
+          i,
+          x + (i % 2) * (cw + gap),
+          y + Math.floor(i / 2) * (ch + gap),
+          cw,
+          ch,
+          preset === "compare",
+        ),
+      );
+    } else if (preset === "grid" || preset === "timeline") {
+      const cols = owner?.columns || Math.min(n, 3) || 1,
+        rows = Math.ceil(n / cols) || 1,
+        cw = (w - gap * (cols - 1)) / cols,
+        ch = (h - gap * (rows - 1)) / rows;
+      bs.forEach((b, i) =>
+        place(
+          b,
+          i,
+          x + (i % cols) * (cw + gap),
+          y + Math.floor(i / cols) * (ch + gap),
+          cw,
+          ch,
+          true,
+        ),
+      );
+    } else {
+      const ch = (h - gap * Math.max(0, n - 1)) / Math.max(n, 1);
+      bs.forEach((b, i) => place(b, i, x, y + i * (ch + gap), w, ch));
+    }
+  }
+  if (s.layout) renderLayout(s.layout, s.blocks, 74, 250, 1132, 370, true);
+  else
+    s.blocks.forEach((b, i) =>
       block(
         b,
-        b.type === "equation" ? 760 : 76,
-        b.type === "equation" ? 250 : 548,
-        b.type === "equation" ? 430 : 1050,
-        b.type === "equation" ? 155 : 70,
+        74,
+        250 + (i * 370) / Math.max(1, s.blocks.length),
+        1132,
+        370 / Math.max(1, s.blocks.length),
         false,
       ),
     );
-  } else if (
-    s.layout === "split" ||
-    s.layout === "compare" ||
-    s.layout === "image"
-  ) {
-    bs.forEach((b, i) => {
-      const row = Math.floor(i / 2),
-        rows = Math.ceil(n / 2),
-        h = 370 / rows - 16;
-      block(
-        b,
-        72 + (i % 2) * 580,
-        252 + row * (h + 16),
-        556,
-        h,
-        s.layout === "compare",
-      );
-    });
-  } else if (s.layout === "grid" || s.layout === "timeline") {
-    const cols = Math.min(n, 3) || 1,
-      rows = Math.ceil(n / cols),
-      w = (1136 - (cols - 1) * 20) / cols,
-      h = (370 - (rows - 1) * 20) / Math.max(rows, 1);
-    bs.forEach((b, i) =>
-      block(
-        b,
-        72 + (i % cols) * (w + 20),
-        252 + Math.floor(i / cols) * (h + 20),
-        w,
-        h,
-        true,
-      ),
-    );
-  } else {
-    const h = 370 / Math.max(n, 1);
-    bs.forEach((b, i) => block(b, 74, 250 + i * h, 1132, h - 16, false));
-  }
   return e;
 }
