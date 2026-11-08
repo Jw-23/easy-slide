@@ -232,6 +232,11 @@ const MAX_ARRAY = 2000;
 export function evaluate(e: Expr, scope: Scope, budget: Budget): unknown {
   if (++budget.operations > 100000)
     error(e, "计算超过 100000 步，请缩小范围或简化表达式");
+  const consume = (count: number) => {
+    budget.operations += count;
+    if (budget.operations > 100000)
+      error(e, "计算超过 100000 步，请缩小范围或简化表达式");
+  };
   const ev = (n: Expr, s = scope) => evaluate(n, s, budget);
   const num = (v: unknown) => {
     if (typeof v !== "number" || !Number.isFinite(v))
@@ -240,6 +245,7 @@ export function evaluate(e: Expr, scope: Scope, budget: Budget): unknown {
   };
   const array = (v: unknown) => {
     if (!Array.isArray(v)) error(e, "此运算需要数组");
+    consume((v as unknown[]).length);
     return v as unknown[];
   };
   const boolean = (v: unknown) => {
@@ -252,6 +258,7 @@ export function evaluate(e: Expr, scope: Scope, budget: Budget): unknown {
       error(e, "计算结果不是有限数值，请检查除法、开方和指数");
     if (Array.isArray(v) && v.length > MAX_ARRAY)
       error(e, "数组最多包含 2000 项");
+    if (Array.isArray(v)) consume(v.length);
     if (typeof v === "string" && v.length > 20000) error(e, "计算文本过长");
     return v;
   };
@@ -273,6 +280,7 @@ export function evaluate(e: Expr, scope: Scope, budget: Budget): unknown {
         return safe(ev(f.body, child));
       }
       if (f.tag === "method") {
+        consume(f.receiver.length);
         if (Object.keys(named).length) error(e, "数组方法不接受命名参数");
         const callItem = (value: unknown, index: number, acc?: unknown) => {
           const lambda = args[0] as Callable;

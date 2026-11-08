@@ -66,6 +66,11 @@ export function validateTable(rows: unknown, opts: TableOptions = {}): void {
     }
   }
   if (
+    opts.columns?.length &&
+    !Number.isFinite(opts.columns.reduce((sum, c) => sum + (c.width ?? 1), 0))
+  )
+    throw Error("列宽权重总和过大");
+  if (
     opts.headers !== undefined &&
     (!Array.isArray(opts.headers) ||
       opts.headers.length > 20 ||

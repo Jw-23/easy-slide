@@ -63,6 +63,7 @@ describe("bounded expression language", () => {
       "sqrt(-1)",
       "range(0,3000)",
       "range(0,2000).map(i => range(0,2000).map(j => i+j))",
+      "range(0,2000).map(i => repeat(0,2000))",
       'fetch("https://example.com")',
       "window.location",
       "[1].constructor",
@@ -127,6 +128,7 @@ describe("computed styled tables", () => {
   it("validates column specs, formats and table size", () => {
     for (const table of [
       'Table(columns:[Column("x",width:0)],rows:[])',
+      'Table(columns:[Column("x",width:1e308),Column("y",width:1e308)],rows:[])',
       'Table(columns:[Column("x",format:"bad")],rows:[])',
       "Table(rows:range(0,101).map(k=>[k]))",
       'Table(rows:[[Column("x")]])',
