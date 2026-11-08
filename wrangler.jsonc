@@ -3,6 +3,7 @@
   "name": "easy-slide",
   "compatibility_date": "2026-11-01",
   "workers_dev": true,
+  "previews": {},
   "build": {
     "command": "npm run build",
     "watch_dir": ["src", "public", "index.html", "vite.config.ts"],

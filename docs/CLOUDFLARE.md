@@ -13,7 +13,7 @@
 | 根目录                           | 仓库根目录，保持默认                                 |
 | 构建命令                         | **留空**                                             |
 | 部署命令                         | `npx wrangler deploy`                                |
-| 非生产分支部署命令（如显示此项） | `npx wrangler versions upload`                       |
+| 非生产分支部署命令（如显示此项） | `npx wrangler preview`                               |
 | Node.js                          | 仓库的 `.node-version` / `.nvmrc` 指定 Node 22       |
 | 构建变量、运行时变量             | 无需设置                                             |
 
@@ -27,9 +27,15 @@ Cloudflare 的 Git 集成会安装仓库锁定的依赖并在后续推送时自�
 
 部署成功后使用 Cloudflare 返回的 workers.dev 地址。功能示例地址为该域名加 `/?example=features`。自定义域名可在 Worker 的域名设置中添加。
 
+## 非生产分支预览
+
+新版 Git 集成使用 `npx wrangler preview` 创建非生产分支预览。仓库的 `wrangler.jsonc` 已包含顶层 `"previews": {}`；这是纯静态项目所需的最小预览配置。`assets`、`build` 和 `compatibility_date` 保留在顶层，无需移入 `previews`。
+
+若日志提示 `missing a previews block`，确认这次构建使用的分支和提交已包含该配置，再重试部署。生产分支仍使用 `npx wrangler deploy`。
+
 ## 仓库配置
 
-- `wrangler.jsonc`：静态输出目录、构建命令、兼容日期与 SPA 回退。
+- `wrangler.jsonc`：静态输出目录、构建命令、兼容日期、SPA 回退与 `previews` 预览配置。
 - `.node-version`、`.nvmrc`、package.json engines：使用兼容 Vite 和 Wrangler 的 Node 版本。
 - `public/_headers`：构建时复制到 dist；HTML、安装清单和 Service Worker 每次访问重新验证，带哈希的 assets 与 Workbox 运行库允许长期缓存。
 - package-lock.json：锁定构建依赖。
@@ -71,3 +77,5 @@ Cloudflare 的 HTTPS 地址支持 PWA 安装。首次访问后缓存应用资源
 - [Wrangler 自定义构建](https://developers.cloudflare.com/workers/wrangler/custom-builds/)
 - [Workers 静态资源](https://developers.cloudflare.com/workers/static-assets/)
 - [静态资源响应头](https://developers.cloudflare.com/workers/static-assets/headers/)
+
+- [Workers Previews 配置](https://developers.cloudflare.com/workers/previews/configuration/#wrangler-configuration-file)
