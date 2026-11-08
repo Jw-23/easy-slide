@@ -1,3 +1,7 @@
+import { MotionPanel } from "./MotionPanel";
+import { DslEditor } from "./DslEditor";
+import { timeline } from "./motion";
+import { scene } from "./scene";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -18,7 +22,6 @@ import {
   Monitor,
   FileText,
   Command,
-  MoreHorizontal,
   Presentation,
   Layers,
   Save,
@@ -33,7 +36,6 @@ import {
   type Deck,
   type Layout,
   type Project,
-  type Block,
 } from "./dsl";
 import { initialSource, mathDeck, engineeringDeck } from "./examples";
 import { SlideView } from "./SlideView";
@@ -56,6 +58,9 @@ export default function App() {
     [modal, setModal] = useState<"export" | "help" | "templates" | null>(null),
     [playing, setPlaying] = useState(false),
     [step, setStep] = useState(0),
+    [previewStep, setPreviewStep] = useState(Infinity),
+    [previewEpoch, setPreviewEpoch] = useState(0),
+    [bottomTab, setBottomTab] = useState<"notes" | "motion">("notes"),
     [toast, setToast] = useState(""),
     [saved, setSaved] = useState("正在恢复"),
     [ready, setReady] = useState(false),
@@ -64,8 +69,7 @@ export default function App() {
     [confirm, setConfirm] = useState<Deck | null>(null);
   const lastDeck = useRef(mathDeck),
     importRef = useRef<HTMLInputElement>(null),
-    imageRef = useRef<HTMLInputElement>(null),
-    editorRef = useRef<HTMLTextAreaElement>(null);
+    imageRef = useRef<HTMLInputElement>(null);
   let error = "";
   let deck: Deck = lastDeck.current;
   try {
@@ -125,12 +129,14 @@ export default function App() {
   function go(n: number) {
     setIndex(Math.max(0, Math.min(deck.slides.length - 1, n)));
     setStep(0);
+    setPreviewStep(Infinity);
   }
   function next() {
-    const stages = (bs: Block[]): number[] =>
-      bs.flatMap((b) => [b.step || 0, ...stages(b.children || [])]);
-    const max = Math.max(0, ...stages(slide.blocks));
-    if (step < max) setStep(step + 1);
+    const stages = [
+      ...new Set(scene(deck, slide, active).map((e) => e.step)),
+    ].sort((a, b) => a - b);
+    const upcoming = stages.find((s) => s > step);
+    if (upcoming !== undefined) setStep(upcoming);
     else go(active + 1);
   }
   useEffect(() => {
@@ -138,7 +144,8 @@ export default function App() {
       const input =
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement;
+        e.target instanceof HTMLSelectElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable);
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
         void save();
@@ -363,7 +370,7 @@ export default function App() {
           </button>
         </div>
       </header>
-      <div className="workspace">
+      <div className={"workspace " + (tab === "dsl" ? "editing" : "")}>
         <aside className="sidebar">
           <div className="sidebar-top">
             <span>演示文稿</span>
@@ -442,6 +449,8 @@ export default function App() {
                 slide={slide}
                 index={active}
                 assets={assets}
+                step={previewStep}
+                epoch={previewEpoch}
                 animate
               />
               <div className="preview-under">
@@ -474,19 +483,49 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <div className="notes-panel">
-              <div>
-                <FileText size={15} />
-                <span>演讲者备注</span>
-                <small>给自己的一点提示</small>
-              </div>
-              <textarea
-                value={slide.notes || ""}
-                disabled={!!error}
-                placeholder="添加这一页的讲述思路，演示时仅你可见…"
-                onChange={(e) => changeSlide({ notes: e.target.value })}
-              />
+            <div className="bottom-tabs">
+              <button
+                className={bottomTab === "notes" ? "active" : ""}
+                onClick={() => setBottomTab("notes")}
+              >
+                <FileText size={13} />
+                演讲者备注
+              </button>
+              <button
+                className={bottomTab === "motion" ? "active" : ""}
+                onClick={() => setBottomTab("motion")}
+              >
+                <Play size={12} />
+                动画编排{" "}
+                <span>{timeline(scene(deck, slide, active)).length}</span>
+              </button>
             </div>
+            {bottomTab === "notes" ? (
+              <div className="notes-panel">
+                <div>
+                  <FileText size={15} />
+                  <span>演讲者备注</span>
+                  <small>给自己的一点提示</small>
+                </div>
+                <textarea
+                  value={slide.notes || ""}
+                  disabled={!!error}
+                  placeholder="添加这一页的讲述思路，演示时仅你可见…"
+                  onChange={(e) => changeSlide({ notes: e.target.value })}
+                />
+              </div>
+            ) : (
+              <MotionPanel
+                cues={timeline(scene(deck, slide, active))}
+                step={previewStep}
+                onPreview={(s) => {
+                  setPreviewStep(s);
+                  setPreviewEpoch((e) => e + 1);
+                }}
+                onAll={() => setPreviewStep(Infinity)}
+                onEdit={() => setTab("dsl")}
+              />
+            )}
             <div className="canvas-tip">
               <Command size={13} />
               <span>⌘ / Ctrl + V 粘贴图片</span>
@@ -601,13 +640,43 @@ export default function App() {
                   <option value="none">无过渡</option>
                 </select>
               </label>
+              <div className="motion-settings">
+                <label>
+                  过渡方向
+                  <select
+                    aria-label="过渡方向"
+                    disabled={!!error}
+                    value={slide.direction || deck.direction || "left"}
+                    onChange={(e) => changeSlide({ direction: e.target.value })}
+                  >
+                    <option value="left">向左</option>
+                    <option value="right">向右</option>
+                    <option value="up">向上</option>
+                    <option value="down">向下</option>
+                  </select>
+                </label>
+                <label>
+                  缓动曲线
+                  <select
+                    aria-label="缓动曲线"
+                    disabled={!!error}
+                    value={slide.easing || deck.easing || "easeOut"}
+                    onChange={(e) => changeSlide({ easing: e.target.value })}
+                  >
+                    <option value="easeOut">柔和减速</option>
+                    <option value="easeInOut">缓入缓出</option>
+                    <option value="linear">匀速</option>
+                    <option value="spring">轻盈弹性</option>
+                  </select>
+                </label>
+              </div>
               <label className="range-label">
                 持续时间<span>{slide.duration ?? deck.duration ?? 600} ms</span>
                 <input
                   type="range"
                   disabled={!!error}
                   min={0}
-                  max={2000}
+                  max={3000}
                   step={50}
                   value={slide.duration ?? deck.duration ?? 600}
                   onChange={(e) =>
@@ -678,30 +747,15 @@ export default function App() {
               </div>
             </div>
           ) : tab === "dsl" ? (
-            <div className="dsl-panel">
-              <div className="dsl-heading">
-                <span>slides.slide</span>
-                <button
-                  className="icon-button"
-                  title="DSL 语法指南"
-                  onClick={() => setModal("help")}
-                >
-                  <BookOpen size={15} />
-                </button>
-              </div>
-              <p>修改即预览，整个演示文稿由你掌控。</p>
-              <textarea
-                ref={editorRef}
-                spellCheck={false}
-                aria-label="DSL 编辑器"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-              />
-              <div className={"dsl-validation " + (error ? "invalid" : "")}>
-                <span className="status-dot" />
-                {error || "语法正确 · 实时同步"}
-              </div>
-            </div>
+            <DslEditor
+              value={source}
+              onChange={setSource}
+              assets={Object.keys(assets)}
+              onFormat={() => {
+                if (!error) update(deck);
+              }}
+              onHelp={() => setModal("help")}
+            />
           ) : (
             <div className="inspector-content">
               <div className="section-heading">
@@ -876,9 +930,9 @@ export default function App() {
                   <Download size={17} />
                 </button>
                 <p className="export-note">
-                  网页支持按 step 逐项呈现；PPTX
-                  导出全部内容，并保留页级过渡。PowerPoint
-                  的逐项入场动画暂不支持。
+                  网页与 PPTX 均支持点击阶段、入场顺序、延迟和时长。PPTX
+                  使用原生入场效果；弹性缓动近似为减速，具体呈现以 PowerPoint
+                  为准。
                 </p>
               </>
             ) : modal === "templates" ? (
@@ -918,18 +972,16 @@ export default function App() {
                   的声明式语法描述演示文稿，支持嵌套布局与链式修饰符。所有尺寸使用
                   1280 × 720 画布像素。
                 </p>
-                <pre>{`Deck("我的研究") {
-    Theme(accent: "#16766d")
-    Slide(.content, title: "一个清晰的结论") {
-        HStack(spacing: 32) {
-            VStack(spacing: 20) {
-                Text("从直觉到证明").font(32)
-                Bullets(["提出问题", "建立模型", "验证结果"])
-            }
-            Equation(#"E = mc^2"#).step(1)
-        }
-    }.notes("先解释直觉，再展示公式")
-}.transition(.slide, duration: 650)`}</pre>
+                <pre>{`Deck("我的研究").transition(.slide, duration: 650)
+Theme(accent: "#16766d")
+
+Slide(.split, title: "一个清晰的结论") {
+    Bullets(["提出问题", "建立模型", "验证结果"])
+        .appear(.rise, step: 1, order: 0, duration: 500)
+    Equation(#"E = mc^2"#)
+        .appear(.zoom, step: 1, order: 1,
+                delay: 150, duration: 700, easing: .easeOut)
+}.notes("先解释直觉，再展示公式")`}</pre>
                 <h3>八种布局</h3>
                 <p>
                   cover 封面 · section 章节 · content 正文 · split 双栏 · grid
@@ -947,7 +999,9 @@ export default function App() {
                   分配空白。修饰符
                   .font()、.foreground()、.background()、.frame(x:, y:, width:,
                   height:)、.padding()、.step() 控制呈现；页面支持 .transition()
-                  与 .notes()。图片使用 assets/
+                  与 .notes()。用 .appear() 定义入场效果、step 点击阶段、order
+                  组内顺序、delay 延迟、duration 时长和 easing
+                  缓动。编辑器支持代码提示和行内错误定位。图片使用 assets/
                   相对路径，可在素材面板插入或粘贴。
                 </p>
                 <p className="muted">

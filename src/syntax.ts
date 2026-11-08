@@ -1,12 +1,19 @@
+import { DslError } from "./diagnostics";
 /** A small declarative language. No eval, Function, dynamic imports or executable expressions. */
 export type Call = {
   name: string;
+  from: number;
+  to: number;
+  line: number;
+  col: number;
   args: unknown[];
   named: Record<string, unknown>;
   children: Call[];
   modifiers: Call[];
 };
 type Token = {
+  from: number;
+  to: number;
   kind: "id" | "string" | "number" | "punct" | "eof";
   value: string;
   line: number;
@@ -26,7 +33,7 @@ export function readSyntax(source: string): Call {
     return c;
   };
   const error = (m: string): never => {
-    throw Error(`第 ${line} 行，第 ${col} 列：${m}`);
+    throw new DslError(m, i, i + 1, line, col);
   };
   while (i < source.length) {
     if (/\s/.test(source[i])) {
@@ -37,6 +44,7 @@ export function readSyntax(source: string): Call {
       while (i < source.length && advance() !== "\n") {}
       continue;
     }
+    const start = i;
     const l = line,
       c = col;
     if (source[i] === '"' || source.slice(i, i + 2) === '#"') {
@@ -69,43 +77,76 @@ export function readSyntax(source: string): Call {
         } else v += ch;
       }
       if (!closed) error("字符串缺少结束引号");
-      ts.push({ kind: "string", value: v, line: l, col: c });
+      ts.push({
+        kind: "string",
+        value: v,
+        line: l,
+        col: c,
+        from: start,
+        to: i,
+      });
       continue;
     }
     const num = source.slice(i).match(/^-?\d+(?:\.\d+)?/);
     if (num) {
       for (let n = 0; n < num[0].length; n++) advance();
-      ts.push({ kind: "number", value: num[0], line: l, col: c });
+      ts.push({
+        kind: "number",
+        value: num[0],
+        line: l,
+        col: c,
+        from: start,
+        to: i,
+      });
       continue;
     }
     const id = source.slice(i).match(/^[A-Za-z_][A-Za-z_0-9]*/);
     if (id) {
       for (let n = 0; n < id[0].length; n++) advance();
-      ts.push({ kind: "id", value: id[0], line: l, col: c });
+      ts.push({
+        kind: "id",
+        value: id[0],
+        line: l,
+        col: c,
+        from: start,
+        to: i,
+      });
       continue;
     }
     if ("(){}[]:,.".includes(source[i])) {
-      ts.push({ kind: "punct", value: advance(), line: l, col: c });
+      ts.push({
+        kind: "punct",
+        value: advance(),
+        line: l,
+        col: c,
+        from: start,
+        to: i,
+      });
       continue;
     }
     error(`无法识别字符 ${source[i]}`);
   }
-  ts.push({ kind: "eof", value: "", line, col });
+  ts.push({ kind: "eof", value: "", line, col, from: i, to: i });
   let pos = 0,
     depth = 0;
   const peek = () => ts[pos];
   const take = (v?: string) => {
     const t = ts[pos];
     if (v !== undefined && t.value !== v)
-      throw Error(
-        `第 ${t.line} 行，第 ${t.col} 列：需要 ${v}，得到 ${t.value || "文件结尾"}`,
+      throw new DslError(
+        `需要 ${v}，得到 ${t.value || "文件结尾"}`,
+        t.from,
+        t.to,
+        t.line,
+        t.col,
+        `在此处补上 ${v}，并检查上一项是否缺少逗号。`,
       );
     pos++;
     return t;
   };
   const fail = (m: string): never => {
     const t = peek();
-    throw Error(`第 ${t.line} 行，第 ${t.col} 列：${m}`);
+    throw new DslError(m, t.from, t.to, t.line, t.col);
   };
   function value(): unknown {
     const t = peek();
@@ -138,6 +179,7 @@ export function readSyntax(source: string): Call {
   function call(modifier = false): Call {
     if (++depth > 30) fail("布局嵌套不得超过 30 层");
     if (peek().kind !== "id") fail("需要声明名称");
+    const origin = peek();
     const name = take().value,
       args: unknown[] = [],
       named: Record<string, unknown> = {};
@@ -172,9 +214,19 @@ export function readSyntax(source: string): Call {
         modifiers.push(call(true));
       }
     depth--;
-    return { name, args, named, children, modifiers };
+    return {
+      name,
+      args,
+      named,
+      children,
+      modifiers,
+      from: origin.from,
+      to: ts[pos - 1].to,
+      line: origin.line,
+      col: origin.col,
+    };
   }
   const root = call();
-  if (peek().kind !== "eof") fail("工程只能有一个 Deck 声明");
+  while (peek().kind !== "eof") root.children.push(call());
   return root;
 }

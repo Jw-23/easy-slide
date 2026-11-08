@@ -1,4 +1,4 @@
-import type { Block, Deck, Slide } from "./dsl";
+import type { Block, Deck, Slide, Motion } from "./dsl";
 export type Element = {
   kind: "text" | "rect" | "image" | "equation";
   x: number;
@@ -15,6 +15,8 @@ export type Element = {
   step: number;
   mono?: boolean;
   opacity?: number;
+  appear?: Motion;
+  motionKey?: string;
 };
 export function scene(deck: Deck, s: Slide, index: number): Element[] {
   const accent = deck.theme?.accent || "#16766d",
@@ -27,6 +29,11 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
   const muted = dark ? "#b6c1c1" : "#71817e",
     panel = dark ? "#263633" : "#eef2ef";
   const e: Element[] = [];
+  let activeMotion: Motion | undefined,
+    activeKey: string | undefined,
+    counter = 0;
+  const push = (el: Element) =>
+    e.push({ ...el, appear: activeMotion, motionKey: activeKey });
   const text = (
     t: string,
     x: number,
@@ -39,7 +46,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     step = 0,
     mono = false,
   ) =>
-    e.push({
+    push({
       kind: "text",
       text: t,
       x,
@@ -60,7 +67,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     fill = panel,
     radius = 22,
     step = 0,
-  ) => e.push({ kind: "rect", x, y, w, h, fill, radius, step });
+  ) => push({ kind: "rect", x, y, w, h, fill, radius, step });
   text(s.eyebrow || "EASY SLIDE", 72, 48, 1100, 24, 14, accent, true);
   const cover = ["cover", "section"].includes(s.layout);
   if (cover) {
@@ -83,6 +90,27 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
   text(deck.author || deck.title, 72, 664, 1000, 20, 12, muted);
   text(String(index + 1).padStart(2, "0"), 1160, 662, 50, 22, 14, accent, true);
   function block(
+    b: Block,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    card: boolean,
+  ) {
+    const previousMotion = activeMotion,
+      previousKey = activeKey;
+    if (b.appear) {
+      activeMotion = b.appear;
+      activeKey = "motion-" + counter++;
+    } else if (!activeKey && ((b.step || 0) > 0 || b.stagger !== undefined)) {
+      activeMotion = { effect: "rise", duration: 450 };
+      activeKey = "motion-" + counter++;
+    }
+    renderBlock(b, x, y, w, h, card);
+    activeMotion = previousMotion;
+    activeKey = previousKey;
+  }
+  function renderBlock(
     b: Block,
     x: number,
     y: number,
@@ -131,6 +159,15 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
             ...c,
             color: c.color || b.color,
             size: c.size ?? b.size,
+            appear:
+              b.stagger === undefined
+                ? c.appear
+                : {
+                    ...(c.appear || activeMotion || { effect: "rise" }),
+                    delay:
+                      (c.appear?.delay ?? activeMotion?.delay ?? 0) +
+                      children.indexOf(c) * b.stagger,
+                  },
             step: Math.max(c.step || 0, step),
           },
           cx,
@@ -180,7 +217,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       return;
     }
     if (b.type === "equation") {
-      e.push({
+      push({
         kind: "equation",
         text: b.text || "",
         x,
@@ -191,7 +228,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         step,
       });
     } else if (b.type === "image") {
-      e.push({ kind: "image", src: b.src, x, y, w, h, step });
+      push({ kind: "image", src: b.src, x, y, w, h, step });
     } else if (b.type === "metric") {
       text(b.value || "", x, y, w, 100, b.size || 66, accent, true, step);
       if (b.label) text(b.label, x, y + 110, w, 50, 22, c, true, step);
@@ -211,6 +248,15 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       const items = b.items || [];
       const gap = Math.min(74, h / Math.max(items.length, 1));
       items.forEach((item, i) => {
+        const oldMotion = activeMotion,
+          oldKey = activeKey;
+        if (b.stagger !== undefined) {
+          activeMotion = {
+            ...(activeMotion || { effect: "rise" }),
+            delay: (activeMotion?.delay ?? 0) + i * b.stagger,
+          };
+          activeKey = oldKey + "-item-" + i;
+        }
         rect(x, y + i * gap + 11, 6, 6, accent, 3, step);
         text(
           item,
@@ -223,12 +269,23 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           false,
           step,
         );
+        activeMotion = oldMotion;
+        activeKey = oldKey;
       });
     } else if (b.type === "table") {
       const rows = b.rows || [];
       const cols = Math.max(1, ...rows.map((r) => r.length)),
         rh = Math.min(64, h / Math.max(rows.length, 1));
       rows.forEach((r, i) => {
+        const oldMotion = activeMotion,
+          oldKey = activeKey;
+        if (b.stagger !== undefined) {
+          activeMotion = {
+            ...(activeMotion || { effect: "rise" }),
+            delay: (activeMotion?.delay ?? 0) + i * b.stagger,
+          };
+          activeKey = oldKey + "-row-" + i;
+        }
         rect(x, y + i * rh, w, rh - 2, i === 0 ? accent : panel, 4, step);
         r.forEach((v, j) =>
           text(
@@ -243,6 +300,8 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
             step,
           ),
         );
+        activeMotion = oldMotion;
+        activeKey = oldKey;
       });
     } else if (b.type === "quote") {
       rect(x, y, 4, h, accent, 2, step);

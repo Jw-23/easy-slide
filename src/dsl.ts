@@ -1,3 +1,4 @@
+import { DslError, closest } from "./diagnostics";
 import { readSyntax, type Call } from "./syntax";
 export const layouts = [
   "cover",
@@ -20,7 +21,25 @@ export const layoutLabels: Record<Layout, string> = {
   timeline: "时间线",
   image: "图文",
 };
+export const effects = [
+  "fade",
+  "rise",
+  "slideLeft",
+  "slideRight",
+  "zoom",
+  "none",
+] as const;
+export const easings = ["linear", "easeOut", "easeInOut", "spring"] as const;
+export type Motion = {
+  effect: (typeof effects)[number];
+  order?: number;
+  delay?: number;
+  duration?: number;
+  easing?: (typeof easings)[number];
+};
 export type Block = {
+  appear?: Motion;
+  stagger?: number;
   type:
     | "text"
     | "bullets"
@@ -65,6 +84,8 @@ export type Slide = {
   color?: string;
   transition?: "fade" | "slide" | "zoom" | "none";
   duration?: number;
+  easing?: (typeof easings)[number];
+  direction?: "left" | "right" | "up" | "down";
   notes?: string;
   blocks: Block[];
 };
@@ -80,6 +101,8 @@ export type Deck = {
   };
   transition?: "fade" | "slide" | "zoom" | "none";
   duration?: number;
+  easing?: (typeof easings)[number];
+  direction?: "left" | "right" | "up" | "down";
   slides: Slide[];
 };
 export type Project = {
@@ -190,10 +213,37 @@ export function validateDeck(input: unknown): Deck {
           b.src.includes(".."))
       )
         fail(`${p}：图片请使用 assets/ 相对路径`);
+      if (b.stagger !== undefined) {
+        if (!Number.isFinite(b.stagger) || b.stagger < 0 || b.stagger > 10000)
+          fail(`${p}：stagger 范围 0–10000 毫秒`);
+        if (
+          !["bullets", "table", "hstack", "vstack", "zstack", "grid"].includes(
+            b.type,
+          )
+        )
+          fail(`${p}：stagger 仅支持列表、表格和布局容器`);
+      }
+      if (b.appear) {
+        if (!effects.includes(b.appear.effect))
+          fail(`${p}：appear 效果支持 ${effects.join(" / ")}`);
+        if (b.appear.easing !== undefined && !easings.includes(b.appear.easing))
+          fail(`${p}：easing 支持 ${easings.join(" / ")}`);
+        for (const k of ["duration", "delay", "order"] as const) {
+          const v = b.appear[k];
+          if (
+            v !== undefined &&
+            (!Number.isFinite(v) || v < 0 || v > (k === "order" ? 100 : 10000))
+          )
+            fail(`${p}：appear.${k} 范围 0–${k === "order" ? 100 : 10000}`);
+        }
+        if (b.appear.order !== undefined && !Number.isInteger(b.appear.order))
+          fail(`${p}：order 必须为整数`);
+      }
       if (b.background && !color.test(b.background))
         fail(`${p}：背景颜色使用 #RRGGBB`);
       if (b.color && !color.test(b.color)) fail(`${p}：颜色使用 #RRGGBB`);
     }
+    validateTransition(s, p);
     for (const k of ["transition"])
       if (
         s[k] !== undefined &&
@@ -227,6 +277,7 @@ export function validateDeck(input: unknown): Deck {
     (!Number.isFinite(d.duration) || d.duration < 0 || d.duration > 3000)
   )
     fail("duration 范围 0–3000 毫秒");
+  validateTransition(d, "Deck");
   return d as Deck;
 }
 
@@ -252,6 +303,40 @@ export function validateProject(p: unknown): Project {
       fail("工程内包含不支持的图片");
   return v;
 }
+
+function validateTransition(t: Deck | Slide, p: string) {
+  if (t.easing !== undefined && !easings.includes(t.easing))
+    fail(`${p}：easing 支持 ${easings.join(" / ")}`);
+  if (
+    t.direction !== undefined &&
+    !["left", "right", "up", "down"].includes(t.direction)
+  )
+    fail(`${p}：direction 支持 left / right / up / down`);
+}
+function at<T>(c: Call, fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof DslError) throw e;
+    const detail = (e as Error).message.replace(/^第 1 页：/, "");
+    throw new DslError(
+      detail,
+      c.from,
+      c.to,
+      c.line,
+      c.col,
+      detail.includes("未知")
+        ? "检查拼写；按 Ctrl / ⌘ + Space 查看可用声明与参数。"
+        : "请根据提示修改此声明。尺寸、时长和顺序均使用非负数字。",
+    );
+  }
+}
+const sampleSlide: Slide = {
+  layout: "content",
+  title: "validation",
+  blocks: [],
+};
+
 const blockNames: Record<string, Block["type"]> = {
   Text: "text",
   Bullets: "bullets",
@@ -272,7 +357,10 @@ const names = Object.fromEntries(
 );
 const plain = (c: Call, allowed: string[]) => {
   for (const k of Object.keys(c.named))
-    if (!allowed.includes(k)) fail(`${c.name}：未知参数 ${k}`);
+    if (!allowed.includes(k))
+      fail(
+        `${c.name}：未知参数 ${k}${closest(k, allowed) ? `，是否想写 ${closest(k, allowed)}？` : ""}。可用参数：${allowed.join(", ") || "无"}`,
+      );
 };
 const apply = (
   target: Record<string, unknown>,
@@ -280,114 +368,169 @@ const apply = (
   kind: "deck" | "slide" | "block",
 ) => {
   for (const m of mods) {
-    if (m.name === "transition" && kind !== "block") {
-      plain(m, ["duration"]);
-      target.transition = m.args[0];
-      if (m.named.duration !== undefined) target.duration = m.named.duration;
-    } else if (m.name === "background" && kind !== "deck") {
-      plain(m, []);
-      target.background = m.args[0];
-    } else if (m.name === "foreground" && kind !== "deck") {
-      plain(m, []);
-      target.color = m.args[0];
-    } else if (m.name === "notes" && kind === "slide") {
-      plain(m, []);
-      target.notes = m.args[0];
-    } else if (kind === "block" && m.name === "font") {
-      plain(m, []);
-      target.size = m.args[0];
-    } else if (kind === "block" && m.name === "title") {
-      plain(m, []);
-      target.title = m.args[0];
-    } else if (kind === "block" && m.name === "step") {
-      plain(m, []);
-      target.step = m.args[0];
-    } else if (kind === "block" && m.name === "padding") {
-      plain(m, []);
-      target.padding = m.args[0];
-    } else if (kind === "block" && m.name === "frame") {
-      plain(m, ["x", "y", "width", "height"]);
-      for (const [k, v] of Object.entries(m.named))
-        target[k === "width" ? "w" : k === "height" ? "h" : k] = v;
-    } else fail(`${kind} 不支持修饰符 .${m.name}`);
+    at(m, () => {
+      if (m.name === "transition" && kind !== "block") {
+        plain(m, ["duration", "easing", "direction"]);
+        for (const k of ["easing", "direction"])
+          if (m.named[k] !== undefined) target[k] = m.named[k];
+        target.transition = m.args[0];
+        if (m.named.duration !== undefined) target.duration = m.named.duration;
+      } else if (m.name === "appear" && kind === "block") {
+        plain(m, ["step", "order", "delay", "duration", "easing"]);
+        const { step, ...motion } = m.named;
+        target.appear = { effect: m.args[0], ...motion };
+        if (step !== undefined) target.step = step;
+      } else if (m.name === "background" && kind !== "deck") {
+        plain(m, []);
+        target.background = m.args[0];
+      } else if (m.name === "foreground" && kind !== "deck") {
+        plain(m, []);
+        target.color = m.args[0];
+      } else if (m.name === "notes" && kind === "slide") {
+        plain(m, []);
+        target.notes = m.args[0];
+      } else if (kind === "block" && m.name === "font") {
+        plain(m, []);
+        target.size = m.args[0];
+      } else if (kind === "block" && m.name === "title") {
+        plain(m, []);
+        target.title = m.args[0];
+      } else if (kind === "block" && m.name === "step") {
+        plain(m, []);
+        target.step = m.args[0];
+      } else if (kind === "block" && m.name === "stagger") {
+        plain(m, []);
+        target.stagger = m.args[0];
+      } else if (kind === "block" && m.name === "padding") {
+        plain(m, []);
+        target.padding = m.args[0];
+      } else if (kind === "block" && m.name === "frame") {
+        plain(m, ["x", "y", "width", "height"]);
+        for (const [k, v] of Object.entries(m.named))
+          target[k === "width" ? "w" : k === "height" ? "h" : k] = v;
+      } else
+        fail(
+          `${kind} 不支持修饰符 .${m.name}${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"]) ? `，是否想写 .${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"])}？` : ""}`,
+        );
+      if (m.args.length !== (m.name === "frame" ? 0 : 1))
+        fail(
+          `.${m.name} ${m.name === "frame" ? "仅接受命名参数" : "需要一个未命名参数"}`,
+        );
+      if (kind === "block")
+        validateDeck({
+          version: 1,
+          title: "validation",
+          slides: [{ ...sampleSlide, blocks: [target] }],
+        });
+      else if (kind === "slide")
+        validateDeck({ version: 1, title: "validation", slides: [target] });
+      else validateDeck({ ...target, slides: [sampleSlide] });
+    });
   }
 };
 function compileBlock(c: Call): Block {
-  const type = blockNames[c.name];
-  if (!type) fail(`未知内容声明 ${c.name}`);
-  plain(c, [
-    "title",
-    "text",
-    "items",
-    "src",
-    "value",
-    "label",
-    "rows",
-    "spacing",
-    "columns",
-  ]);
-  const b: Record<string, unknown> = { type, ...c.named };
-  if (c.named.spacing !== undefined) {
-    b.gap = c.named.spacing;
-    delete b.spacing;
-  }
-  if (c.args.length > 1) fail(`${c.name} 只接受一个未命名参数`);
-  const field =
-    type === "image"
-      ? "src"
-      : type === "metric"
-        ? "value"
-        : type === "bullets"
-          ? "items"
-          : type === "table"
-            ? "rows"
-            : "text";
-  if (c.args.length) b[field] = c.args[0];
-  if (["hstack", "vstack", "zstack", "grid"].includes(type))
-    b.children = c.children.map(compileBlock);
-  else if (c.children.length) fail(`${c.name} 不能嵌套内容`);
-  apply(b, c.modifiers, "block");
-  return b as Block;
+  return at(c, () => {
+    const type = blockNames[c.name];
+    if (!type)
+      fail(
+        `未知内容声明 ${c.name}${closest(c.name, Object.keys(blockNames)) ? `，是否想写 ${closest(c.name, Object.keys(blockNames))}？` : ""}`,
+      );
+    plain(c, [
+      "title",
+      "text",
+      "items",
+      "src",
+      "value",
+      "label",
+      "rows",
+      "spacing",
+      "columns",
+    ]);
+    const b: Record<string, unknown> = { type, ...c.named };
+    if (c.named.spacing !== undefined) {
+      b.gap = c.named.spacing;
+      delete b.spacing;
+    }
+    if (c.args.length > 1) fail(`${c.name} 只接受一个未命名参数`);
+    const field =
+      type === "image"
+        ? "src"
+        : type === "metric"
+          ? "value"
+          : type === "bullets"
+            ? "items"
+            : type === "table"
+              ? "rows"
+              : "text";
+    if (c.args.length) b[field] = c.args[0];
+    if (["hstack", "vstack", "zstack", "grid"].includes(type))
+      b.children = c.children.map(compileBlock);
+    else if (c.children.length) fail(`${c.name} 不能嵌套内容`);
+    apply(b, c.modifiers, "block");
+    validateDeck({
+      version: 1,
+      title: "validation",
+      slides: [{ ...sampleSlide, blocks: [b] }],
+    });
+    return b as Block;
+  });
 }
 export function parseDeck(source: string): Deck {
   const root = readSyntax(source);
-  if (root.name !== "Deck") fail('工程必须以 Deck("工程名称") { ... } 开始');
-  plain(root, ["author", "version"]);
-  if (root.args.length !== 1) fail("Deck 需要一个工程名称");
-  const d: Record<string, unknown> = {
-    version: root.named.version ?? 1,
-    title: root.args[0],
-    ...(root.named.author !== undefined ? { author: root.named.author } : {}),
-    slides: [],
-  };
-  for (const c of root.children) {
-    if (c.name === "Theme") {
-      plain(c, ["accent", "background", "color", "font"]);
-      if (c.args.length || c.children.length || c.modifiers.length)
-        fail("Theme 只接受命名参数");
-      if (d.theme) fail("Theme 不可重复");
-      d.theme = c.named;
-    } else if (c.name === "Slide") {
-      plain(c, ["title", "eyebrow", "subtitle", "notes", "id"]);
-      if (c.args.length !== 1) fail("Slide 需要一个 .布局");
-      const s: Record<string, unknown> = {
-        layout: c.args[0],
-        ...c.named,
-        blocks: c.children.map(compileBlock),
-      };
-      apply(s, c.modifiers, "slide");
-      (d.slides as unknown[]).push(s);
-    } else fail(`Deck 内不支持 ${c.name}`);
-  }
-  apply(d, root.modifiers, "deck");
-  return validateDeck(d);
+  return at(root, () => {
+    if (root.name !== "Deck")
+      fail('工程必须以 Deck("工程名称") 开始，Slide 与 Deck 并列书写');
+    plain(root, ["author", "version"]);
+    if (root.args.length !== 1) fail("Deck 需要一个工程名称");
+    const d: Record<string, unknown> = {
+      version: root.named.version ?? 1,
+      title: root.args[0],
+      ...(root.named.author !== undefined ? { author: root.named.author } : {}),
+      slides: [],
+    };
+    for (const c of root.children) {
+      at(c, () => {
+        if (c.name === "Theme") {
+          plain(c, ["accent", "background", "color", "font"]);
+          if (c.args.length || c.children.length || c.modifiers.length)
+            fail("Theme 只接受命名参数");
+          if (d.theme) fail("Theme 不可重复");
+          d.theme = c.named;
+        } else if (c.name === "Slide") {
+          plain(c, ["title", "eyebrow", "subtitle", "notes", "id"]);
+          if (c.args.length !== 1) fail("Slide 需要一个 .布局");
+          const s: Record<string, unknown> = {
+            layout: c.args[0],
+            ...c.named,
+            blocks: c.children.map(compileBlock),
+          };
+          apply(s, c.modifiers, "slide");
+          (d.slides as unknown[]).push(s);
+        } else fail(`顶层不支持 ${c.name}，请使用 Theme 或 Slide`);
+        validateDeck({
+          ...d,
+          slides: (d.slides as unknown[]).length ? d.slides : [sampleSlide],
+        });
+      });
+    }
+    apply(d, root.modifiers, "deck");
+    return validateDeck(d);
+  });
 }
 const str = (v: unknown) => JSON.stringify(v);
 function modifiers(b: Block): string {
   let out = "";
+  if (b.stagger !== undefined) out += `.stagger(${b.stagger})`;
   if (b.size !== undefined) out += `.font(${b.size})`;
   if (b.color) out += `.foreground(${str(b.color)})`;
-  if (b.step !== undefined) out += `.step(${b.step})`;
+  if (b.appear)
+    out += `.appear(.${b.appear.effect}${b.step !== undefined ? `, step: ${b.step}` : ""}${Object.entries(
+      b.appear,
+    )
+      .filter(([k]) => k !== "effect")
+      .map(([k, v]) => `, ${k}: ${typeof v === "string" ? "." + v : v}`)
+      .join("")})`;
+  else if (b.step !== undefined) out += `.step(${b.step})`;
   const frame = [
     ["x", b.x],
     ["y", b.y],
@@ -429,12 +572,24 @@ function writeBlock(b: Block, indent: string): string {
       "}";
   return result + modifiers(b);
 }
+function transitionText(s: Deck | Slide, fallback = "fade"): string {
+  if (
+    s.transition === undefined &&
+    s.duration === undefined &&
+    s.easing === undefined &&
+    s.direction === undefined
+  )
+    return "";
+  return `.transition(.${s.transition || fallback}${s.duration !== undefined ? `, duration: ${s.duration}` : ""}${s.easing ? `, easing: .${s.easing}` : ""}${s.direction ? `, direction: .${s.direction}` : ""})`;
+}
 export function serialize(d: Deck): string {
-  const head = `Deck(${str(d.title)}${d.author ? `, author: ${str(d.author)}` : ""}) {`;
-  const body: string[] = [];
+  const parts = [
+    `Deck(${str(d.title)}${d.author ? `, author: ${str(d.author)}` : ""})` +
+      transitionText(d),
+  ];
   if (d.theme)
-    body.push(
-      "    Theme(" +
+    parts.push(
+      "Theme(" +
         Object.entries(d.theme)
           .map(([k, v]) => `${k}: ${str(v)}`)
           .join(", ") +
@@ -445,26 +600,16 @@ export function serialize(d: Deck): string {
     for (const k of ["eyebrow", "subtitle", "id"] as const)
       if (s[k] !== undefined) args.push(`${k}: ${str(s[k])}`);
     let t =
-      "    Slide(" +
+      "Slide(" +
       args.join(", ") +
       ") {\n" +
-      s.blocks.map((b) => writeBlock(b, "        ")).join("\n") +
-      "\n    }";
+      s.blocks.map((b) => writeBlock(b, "    ")).join("\n") +
+      "\n}";
     if (s.background) t += `.background(${str(s.background)})`;
     if (s.color) t += `.foreground(${str(s.color)})`;
-    if (s.transition || s.duration !== undefined)
-      t += `.transition(.${s.transition || d.transition || "fade"}${s.duration !== undefined ? `, duration: ${s.duration}` : ""})`;
+    t += transitionText(s, d.transition);
     if (s.notes !== undefined) t += `.notes(${str(s.notes)})`;
-    body.push(t);
+    parts.push(t);
   }
-  return (
-    head +
-    "\n" +
-    body.join("\n\n") +
-    "\n}" +
-    (d.transition || d.duration !== undefined
-      ? `.transition(.${d.transition || "fade"}${d.duration !== undefined ? `, duration: ${d.duration}` : ""})`
-      : "") +
-    "\n"
-  );
+  return parts.join("\n\n") + "\n";
 }

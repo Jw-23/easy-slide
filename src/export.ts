@@ -1,3 +1,5 @@
+import { timeline } from "./motion";
+import { pptxTiming, shapeIds } from "./pptx-motion";
 import PptxGenJS from "pptxgenjs";
 import JSZip from "jszip";
 import { scene } from "./scene";
@@ -87,20 +89,24 @@ export async function exportPptx(deck: Deck, assets: Record<string, string>) {
     if (!file) continue;
     const type = s.transition || deck.transition || "fade",
       duration = s.duration ?? deck.duration ?? 600;
+    const direction = { left: "l", right: "r", up: "u", down: "d" }[
+      s.direction || deck.direction || "left"
+    ];
     const effect =
       type === "slide"
-        ? '<p:push dir="l"/>'
+        ? `<p:push dir="${direction}"/>`
         : type === "zoom"
           ? '<p:zoom dir="in"/>'
           : "<p:fade/>";
+    let xml = await file.async("string");
     if (type !== "none")
-      zip.file(
-        path,
-        (await file.async("string")).replace(
-          "</p:clrMapOvr>",
-          `</p:clrMapOvr><p:transition spd="${duration > 700 ? "slow" : duration < 400 ? "fast" : "med"}">${effect}</p:transition>`,
-        ),
+      xml = xml.replace(
+        "</p:clrMapOvr>",
+        `</p:clrMapOvr><p:transition xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" p14:dur="${duration}" spd="${duration > 700 ? "slow" : duration < 400 ? "fast" : "med"}">${effect}</p:transition>`,
       );
+    const timing = pptxTiming(timeline(scene(deck, s, i)), shapeIds(xml));
+    if (timing) xml = xml.replace("</p:sld>", timing + "</p:sld>");
+    zip.file(path, xml);
   }
   download(
     await zip.generateAsync({

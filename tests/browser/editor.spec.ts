@@ -22,14 +22,18 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   await expect(page.locator(".preview-wrap")).toContainText("本地测试标题");
   await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
-  const source = await editor.inputValue();
+  const backup = page.waitForEvent("download");
+  await page.getByRole("button", { name: "保存工程", exact: true }).click();
+  const source = JSON.parse(
+    await readFile((await (await backup).path())!, "utf8"),
+  ).source;
   await editor.fill('Deck("broken") {}');
-  await expect(page.locator(".dsl-validation")).toContainText("1–200");
+  await expect(page.locator(".editor-diagnostic")).toContainText("1–200");
   await expect(page.locator(".preview-wrap")).toContainText("本地测试标题");
   await editor.fill(source);
   await page.locator(".slide-item").nth(2).click();
   await page.getByRole("button", { name: "演示", exact: true }).click();
-  const formula = page.locator(".presentation img");
+  const formula = page.locator(".presentation img").locator("..");
   await expect(formula).toHaveCSS("opacity", "0");
   await page.keyboard.press("Space");
   await expect(formula).toHaveCSS("opacity", "1");
@@ -60,6 +64,19 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   expect(first).toContain("本地测试标题");
   expect(first).toContain("<p:transition");
   expect(first).toContain("<p:push");
+  const animated = await zip.file("ppt/slides/slide6.xml")!.async("string");
+  expect(animated).toContain("<p:timing>");
+  expect(animated).toContain('presetClass="entr"');
+  expect(animated).toContain('delay="600"');
+  expect(animated).toContain('delay="1200"');
+  const invalidXml = await page.evaluate(
+    async (str) =>
+      new DOMParser()
+        .parseFromString(str, "application/xml")
+        .querySelector("parsererror")?.textContent,
+    animated,
+  );
+  expect(invalidXml).toBeUndefined();
   expect(Object.keys(zip.files).some((x) => x.endsWith(".svg"))).toBeTruthy();
   expect(errors).toEqual([]);
   await page.screenshot({ path: "test-results/editor.png", fullPage: true });
@@ -147,4 +164,77 @@ test("all runtime requests stay local, including math rendering and help", async
   await page.getByRole("button", { name: "DSL 使用指南" }).click();
   await expect(page.locator(".help-modal")).toBeVisible();
   expect(remote).toEqual([]);
+});
+test("flat authoring offers completion, located diagnostics and timed playback", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  await editor.fill('Deck("提示")\nSlide(.content, title: "测试") {\n    Te');
+  await page.keyboard.press("Control+Space");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("Text");
+  await page
+    .locator(".cm-tooltip-autocomplete li")
+    .filter({ hasText: "Text" })
+    .first()
+    .click();
+  await expect(editor).toContainText('Text("正文")');
+  await editor.fill(
+    'Deck("提示")\nSlide(.content, title: "测试") {\n    Text("错误").font(-3)\n}',
+  );
+  const diagnostic = page.locator(".editor-diagnostic");
+  await expect(diagnostic).toContainText("第 3 行");
+  await expect(diagnostic).toContainText("size 必须是非负数字");
+  await diagnostic.getByRole("button", { name: /定位/ }).click();
+  await expect(editor).toBeFocused();
+  await editor.fill(
+    'Deck("提示")\nSlide(.content,title:"测试"){Text("A").appear(.',
+  );
+  await page.keyboard.press("Control+Space");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText(
+    "slideLeft",
+  );
+  await editor.fill(`Deck("编排测试").transition(.none)
+Slide(.content, title: "定义出现顺序") {
+ Text("首先出现").appear(.rise, step: 1, order: 0, duration: 400)
+ Text("接续出现").appear(.zoom, step: 1, order: 1, delay: 150, duration: 500, easing: .linear)
+ Text("下一次点击").appear(.fade, step: 3, duration: 300)
+}`);
+  await expect(page.locator(".dsl-validation")).toContainText("语法正确");
+  await expect(page.locator(".preview-wrap")).toContainText("定义出现顺序");
+  await page.getByRole("button", { name: /动画编排/ }).click();
+  await expect(page.locator(".motion-panel")).toContainText("550–1050 ms");
+  await page
+    .locator(".stage-chips")
+    .getByRole("button", { name: "点击 1", exact: true })
+    .click();
+  const animation = await page
+    .locator(".preview-wrap [data-motion]")
+    .filter({ hasText: "接续出现" })
+    .evaluate((e) => e.getAnimations()[0]?.effect?.getTiming());
+  expect(animation).toMatchObject({
+    delay: 550,
+    duration: 500,
+    easing: "linear",
+  });
+  await page.getByRole("button", { name: "演示", exact: true }).click();
+  await page.keyboard.press("Space");
+  await expect(
+    page.locator(".presentation [data-motion]").filter({ hasText: "首先出现" }),
+  ).toHaveCSS("opacity", "1");
+  await page.keyboard.press("Space");
+  await expect(
+    page
+      .locator(".presentation [data-motion]")
+      .filter({ hasText: "下一次点击" }),
+  ).toHaveCSS("opacity", "1");
+  await page.keyboard.press("Escape");
+  await page.screenshot({
+    path: "test-results/flat-dsl-editor.png",
+    fullPage: true,
+  });
 });

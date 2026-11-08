@@ -259,4 +259,30 @@ export const engineeringDeck: Deck = {
     },
   ],
 };
+// Demonstrate parallel and sequential entrances without requiring nested wrappers.
+mathDeck.slides[2].blocks[0].stagger = 120;
+mathDeck.slides[2].blocks[0].appear = {
+  effect: "rise",
+  duration: 500,
+  easing: "easeOut",
+};
+mathDeck.slides[2].blocks[1].appear = {
+  effect: "zoom",
+  delay: 150,
+  duration: 700,
+  easing: "easeOut",
+};
+mathDeck.slides[5].blocks.forEach((b, i) => {
+  b.step = 1;
+  b.appear = {
+    effect: "rise",
+    order: i,
+    duration: 500,
+    delay: i === 0 ? 0 : 100,
+    easing: "easeOut",
+  };
+});
+engineeringDeck.slides[1].blocks.forEach((b, i) => {
+  b.appear = { effect: "rise", order: i, duration: 450, easing: "easeOut" };
+});
 export const initialSource = serialize(mathDeck);
