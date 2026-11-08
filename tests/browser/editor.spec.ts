@@ -63,6 +63,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   await expect(page.getByRole("status")).toContainText("工程已导入");
   await page.getByRole("button", { name: "导出", exact: true }).click();
   const dl = page.waitForEvent("download");
+  await page.getByRole("radio", { name: "可编辑文字" }).check();
   await page.getByRole("button", { name: /PowerPoint/ }).click();
   const file = await dl;
   const zip = await JSZip.loadAsync(await readFile((await file.path())!));
@@ -364,6 +365,7 @@ Slide(title:"公式与结论", eyebrow:"RESULTS") {
   await expect(pane).toHaveCSS("backdrop-filter", /blur\(24px\)/);
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出", exact: true }).click();
+  await page.getByRole("radio", { name: "可编辑文字" }).check();
   await page.getByRole("button", { name: /PowerPoint/ }).click();
   const file = await download;
   const zip = await JSZip.loadAsync(await readFile((await file.path())!));
@@ -542,6 +544,7 @@ Slide(title:"计算表格") {
   await editor.fill(source.replace("let rate = 0.2", "let rate = 0.5"));
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出", exact: true }).click();
+  await page.getByRole("radio", { name: "可编辑文字" }).check();
   await page.getByRole("button", { name: /PowerPoint/ }).click();
   const zip = await JSZip.loadAsync(await readFile((await (await dl).path())!));
   const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");

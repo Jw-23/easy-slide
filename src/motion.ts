@@ -6,6 +6,26 @@ export const easingCss = {
   easeInOut: "cubic-bezier(.65,0,.35,1)",
   spring: "cubic-bezier(.18,.9,.3,1.16)",
 };
+export function easingProgress(easing: Motion["easing"], time: number): number {
+  const t = Math.max(0, Math.min(1, time));
+  if (easing === "linear") return t;
+  const [x1, y1, x2, y2] =
+    easing === "easeInOut"
+      ? [0.65, 0, 0.35, 1]
+      : easing === "spring"
+        ? [0.18, 0.9, 0.3, 1.16]
+        : [0.22, 1, 0.36, 1];
+  const bezier = (s: number, a: number, b: number) =>
+    3 * (1 - s) * (1 - s) * s * a + 3 * (1 - s) * s * s * b + s * s * s;
+  let lo = 0,
+    hi = 1;
+  for (let i = 0; i < 32; i++) {
+    const mid = (lo + hi) / 2;
+    if (bezier(mid, x1, x2) < t) lo = mid;
+    else hi = mid;
+  }
+  return t === 0 ? 0 : t === 1 ? 1 : bezier((lo + hi) / 2, y1, y2);
+}
 export type Cue = {
   key: string;
   label: string;

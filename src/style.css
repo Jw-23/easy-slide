@@ -786,6 +786,35 @@ textarea {
   overflow-wrap: anywhere;
   color: #667f75;
 }
+.pptx-text-mode {
+  border: 0;
+  padding: 12px 0 4px;
+  margin: 0;
+  font-size: 12px;
+  color: #597166;
+}
+.pptx-text-mode legend {
+  font-size: 11px;
+  padding: 0;
+  margin-bottom: 8px;
+}
+.pptx-text-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 22px;
+  cursor: pointer;
+}
+.pptx-text-mode input {
+  accent-color: #23786b;
+}
+.pptx-text-mode small {
+  display: block;
+  color: #7e9187;
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 8px;
+}
 .dsl-signature strong {
   color: #176e59;
   background: #eaf4ed;

@@ -89,6 +89,9 @@ export default function App() {
     [saved, setSaved] = useState("正在恢复"),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
+    [pptxTextMode, setPptxTextMode] = useState<"faithful" | "editable">(
+      "faithful",
+    ),
     [folder, setFolder] = useState<FolderHandle | null>(null),
     [confirm, setConfirm] = useState<Deck | null>(null);
   const lastDeck = useRef(showcaseDeck),
@@ -938,12 +941,40 @@ export default function App() {
                   </div>
                   <Download size={17} />
                 </button>
+                <fieldset className="pptx-text-mode">
+                  <legend>PPTX 文字</legend>
+                  <label>
+                    <input
+                      type="radio"
+                      name="pptx-text"
+                      checked={pptxTextMode === "faithful"}
+                      onChange={() => setPptxTextMode("faithful")}
+                    />
+                    保留版式
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="pptx-text"
+                      checked={pptxTextMode === "editable"}
+                      onChange={() => setPptxTextMode("editable")}
+                    />
+                    可编辑文字
+                  </label>
+                  <small>
+                    {pptxTextMode === "faithful"
+                      ? "文字导出为图片；两种方式都保留动画。"
+                      : "文字可在 PowerPoint 中修改，字体由演示设备决定。"}
+                  </small>
+                </fieldset>
                 <button
                   className="export-option"
                   disabled={busy || !!error}
                   onClick={() =>
                     task(async () => {
-                      await exportPptx(deck, assets);
+                      await exportPptx(deck, assets, {
+                        textMode: pptxTextMode,
+                      });
                       notify("PPTX 已导出");
                       setModal(null);
                     })
@@ -952,7 +983,11 @@ export default function App() {
                   <Presentation />
                   <div>
                     PowerPoint <b>.pptx</b>
-                    <small>可编辑文本、矢量公式、原生页面过渡</small>
+                    <small>
+                      {pptxTextMode === "faithful"
+                        ? "文字版式、矢量公式与动画"
+                        : "可编辑文字、矢量公式与动画"}
+                    </small>
                   </div>
                   <Download size={17} />
                 </button>
@@ -973,9 +1008,7 @@ export default function App() {
                   <Download size={17} />
                 </button>
                 <p className="export-note">
-                  网页与 PPTX 均支持点击阶段、入场顺序、延迟和时长。PPTX
-                  使用原生入场效果；弹性缓动近似为减速，具体呈现以 PowerPoint
-                  为准。
+                  动画在 PowerPoint 的幻灯片放映模式中播放。
                 </p>
               </>
             ) : modal === "templates" ? (

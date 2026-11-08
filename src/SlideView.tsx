@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Deck, Slide } from "./dsl";
-import { scene, type Element } from "./scene";
+import { scene, TEXT_LINE_HEIGHT, type Element } from "./scene";
 import { mathSvg } from "./math";
 import { timeline, easingCss, entranceFrames } from "./motion";
 function SceneElement({
@@ -82,7 +82,7 @@ function SceneElement({
       fontWeight: e.bold ? 650 : 400,
       textAlign: e.align || "left",
       whiteSpace: "pre-wrap",
-      lineHeight: 1.42,
+      lineHeight: TEXT_LINE_HEIGHT,
       fontFamily: e.mono ? "monospace" : undefined,
       overflow: "hidden",
       overflowWrap: "anywhere",

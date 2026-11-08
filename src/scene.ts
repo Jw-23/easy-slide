@@ -2,6 +2,7 @@ import { tableModel } from "./table";
 import { backdropData } from "./materials";
 import { pageLayout } from "./dsl";
 import type { Block, Deck, Slide, Motion, GlassStyle } from "./dsl";
+export const TEXT_LINE_HEIGHT = 1.42;
 export type Element = {
   kind: "text" | "rect" | "image" | "equation";
   glass?: GlassStyle;

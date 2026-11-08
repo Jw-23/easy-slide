@@ -109,12 +109,12 @@ Slide(title: "叠层布局与材质边界", eyebrow: "10 / ZSTACK", subtitle: "�
         Image("assets/convergence.png").frame(x: 74, y: 250, width: 750, height: 370)
         Glass {
             Text("叠放的说明面板", title: "ZStack").font(25).frame(height: 95)
-            Text("网页实时模糊下层图表；PPTX 的面板纹理仅采样页面背景。").font(21)
+            Text("网页实时模糊下层图表；PPTX 按入场时序采样下层内容。").font(21)
         }.frame(x: 640, y: 290, width: 520, height: 270)
          .glass(blur: 24, opacity: 0.72, radius: 28)
          .appear(.slideRight, step: 1, duration: 650)
     }
-}.notes("ZStack 按声明顺序叠放内容。frame.x/y 是画布绝对坐标。网页 backdrop-filter 能模糊下层图表；PPTX 不支持实时背景模糊，导出的材质纹理基于页面背景生成，文字与公式仍保持独立。")
+}.notes("ZStack 按声明顺序叠放内容。frame.x/y 是画布绝对坐标。网页 backdrop-filter 能实时模糊下层图表；PPTX 将入场时下层内容采样为静态材质，后续点击的内容不会提前出现在材质中。文字与公式仍独立保留动画，文字可选择保留版式或可编辑模式。")
 
 Slide(title: "LaTeX 公式与命令补全", eyebrow: "11 / EQUATIONS", subtitle: "在 Equation 字符串中输入反斜杠，或按 Ctrl / ⌘ + Space") {
     Grid(columns: 2, spacing: 20) {
