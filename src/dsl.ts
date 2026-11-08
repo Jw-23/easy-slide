@@ -1,0 +1,798 @@
+import { validateTable, tableKeys, type TableOptions } from "./table";
+import type { Cell } from "./number-format";
+import { mathError } from "./math";
+import { DslError, closest } from "./diagnostics";
+import { readSyntax, type Call } from "./syntax";
+export const layouts = [
+  "cover",
+  "section",
+  "content",
+  "split",
+  "grid",
+  "compare",
+  "timeline",
+  "image",
+] as const;
+export type Layout = (typeof layouts)[number];
+export const layoutLabels: Record<Layout, string> = {
+  cover: "封面",
+  section: "章节",
+  content: "正文",
+  split: "双栏",
+  grid: "卡片",
+  compare: "对比",
+  timeline: "时间线",
+  image: "图文",
+};
+export const effects = [
+  "fade",
+  "rise",
+  "slideLeft",
+  "slideRight",
+  "zoom",
+  "none",
+] as const;
+export const easings = ["linear", "easeOut", "easeInOut", "spring"] as const;
+export type Motion = {
+  effect: (typeof effects)[number];
+  order?: number;
+  delay?: number;
+  duration?: number;
+  easing?: (typeof easings)[number];
+};
+export type GlassStyle = { blur?: number; opacity?: number; radius?: number };
+export const layoutComponents: Record<Layout, string> = {
+  cover: "Cover",
+  section: "Section",
+  content: "Flow",
+  split: "Split",
+  grid: "Cards",
+  compare: "Compare",
+  timeline: "Timeline",
+  image: "ImageText",
+};
+export type Block = {
+  expressionSource?: string;
+  bindings?: string[];
+  table?: TableOptions;
+  preset?: Layout;
+  glass?: GlassStyle;
+  appear?: Motion;
+  stagger?: number;
+  type:
+    | "text"
+    | "bullets"
+    | "equation"
+    | "image"
+    | "metric"
+    | "code"
+    | "quote"
+    | "table"
+    | "hstack"
+    | "vstack"
+    | "zstack"
+    | "grid"
+    | "spacer"
+    | "layout"
+    | "glass";
+  text?: string;
+  title?: string;
+  items?: string[];
+  src?: string;
+  value?: string;
+  label?: string;
+  rows?: Cell[][];
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  size?: number;
+  color?: string;
+  step?: number;
+  background?: string;
+  children?: Block[];
+  gap?: number;
+  padding?: number;
+  columns?: number;
+};
+export type Slide = {
+  bindings?: string[];
+  id?: string;
+  /** Legacy input only; canonical DSL uses dedicated layout components. */
+  layout?: Layout;
+  title: string;
+  eyebrow?: string;
+  subtitle?: string;
+  background?: string;
+  color?: string;
+  transition?: "fade" | "slide" | "zoom" | "none";
+  duration?: number;
+  easing?: (typeof easings)[number];
+  direction?: "left" | "right" | "up" | "down";
+  notes?: string;
+  blocks: Block[];
+};
+export type Deck = {
+  bindings?: string[];
+  version: 1;
+  title: string;
+  author?: string;
+  theme?: {
+    accent?: string;
+    background?: string;
+    color?: string;
+    font?: string;
+    material?: "glass" | "solid";
+  };
+  transition?: "fade" | "slide" | "zoom" | "none";
+  duration?: number;
+  easing?: (typeof easings)[number];
+  direction?: "left" | "right" | "up" | "down";
+  slides: Slide[];
+};
+export type Project = {
+  format: "easy-slide";
+  version: 1;
+  source: string;
+  assets: Record<string, string>;
+};
+const color = /^(#[0-9a-f]{6})$/i;
+function fail(message: string): never {
+  throw new Error(message);
+}
+export function validateDeck(input: unknown): Deck {
+  const d = input as any;
+  if (!d || d.version !== 1) fail("version 必须为 1");
+  if (d.author !== undefined && typeof d.author !== "string")
+    fail("author 必须是文本");
+  if (typeof d.title !== "string" || !d.title.trim()) fail("请填写工程 title");
+  if (!Array.isArray(d.slides) || !d.slides.length || d.slides.length > 200)
+    fail("slides 需要包含 1–200 页");
+  for (const [i, s] of d.slides.entries()) {
+    const p = `第 ${i + 1} 页`;
+    if (!s || (s.layout !== undefined && !layouts.includes(s.layout)))
+      fail(`${p}：未知 layout`);
+    if (typeof s.title !== "string") fail(`${p}：title 必须是文本`);
+    if (s.blocks === undefined) s.blocks = [];
+    if (!Array.isArray(s.blocks) || s.blocks.length > 30)
+      fail(`${p}：blocks 必须是数组，最多 30 项`);
+    const all: Block[] = [];
+    const collect = (blocks: Block[], depth = 0) => {
+      if (depth > 30) fail(`${p}：布局嵌套过深`);
+      for (const b of blocks) {
+        all.push(b);
+        if (b.children) {
+          if (!Array.isArray(b.children)) fail(`${p}：children 需要数组`);
+          collect(b.children, depth + 1);
+        }
+      }
+    };
+    collect(s.blocks);
+    if (all.length > 300) fail(`${p}：内容块过多`);
+    for (const b of all) {
+      if (
+        !b ||
+        ![
+          "text",
+          "bullets",
+          "equation",
+          "image",
+          "metric",
+          "code",
+          "quote",
+          "table",
+          "hstack",
+          "vstack",
+          "zstack",
+          "grid",
+          "spacer",
+          "layout",
+          "glass",
+        ].includes(b.type)
+      )
+        fail(`${p}：未知内容 type`);
+      for (const key of ["text", "title", "src", "value", "label"])
+        if (
+          (b as any)[key] !== undefined &&
+          typeof (b as any)[key] !== "string"
+        )
+          fail(`${p}：${key} 必须是文本（数字请加引号）`);
+      if (b.type === "equation" && typeof b.text === "string") {
+        const issue = mathError(b.text);
+        if (issue) fail(issue);
+      }
+      if (
+        b.items !== undefined &&
+        (!Array.isArray(b.items) ||
+          b.items.some((x: unknown) => typeof x !== "string"))
+      )
+        fail(`${p}：items 必须是文本数组`);
+      if (b.type === "table") validateTable(b.rows || [], b.table);
+      for (const k of [
+        "x",
+        "y",
+        "w",
+        "h",
+        "size",
+        "step",
+        "gap",
+        "padding",
+        "columns",
+      ])
+        if (
+          (b as any)[k] !== undefined &&
+          (!Number.isFinite((b as any)[k]) || (b as any)[k] < 0)
+        )
+          fail(`${p}：${k} 必须是非负数字`);
+      if (
+        b.columns !== undefined &&
+        (!Number.isInteger(b.columns) || b.columns < 1 || b.columns > 12)
+      )
+        fail(`${p}：columns 必须是 1–12`);
+      if (b.step !== undefined && (!Number.isInteger(b.step) || b.step > 30))
+        fail(`${p}：step 必须是 0–30 的整数`);
+      if (
+        b.src &&
+        (/^(https?:|\/\/|javascript:|file:)/i.test(b.src) ||
+          b.src.includes(".."))
+      )
+        fail(`${p}：图片请使用 assets/ 相对路径`);
+      if (b.type === "layout" && (!b.preset || !layouts.includes(b.preset)))
+        fail(`${p}：未知布局组件`);
+      if (b.glass) {
+        for (const k of ["blur", "opacity", "radius"] as const) {
+          const v = b.glass[k],
+            max = k === "opacity" ? 1 : k === "blur" ? 80 : 100;
+          if (v !== undefined && (!Number.isFinite(v) || v < 0 || v > max))
+            fail(`${p}：glass.${k} 范围 0–${max}`);
+        }
+      }
+      if (b.stagger !== undefined) {
+        if (!Number.isFinite(b.stagger) || b.stagger < 0 || b.stagger > 10000)
+          fail(`${p}：stagger 范围 0–10000 毫秒`);
+        if (
+          ![
+            "bullets",
+            "table",
+            "hstack",
+            "vstack",
+            "zstack",
+            "grid",
+            "layout",
+            "glass",
+          ].includes(b.type)
+        )
+          fail(`${p}：stagger 仅支持列表、表格和布局容器`);
+      }
+      if (b.appear) {
+        if (!effects.includes(b.appear.effect))
+          fail(`${p}：appear 效果支持 ${effects.join(" / ")}`);
+        if (b.appear.easing !== undefined && !easings.includes(b.appear.easing))
+          fail(`${p}：easing 支持 ${easings.join(" / ")}`);
+        for (const k of ["duration", "delay", "order"] as const) {
+          const v = b.appear[k];
+          if (
+            v !== undefined &&
+            (!Number.isFinite(v) || v < 0 || v > (k === "order" ? 100 : 10000))
+          )
+            fail(`${p}：appear.${k} 范围 0–${k === "order" ? 100 : 10000}`);
+        }
+        if (b.appear.order !== undefined && !Number.isInteger(b.appear.order))
+          fail(`${p}：order 必须为整数`);
+      }
+      if (b.background && !color.test(b.background))
+        fail(`${p}：背景颜色使用 #RRGGBB`);
+      if (b.color && !color.test(b.color)) fail(`${p}：颜色使用 #RRGGBB`);
+    }
+    validateTransition(s, p);
+    for (const k of ["transition"])
+      if (
+        s[k] !== undefined &&
+        !["fade", "slide", "zoom", "none"].includes(s[k])
+      )
+        fail(`${p}：未知 transition`);
+    if (
+      s.duration !== undefined &&
+      (!Number.isFinite(s.duration) || s.duration < 0 || s.duration > 3000)
+    )
+      fail(`${p}：duration 范围 0–3000 毫秒`);
+    for (const k of ["background", "color"])
+      if (s[k] && !color.test(s[k])) fail(`${p}：${k} 使用 #RRGGBB`);
+    for (const k of ["subtitle", "eyebrow", "notes"])
+      if (s[k] !== undefined && typeof s[k] !== "string")
+        fail(`${p}：${k} 必须是文本`);
+  }
+  if (
+    d.theme?.material !== undefined &&
+    !["glass", "solid"].includes(d.theme.material)
+  )
+    fail("theme.material 支持 .glass / .solid");
+  if (d.theme) {
+    if (typeof d.theme !== "object" || Array.isArray(d.theme))
+      fail("theme 必须为对象");
+    for (const k of ["accent", "background", "color"])
+      if (d.theme[k] && !color.test(d.theme[k]))
+        fail(`theme.${k} 使用 #RRGGBB`);
+    if (d.theme.font !== undefined && typeof d.theme.font !== "string")
+      fail("theme.font 必须是文本");
+  }
+  if (d.transition && !["fade", "slide", "zoom", "none"].includes(d.transition))
+    fail("未知全局 transition");
+  if (
+    d.duration !== undefined &&
+    (!Number.isFinite(d.duration) || d.duration < 0 || d.duration > 3000)
+  )
+    fail("duration 范围 0–3000 毫秒");
+  validateTransition(d, "Deck");
+  return d as Deck;
+}
+
+export function validateProject(p: unknown): Project {
+  const v = p as Project;
+  if (
+    !v ||
+    v.format !== "easy-slide" ||
+    v.version !== 1 ||
+    typeof v.source !== "string" ||
+    !v.assets ||
+    typeof v.assets !== "object" ||
+    Array.isArray(v.assets)
+  )
+    fail("不是有效的 Easy Slide 工程");
+  parseDeck(v.source);
+  for (const [k, data] of Object.entries(v.assets))
+    if (
+      !k.startsWith("assets/") ||
+      typeof data !== "string" ||
+      !/^data:image\/(png|jpeg|webp|gif);base64,/.test(data)
+    )
+      fail("工程内包含不支持的图片");
+  return v;
+}
+
+function validateTransition(t: Deck | Slide, p: string) {
+  if (t.easing !== undefined && !easings.includes(t.easing))
+    fail(`${p}：easing 支持 ${easings.join(" / ")}`);
+  if (
+    t.direction !== undefined &&
+    !["left", "right", "up", "down"].includes(t.direction)
+  )
+    fail(`${p}：direction 支持 left / right / up / down`);
+}
+function at<T>(c: Call, fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof DslError) throw e;
+    const detail = (e as Error).message.replace(/^第 1 页：/, "");
+    throw new DslError(
+      detail,
+      c.from,
+      c.to,
+      c.line,
+      c.col,
+      detail.includes("LaTeX")
+        ? '检查命令拼写与花括号；建议使用 #"..."# 原始字符串。在公式中输入反斜杠呼出 LaTeX 补全。'
+        : detail.includes("未知")
+          ? "检查拼写；按 Ctrl / ⌘ + Space 查看可用声明与参数。"
+          : "请根据提示修改此声明。尺寸、时长和顺序均使用非负数字。",
+    );
+  }
+}
+const sampleSlide: Slide = {
+  layout: "content",
+  title: "validation",
+  blocks: [],
+};
+
+const blockNames: Record<string, Block["type"]> = {
+  Text: "text",
+  Bullets: "bullets",
+  Equation: "equation",
+  Image: "image",
+  Metric: "metric",
+  Code: "code",
+  Quote: "quote",
+  Table: "table",
+  HStack: "hstack",
+  VStack: "vstack",
+  ZStack: "zstack",
+  Grid: "grid",
+  Spacer: "spacer",
+  Glass: "glass",
+  ...Object.fromEntries(
+    Object.values(layoutComponents).map((n) => [n, "layout" as const]),
+  ),
+};
+const names = Object.fromEntries(
+  Object.entries(blockNames).map(([k, v]) => [v, k]),
+);
+const plain = (c: Call, allowed: string[]) => {
+  for (const k of Object.keys(c.named))
+    if (!allowed.includes(k))
+      fail(
+        `${c.name}：未知参数 ${k}${closest(k, allowed) ? `，是否想写 ${closest(k, allowed)}？` : ""}。可用参数：${allowed.join(", ") || "无"}`,
+      );
+};
+const apply = (
+  target: Record<string, unknown>,
+  mods: Call[],
+  kind: "deck" | "slide" | "block",
+) => {
+  for (const m of mods) {
+    at(m, () => {
+      if (m.name === "transition" && kind !== "block") {
+        plain(m, ["duration", "easing", "direction"]);
+        for (const k of ["easing", "direction"])
+          if (m.named[k] !== undefined) target[k] = m.named[k];
+        target.transition = m.args[0];
+        if (m.named.duration !== undefined) target.duration = m.named.duration;
+      } else if (m.name === "appear" && kind === "block") {
+        plain(m, ["step", "order", "delay", "duration", "easing"]);
+        const { step, ...motion } = m.named;
+        target.appear = { effect: m.args[0], ...motion };
+        if (step !== undefined) target.step = step;
+      } else if (m.name === "background" && kind !== "deck") {
+        plain(m, []);
+        target.background = m.args[0];
+      } else if (m.name === "foreground" && kind !== "deck") {
+        plain(m, []);
+        target.color = m.args[0];
+      } else if (m.name === "notes" && kind === "slide") {
+        plain(m, []);
+        target.notes = m.args[0];
+      } else if (kind === "block" && m.name === "font") {
+        plain(m, []);
+        target.size = m.args[0];
+      } else if (kind === "block" && m.name === "title") {
+        plain(m, []);
+        target.title = m.args[0];
+      } else if (kind === "block" && m.name === "step") {
+        plain(m, []);
+        target.step = m.args[0];
+      } else if (kind === "block" && m.name === "stagger") {
+        plain(m, []);
+        target.stagger = m.args[0];
+      } else if (kind === "block" && m.name === "padding") {
+        plain(m, []);
+        target.padding = m.args[0];
+      } else if (kind === "block" && m.name === "glass") {
+        plain(m, ["blur", "opacity", "radius"]);
+        target.glass = { ...m.named };
+      } else if (kind === "block" && m.name === "tableStyle") {
+        if (target.type !== "table") fail(".tableStyle 仅用于 Table");
+        plain(
+          m,
+          tableKeys.filter((k) => !["columns", "headers"].includes(k)),
+        );
+        target.table = {
+          ...((target.table as TableOptions) || {}),
+          ...m.named,
+        };
+      } else if (kind === "block" && m.name === "frame") {
+        plain(m, ["x", "y", "width", "height"]);
+        for (const [k, v] of Object.entries(m.named))
+          target[k === "width" ? "w" : k === "height" ? "h" : k] = v;
+      } else
+        fail(
+          `${kind} 不支持修饰符 .${m.name}${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"]) ? `，是否想写 .${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"])}？` : ""}`,
+        );
+      if (
+        m.args.length !==
+        (["frame", "glass", "tableStyle"].includes(m.name) ? 0 : 1)
+      )
+        fail(
+          `.${m.name} ${["frame", "glass", "tableStyle"].includes(m.name) ? "仅接受命名参数" : "需要一个未命名参数"}`,
+        );
+      if (kind === "block")
+        validateDeck({
+          version: 1,
+          title: "validation",
+          slides: [{ ...sampleSlide, blocks: [target] }],
+        });
+      else if (kind === "slide")
+        validateDeck({ version: 1, title: "validation", slides: [target] });
+      else validateDeck({ ...target, slides: [sampleSlide] });
+    });
+  }
+};
+function compileBlock(c: Call): Block {
+  return at(c, () => {
+    const type = blockNames[c.name];
+    if (!type)
+      fail(
+        `未知内容声明 ${c.name}${closest(c.name, Object.keys(blockNames)) ? `，是否想写 ${closest(c.name, Object.keys(blockNames))}？` : ""}`,
+      );
+    plain(c, [
+      "title",
+      "text",
+      "items",
+      "src",
+      "value",
+      "label",
+      "rows",
+      "spacing",
+      "columns",
+      ...(type === "table" ? tableKeys : []),
+    ]);
+    const b: Record<string, unknown> = { type, ...c.named };
+    if (type === "table") {
+      const opts: Record<string, unknown> = {};
+      for (const key of tableKeys) {
+        if (c.named[key] !== undefined) {
+          opts[key] = c.named[key];
+          delete b[key];
+        }
+      }
+      if (Object.keys(opts).length) b.table = opts;
+    }
+    if (c.bindings) b.bindings = c.bindings;
+    if (c.expressionSource) b.expressionSource = c.expressionSource;
+    if (type === "layout")
+      b.preset = Object.entries(layoutComponents).find(
+        ([, name]) => name === c.name,
+      )![0];
+    if (type === "glass") b.glass = {};
+    if (c.named.spacing !== undefined) {
+      b.gap = c.named.spacing;
+      delete b.spacing;
+    }
+    if (c.args.length > 1) fail(`${c.name} 只接受一个未命名参数`);
+    const field =
+      type === "image"
+        ? "src"
+        : type === "metric"
+          ? "value"
+          : type === "bullets"
+            ? "items"
+            : type === "table"
+              ? "rows"
+              : "text";
+    if (c.args.length) b[field] = c.args[0];
+    if (
+      ["hstack", "vstack", "zstack", "grid", "layout", "glass"].includes(type)
+    )
+      b.children = c.children.map(compileBlock);
+    else if (c.children.length) fail(`${c.name} 不能嵌套内容`);
+    apply(b, c.modifiers, "block");
+    validateDeck({
+      version: 1,
+      title: "validation",
+      slides: [{ ...sampleSlide, blocks: [b] }],
+    });
+    return b as Block;
+  });
+}
+export function parseDeck(source: string): Deck {
+  const root = readSyntax(source);
+  return at(root, () => {
+    if (root.name !== "Deck")
+      fail('工程必须以 Deck("工程名称") 开始，Slide 与 Deck 并列书写');
+    plain(root, ["author", "version"]);
+    if (root.args.length !== 1) fail("Deck 需要一个工程名称");
+    const d: Record<string, unknown> = {
+      version: root.named.version ?? 1,
+      title: root.args[0],
+      ...(root.named.author !== undefined ? { author: root.named.author } : {}),
+      slides: [],
+      ...(root.bindings ? { bindings: root.bindings } : {}),
+    };
+    for (const c of root.children) {
+      at(c, () => {
+        if (c.name === "Theme") {
+          plain(c, ["accent", "background", "color", "font", "material"]);
+          if (c.args.length || c.children.length || c.modifiers.length)
+            fail("Theme 只接受命名参数");
+          if (d.theme) fail("Theme 不可重复");
+          d.theme = c.named;
+        } else if (c.name === "Slide") {
+          plain(c, ["title", "eyebrow", "subtitle", "notes", "id"]);
+          if (c.args.length > 1)
+            fail("Slide 只接受命名参数，布局请使用 Split / Cards 等组件");
+          const s: Record<string, unknown> = {
+            ...c.named,
+            ...(c.bindings ? { bindings: c.bindings } : {}),
+            blocks: c.children.map(compileBlock),
+          };
+          if (c.args.length) {
+            if (!layouts.includes(c.args[0] as Layout)) fail("未知 layout");
+            s.blocks = [
+              { type: "layout", preset: c.args[0], children: s.blocks },
+            ];
+          }
+          apply(s, c.modifiers, "slide");
+          (d.slides as unknown[]).push(s);
+        } else fail(`顶层不支持 ${c.name}，请使用 Theme 或 Slide`);
+        validateDeck({
+          ...d,
+          slides: (d.slides as unknown[]).length ? d.slides : [sampleSlide],
+        });
+      });
+    }
+    apply(d, root.modifiers, "deck");
+    return validateDeck(d);
+  });
+}
+const str = (v: unknown) => JSON.stringify(v);
+function modifiers(b: Block): string {
+  let out = "";
+  if (b.glass && b.type !== "glass")
+    out += `.glass(${Object.entries(b.glass)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ")})`;
+  if (b.type === "glass" && b.glass && Object.keys(b.glass).length)
+    out += `.glass(${Object.entries(b.glass)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ")})`;
+  if (b.table) {
+    const styles = Object.entries(b.table).filter(
+      ([k]) => !["columns", "headers"].includes(k),
+    );
+    if (styles.length)
+      out += `.tableStyle(${styles.map(([k, v]) => `${k}: ${k === "borders" ? "." + v : str(v)}`).join(", ")})`;
+  }
+  if (b.stagger !== undefined) out += `.stagger(${b.stagger})`;
+  if (b.size !== undefined) out += `.font(${b.size})`;
+  if (b.color) out += `.foreground(${str(b.color)})`;
+  if (b.appear)
+    out += `.appear(.${b.appear.effect}${b.step !== undefined ? `, step: ${b.step}` : ""}${Object.entries(
+      b.appear,
+    )
+      .filter(([k]) => k !== "effect")
+      .map(([k, v]) => `, ${k}: ${typeof v === "string" ? "." + v : v}`)
+      .join("")})`;
+  else if (b.step !== undefined) out += `.step(${b.step})`;
+  const frame = [
+    ["x", b.x],
+    ["y", b.y],
+    ["width", b.w],
+    ["height", b.h],
+  ].filter(([, v]) => v !== undefined);
+  if (frame.length)
+    out += `.frame(${frame.map(([k, v]) => `${k}: ${v}`).join(", ")})`;
+  if (b.background) out += `.background(${str(b.background)})`;
+  if (b.padding !== undefined) out += `.padding(${b.padding})`;
+  return out;
+}
+function writeBlock(b: Block, indent: string): string {
+  if (b.expressionSource)
+    return indent + b.expressionSource.split("\n").join("\n" + indent);
+  const field =
+    b.type === "image"
+      ? "src"
+      : b.type === "metric"
+        ? "value"
+        : b.type === "bullets"
+          ? "items"
+          : b.type === "table"
+            ? "rows"
+            : "text";
+  const args: string[] = [];
+  if (b[field as keyof Block] !== undefined)
+    args.push(str(b[field as keyof Block]));
+  for (const k of ["title", "text", "label"] as const)
+    if (k !== field && b[k] !== undefined) args.push(`${k}: ${str(b[k])}`);
+  if (b.type === "table") {
+    if (b.table?.headers) args.push(`headers: ${str(b.table.headers)}`);
+    if (b.table?.columns)
+      args.push(
+        "columns: [" +
+          b.table.columns
+            .map(
+              (c) =>
+                "Column(" +
+                str(c.label) +
+                Object.entries(c)
+                  .filter(([k]) => k !== "label")
+                  .map(
+                    ([k, v]) => `, ${k}: ${k === "align" ? "." + v : str(v)}`,
+                  )
+                  .join("") +
+                ")",
+            )
+            .join(", ") +
+          "]",
+      );
+  }
+  if (b.gap !== undefined) args.push(`spacing: ${b.gap}`);
+  if (b.columns !== undefined) args.push(`columns: ${b.columns}`);
+  let result =
+    indent +
+    (b.type === "layout" ? layoutComponents[b.preset!] : names[b.type]) +
+    (args.length ? "(" + args.join(", ") + ")" : "");
+  if (b.children)
+    result +=
+      " {\n" +
+      [
+        ...(b.bindings || []).map(
+          (v) => indent + "    " + v.split("\n").join("\n" + indent + "    "),
+        ),
+        ...b.children.map((x) => writeBlock(x, indent + "    ")),
+      ].join("\n") +
+      "\n" +
+      indent +
+      "}";
+  return result + modifiers(b);
+}
+function transitionText(s: Deck | Slide, fallback = "fade"): string {
+  if (
+    s.transition === undefined &&
+    s.duration === undefined &&
+    s.easing === undefined &&
+    s.direction === undefined
+  )
+    return "";
+  return `.transition(.${s.transition || fallback}${s.duration !== undefined ? `, duration: ${s.duration}` : ""}${s.easing ? `, easing: .${s.easing}` : ""}${s.direction ? `, direction: .${s.direction}` : ""})`;
+}
+export function serialize(d: Deck): string {
+  const parts = [
+    ...(d.bindings || []),
+    `Deck(${str(d.title)}${d.author ? `, author: ${str(d.author)}` : ""})` +
+      transitionText(d),
+  ];
+  if (d.theme)
+    parts.push(
+      "Theme(" +
+        Object.entries(d.theme)
+          .map(([k, v]) => `${k}: ${k === "material" ? "." + v : str(v)}`)
+          .join(", ") +
+        ")",
+    );
+  for (const s of d.slides) {
+    const args = [`title: ${str(s.title)}`];
+    for (const k of ["eyebrow", "subtitle", "id"] as const)
+      if (s[k] !== undefined) args.push(`${k}: ${str(s[k])}`);
+    let t =
+      "Slide(" +
+      args.join(", ") +
+      ") {\n" +
+      [
+        ...(s.bindings || []).map((v) => "    " + v.split("\n").join("\n    ")),
+        ...(s.layout
+          ? [{ type: "layout", preset: s.layout, children: s.blocks } as Block]
+          : s.blocks
+        ).map((b) => writeBlock(b, "    ")),
+      ].join("\n") +
+      "\n}";
+    if (s.background) t += `.background(${str(s.background)})`;
+    if (s.color) t += `.foreground(${str(s.color)})`;
+    t += transitionText(s, d.transition);
+    if (s.notes !== undefined) t += `.notes(${str(s.notes)})`;
+    parts.push(t);
+  }
+  return parts.join("\n\n") + "\n";
+}
+
+export function pageLayout(s: Slide): Layout {
+  return s.blocks[0]?.type === "layout"
+    ? s.blocks[0].preset || "content"
+    : s.layout || "content";
+}
+export function pageContent(s: Slide): Block[] {
+  return s.blocks.length === 1 && s.blocks[0].type === "layout"
+    ? s.blocks[0].children || []
+    : s.blocks;
+}
+export function withLayout(s: Slide, preset: Layout): Slide {
+  const { layout, ...rest } = s;
+  void layout;
+  return {
+    ...rest,
+    blocks: [
+      {
+        ...(s.blocks.length === 1 && s.blocks[0].type === "layout"
+          ? s.blocks[0]
+          : {}),
+        type: "layout",
+        preset,
+        expressionSource: undefined,
+        children: pageContent(s),
+      },
+    ],
+  };
+}
+export function addPageBlock(s: Slide, b: Block): Block[] {
+  if (s.blocks.length === 1 && s.blocks[0].type === "layout")
+    return [{ ...s.blocks[0], children: [...(s.blocks[0].children || []), b] }];
+  return [...s.blocks, b];
+}
