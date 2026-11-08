@@ -1,6 +1,6 @@
 # Easy Slide
 
-一个在浏览器本地处理内容的演示文稿工作台，可本地运行或静态托管。用类似 SwiftUI 的声明式 DSL，把数学论坛和工程汇报变成层次清晰的幻灯片。
+演示文稿编辑器，可本地运行或静态托管。使用 SwiftUI 风格的声明式 DSL，支持数学论坛和工程汇报场景。
 
 ## 本地运行
 
@@ -31,7 +31,7 @@ npm test
 
 ## Cloudflare 从仓库部署
 
-已提供 `wrangler.jsonc`，使用 **Workers Static Assets** 从 GitHub 自动构建部署。连接 `Jw-23/easy-slide` 时，生产分支可选 `main`；要预览尚未合并的 PWA 更新，可选择 `feat/local-slide-studio`。构建命令留空，部署命令使用 `npx wrangler deploy`。构建与 dist 目录已在配置中定义。
+已提供 `wrangler.jsonc`，使用 **Workers Static Assets** 从 GitHub 自动构建部署。连接 `Jw-23/easy-slide` 时，生产分支可选 `main`；预览尚未合并的更新可选择 `feat/local-slide-studio`。构建命令留空，部署命令使用 `npx wrangler deploy`。构建与 dist 目录已在配置中定义。
 
 详见 [Cloudflare 部署说明](docs/CLOUDFLARE.md)，本地可运行 `npm run cf:check` 验证，不需要发布到账户。
 
@@ -43,9 +43,9 @@ npm test
 - 内置数学论坛与工程汇报示例。切换前可导出当前工程。
 - `Ctrl / ⌘ + V` 粘贴图片，或从素材面板添加。支持 PNG、JPG、WebP、GIF，每张最多 20MB。
 - 编辑自动存入此浏览器的 IndexedDB；保存状态在画布下方显示。浏览器数据可能被清理，重要内容请导出完整工程。
-- 「保存工程」下载 `.easy-slide.json`，内含 DSL 和全部图片，可原样重新导入。`.slide` 导出仅保存 DSL。
-- 素材面板可连接本地文件夹（Chrome / Edge + localhost）。若存在 `project.easy-slide.json`，会打开工程；否则导入文件夹内的图片。点击「保存工程」在目录中写入 `project.easy-slide.json` 与 `slides.slide`。图片嵌入 JSON，不必手动复制。重启浏览器后需重新选择目录。
-- 导入文件支持完整工程 JSON 或 `.slide` / `.swift` DSL。导入 DSL 后，需添加其引用的图片。目录里的 `plot.png` 会映射为 `assets/plot.png`，子目录保留相对结构。图片以素材面板所示的相对路径为准。
+- 「保存工程」下载 `.easy-slide.zip`；「导出 → 工程压缩包」也会始终下载 ZIP，即使当前已连接文件夹。压缩包内包含原样 DSL、工程清单和全部原始图片，保留中文文件名、子目录以及未使用素材。重新导入会恢复源码、主题、备注、计算、动画与图片。
+- 素材面板可连接本地文件夹（Chrome / Edge + HTTPS 或 localhost）。优先打开目录中的 `project.easy-slide.zip`，也支持解压后的工程和旧版 `project.easy-slide.json`；没有工程时导入图片。连接目录后，「保存工程」写入 `project.easy-slide.zip`，不会删除目录中的其他文件；「导出」仍可单独下载。重启浏览器后需重新选择目录。
+- 导入支持工程 ZIP、旧版完整 JSON，以及 `.slide` / `.swift` 源码。ZIP 在全部文件读取和校验成功后才替换当前工程，缺失素材会显示具体路径。纯 DSL 不包含图片，需要单独添加素材。目录里的 `plot.png` 会映射为 `assets/plot.png`，子目录保留相对结构。
 - 画布下方「动画编排」可查看每项的起止时间、重播某阶段，或显示完整页面。DSL 使用 `.appear(.rise, step: 1, order: 0, delay: 0, duration: 600, easing: .easeOut)` 控制动画。
 - 点击「演示」进入沉浸视图；方向右键或空格逐步显示内容、切页，左键返回上一页，Esc 退出。备注仅在编辑器显示。
 - PPTX 导出保留可编辑文本、数据表单元文字、矢量公式、图片与页级过渡。公式以 SVG 插入，推荐 Microsoft PowerPoint 2019+ / Microsoft 365。网页和 PPTX 均保留 step 点击阶段、order 组内顺序、delay 延迟、duration 时长与入场效果。PPTX 弹性缓动近似为减速；页级时长包含现代 PowerPoint 精确毫秒与旧版三档回退。不同系统字体、换行与圆角可能有少量差异。
@@ -88,7 +88,7 @@ React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢�
 
 编辑器补全使用独立的容错 AST，与运行时共享词法器和运算优先级；静态分析负责词法作用域、数组/回调/用户函数类型、参数与修饰符筛选、签名帮助和悬停说明。每份不可变文档缓存一次分析，单纯移动光标复用语法树；补全不执行 DSL 表达式。详见 [编辑体验](docs/DSL.md#编辑体验与错误提示)。
 
-`npm test` 验证扁平/旧版 DSL 往返、带位置错误、代码补全、动画时间线、原生 PPTX 动画节点、模板布局边界与公式。`npm run test:e2e` 执行 Chromium 浏览器测试（首次运行需 `npx playwright install chromium`）。
+`npm test` 验证 DSL、AST 补全、动画、公式、工程 ZIP 的源码/图片往返、缺失文件、解压大小限制和文件夹兼容性。`npm run test:e2e` 执行 Chromium 浏览器测试，包含将 ZIP 导入全新浏览器并恢复粘贴图片（首次运行需 `npx playwright install chromium`）。
 
 `npm run test:pwa` 构建生产产物并测试清单与图标、离线重新启动和 PPTX 导出、安装入口、版本等待与保存后更新、多窗口不强制刷新。测试用静态服务器及版本切换接口仅在本机测试中启用，不属于网站部署内容。应用图标源码为 `public/favicon.svg`，可选脚本 `python scripts/generate-pwa-icons.py` 生成 PNG 图标（仅运行该脚本时需要 Pillow）。
 

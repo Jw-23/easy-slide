@@ -156,7 +156,17 @@ Table([["事项", "状态"], ["基准测试", "已完成"]])
 
 不同播放器对动画支持存在差异：PPTX 的弹性缓动近似为减速，其余缓动映射为原生加减速；页级时长附带现代 PowerPoint 的精确毫秒与旧版三档回退。入场轨迹、字体与网页可能有差别。当前自动测试检查导出 XML 与目标对象，不替代桌面 PowerPoint 播放验证。
 
-完整工程 JSON：`{ format: "easy-slide", version: 1, source: "DSL文本", assets: { "assets/a.png": "data:image/png;base64,..." } }`。纯 `.slide` 导出不包含图片。
+工程导出为 `.easy-slide.zip`，保存原样源码、配置与全部原始图片，包含未使用的素材。ZIP 内的结构如下，可直接解压后通过素材面板打开该文件夹：
+
+```text
+project.easy-slide.json   工程清单
+slides.slide             DSL 源码，包含主题、备注、计算和动画
+assets/...               原始图片，保持相对路径
+```
+
+清单格式为 `{ format: "easy-slide-archive", version: 1, source: "slides.slide", assets: { "assets/a.png": { file: "assets/a.png", mime: "image/png" } } }`。图片保存为二进制文件，不内嵌在源码中。导入先读取并校验所有引用文件，成功后才替换当前工程；缺少文件时报告具体路径。
+
+旧版 JSON `{ format: "easy-slide", version: 1, source: "DSL文本", assets: { "assets/a.png": "data:image/png;base64,..." } }` 仍可导入。纯 `.slide` 导出只保留源码，不包含图片；PPTX 是单独的演示文件导出选项。
 
 图片经素材面板、文件夹或粘贴导入。使用 `assets/` 相对路径；支持 PNG、JPEG、WebP、GIF。禁止远程 HTTP、file 与目录穿越路径。
 
@@ -291,6 +301,6 @@ let label = "合计：" + fixed(total, 2)
 | `stripeColor` / `borderColor` | 交替行底色与边框色                        |
 | `cellPadding`                 | 水平内边距，0–40 像素                     |
 
-`.font()`、`.foreground()`、`.frame()`、`.appear()` 与 `.stagger()` 继续适用。表格文字与边框在 PPTX 中为独立可编辑对象；PPTX 保存求值后的结果，工程 JSON 和 .slide 保存计算源码，重新导入后再次求值。
+`.font()`、`.foreground()`、`.frame()`、`.appear()` 与 `.stagger()` 继续适用。表格文字与边框在 PPTX 中为独立可编辑对象；PPTX 保存求值后的结果，工程 ZIP 与 .slide 保存计算源码，重新导入后再次求值。
 
 可视化编辑和布局切换会保留计算型内容块及 let 声明的源码，避免表格表达式被自动替换为静态数值。编辑器提供变量、计算函数、数组方法、Column 参数与表格样式补全。

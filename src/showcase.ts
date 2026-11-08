@@ -85,7 +85,7 @@ Slide(title: "本地图片与图文布局", eyebrow: "08 / IMAGE + ASSETS", subt
         }
     }
 }.transition(.zoom, duration: 700, easing: .spring)
-.notes("图表为随工程附带的 PNG，不依赖外部 URL。完整工程 JSON 包含 DSL 与图片；纯 .slide 文件不包含图片。选择文件夹后，可读取其中的图片与项目文件。示例图展示二次函数上的迭代轨迹，仅用于演示。")
+.notes("图表为随工程附带的 PNG，不依赖外部 URL。工程 ZIP 包含 DSL、配置与原始图片；纯 .slide 文件不包含图片。选择文件夹后，可读取其中的工程压缩包、解压后的工程或图片。示例图展示二次函数上的迭代轨迹，仅用于演示。")
 
 Slide(title: "自由组合布局容器", eyebrow: "09 / STACKS + GRID", subtitle: "HStack、VStack、Grid 与 Spacer 可嵌套使用") {
     HStack(spacing: 28) {
@@ -211,7 +211,7 @@ Slide(title: "页面样式覆盖与无过渡", eyebrow: "18 / PAGE OVERRIDES", s
 Slide(title: "编辑、素材与工程文件", eyebrow: "19 / LOCAL WORKFLOW", subtitle: "示例中的操作均可在当前编辑器中完成") {
     Compare(spacing: 28) {
         Bullets(["DSL 补全：Ctrl / ⌘ + Space", "错误面板：行列位置、定位与建议", "粘贴图片：Ctrl / ⌘ + V", "素材面板：插入图片或连接文件夹"], title: "编辑与素材").font(21)
-        Bullets(["保存工程：Ctrl / ⌘ + S", "完整 JSON：DSL 与内嵌图片", "纯 .slide：只含声明式源码", "PPTX：文本、公式、材质与动画"], title: "保存与导出").font(21)
+        Bullets(["保存工程：Ctrl / ⌘ + S", "工程 ZIP：DSL、配置与全部图片", "纯 .slide：只含声明式源码", "PPTX：文本、公式、材质与动画"], title: "保存与导出").font(21)
     }
 }.notes("浏览器自动保存至 IndexedDB；重要内容请导出完整工程。工具栏的安装应用可将生产网站安装为 PWA；首次联网缓存完成后可离线编辑和导出，更新时先保存草稿。直接目录访问需要支持 File System Access 的浏览器及用户选择目录；连接目录后点击保存工程才会写入文件。备注只在编辑器显示，PPTX 中保存为演讲备注。")
 
@@ -221,5 +221,5 @@ Slide(title: "功能示例结束", eyebrow: "20 / REFERENCE", subtitle: "修改�
         Text("工具栏 → 安装应用；首次缓存完成后可离线编辑与导出。").font(18)
     }
 }.transition(.fade, duration: 550)
-.notes("本工程涵盖全部现有布局、内容类型、组合容器、修饰符和动画选项。素材图包含在工程 JSON 中。既有本地工程不会被新版示例自动覆盖；需要时从切换示例打开此功能示例。")
+.notes("本工程涵盖全部现有布局、内容类型、组合容器、修饰符和动画选项。素材图包含在工程 ZIP 中。既有本地工程不会被新版示例自动覆盖；需要时从切换示例打开此功能示例。")
 `);

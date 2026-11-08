@@ -192,7 +192,7 @@ export function DslEditor({
           </button>
         </div>
       </div>
-      <p>Deck 与 Slide 并列书写 · Ctrl / ⌘ + Space 补全</p>
+      <p>Ctrl / ⌘ + Space 补全</p>
       <div className="code-editor-host" ref={host} />
       {error ? (
         <div className="editor-diagnostic" role="alert">

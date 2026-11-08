@@ -1,5 +1,14 @@
 import { get, set } from "idb-keyval";
-import { validateProject, type Project } from "./dsl";
+import type { Project } from "./dsl";
+import {
+  ARCHIVE_FILE,
+  MAX_ARCHIVE_BYTES,
+  MANIFEST_FILE,
+  exportProjectArchive,
+  importProjectArchive,
+  readProjectManifest,
+  validatePortableProject,
+} from "./project-archive";
 export const loadDraft = (key = "draft") => get<Project>(key);
 export const saveDraft = (p: Project, key = "draft") => set(key, p);
 export type FolderHandle = {
@@ -44,12 +53,41 @@ export async function folderProject(
   dir: FolderHandle,
 ): Promise<Project | null> {
   try {
-    const f = await dir.getFileHandle("project.easy-slide.json");
-    return validateProject(JSON.parse(await (await f.getFile()).text()));
+    const file = await (await dir.getFileHandle(ARCHIVE_FILE)).getFile();
+    if (file.size > MAX_ARCHIVE_BYTES) throw Error("工程压缩包超过 256 MB");
+    return importProjectArchive(await file.arrayBuffer());
+  } catch (e) {
+    if ((e as DOMException).name !== "NotFoundError") throw e;
+  }
+  let file: File;
+  try {
+    file = await (await dir.getFileHandle(MANIFEST_FILE)).getFile();
   } catch (e) {
     if ((e as DOMException).name === "NotFoundError") return null;
     throw e;
   }
+  if (file.size > 280 * 1024 * 1024) throw Error("工程清单过大");
+  const manifest = JSON.parse(await file.text());
+  if (manifest?.format === "easy-slide")
+    return validatePortableProject(manifest);
+  return readProjectManifest(manifest, async (path, limit) => {
+    const parts = path.split("/");
+    let current = dir;
+    let asset: File;
+    try {
+      for (const part of parts.slice(0, -1))
+        current = await current.getDirectoryHandle(part);
+      asset = await (
+        await current.getFileHandle(parts[parts.length - 1])
+      ).getFile();
+    } catch (e) {
+      if ((e as Error).name === "NotFoundError")
+        throw Error(`工程文件夹缺少文件：${path}`);
+      throw e;
+    }
+    if (asset.size > limit) throw Error(`文件过大：${path}`);
+    return new Uint8Array(await asset.arrayBuffer());
+  });
 }
 export async function folderImages(
   dir: FolderHandle,
@@ -78,14 +116,11 @@ export async function folderImages(
   return result;
 }
 export async function writeFolder(dir: FolderHandle, p: Project) {
-  const file = await dir.getFileHandle("project.easy-slide.json", {
+  const archive = await exportProjectArchive(p);
+  const file = await dir.getFileHandle(ARCHIVE_FILE, {
     create: true,
   });
   const writer = await file.createWritable();
-  await writer.write(JSON.stringify(p, null, 2));
+  await writer.write(archive);
   await writer.close();
-  const dsl = await dir.getFileHandle("slides.slide", { create: true });
-  const w = await dsl.createWritable();
-  await w.write(p.source);
-  await w.close();
 }

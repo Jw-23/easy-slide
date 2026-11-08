@@ -263,9 +263,7 @@ export function PwaControls({
                 </>
               )}
             </div>
-            <p className="muted">
-              工程仍保存在当前浏览器中；安装应用不会上传文件。更新前会保存草稿，重要工程可导出备份。
-            </p>
+            <p className="muted">草稿保存在当前浏览器中，可导出为工程 ZIP。</p>
             {promptAvailable && (
               <button className="primary" onClick={requestInstall}>
                 打开安装窗口

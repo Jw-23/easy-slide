@@ -23,7 +23,6 @@ import {
   Trash2,
   Monitor,
   FileText,
-  Command,
   Presentation,
   Layers,
   Save,
@@ -32,7 +31,6 @@ import {
 import {
   parseDeck,
   serialize,
-  validateProject,
   layouts,
   layoutLabels,
   type Deck,
@@ -49,6 +47,13 @@ import {
 } from "./examples";
 import { SlideView } from "./SlideView";
 import { download, exportPptx } from "./export";
+import {
+  exportProjectArchive,
+  MAX_ARCHIVE_BYTES,
+  importProjectArchive,
+  projectArchiveName,
+  validatePortableProject,
+} from "./project-archive";
 import {
   loadDraft,
   saveDraft,
@@ -217,14 +222,21 @@ export default function App() {
         await writeFolder(folder, project());
         notify("工程已保存到 " + folder.name);
       } else {
-        download(
-          new Blob([JSON.stringify(project(), null, 2)], {
-            type: "application/json",
-          }),
-          deck.title + ".easy-slide.json",
-        );
-        notify("已导出本地工程，包含全部图片");
+        await downloadArchive();
       }
+    });
+  }
+  async function downloadArchive() {
+    download(
+      await exportProjectArchive(project()),
+      projectArchiveName(deck.title),
+    );
+    notify("已导出工程 ZIP");
+  }
+  async function exportArchive() {
+    await task(async () => {
+      await downloadArchive();
+      setModal(null);
     });
   }
   async function openFolder() {
@@ -248,13 +260,20 @@ export default function App() {
   async function importFile(file?: File) {
     if (!file) return;
     await task(async () => {
-      const value = await file.text();
-      if (/\.(slide|swift)$/i.test(file.name)) {
+      if (file.size > 280 * 1024 * 1024) throw Error("工程文件过大");
+      if (/\.zip$/i.test(file.name)) {
+        if (file.size > MAX_ARCHIVE_BYTES) throw Error("工程压缩包超过 256 MB");
+        const p = await importProjectArchive(await file.arrayBuffer());
+        setSource(p.source);
+        setAssets(p.assets);
+        notify("工程已导入");
+      } else if (/\.(slide|swift)$/i.test(file.name)) {
+        const value = await file.text();
         parseDeck(value);
         setSource(value);
         notify("已导入 DSL，图片请从素材面板添加");
       } else {
-        const p = validateProject(JSON.parse(value));
+        const p = validatePortableProject(JSON.parse(await file.text()));
         setSource(p.source);
         setAssets(p.assets);
         notify("工程已导入");
@@ -312,14 +331,14 @@ export default function App() {
     slides.splice(active + 1, 0, {
       layout,
       title: "新页面",
-      eyebrow: `${String(active + 2).padStart(2, "0")} / YOUR NEXT IDEA`,
+      eyebrow: String(active + 2).padStart(2, "0"),
       blocks:
         layout === "section"
           ? []
           : [
               {
                 type: "text",
-                text: "在右侧编辑内容，或用 DSL 完整描述这一页。",
+                text: "正文",
               },
             ],
     });
@@ -344,7 +363,7 @@ export default function App() {
       <input
         hidden
         type="file"
-        accept=".json,.slide,.swift"
+        accept=".zip,.json,.slide,.swift"
         ref={importRef}
         onChange={(e) => {
           void importFile(e.target.files?.[0]);
@@ -446,7 +465,7 @@ export default function App() {
         <main className="main">
           <div className="workspace-toolbar">
             <div className="breadcrumbs">
-              {featureTour ? "功能示例" : "我的工作台"}
+              {featureTour ? "功能示例" : "工程"}
               <ChevronRight size={13} />
               <strong>{deck.title}</strong>
             </div>
@@ -523,7 +542,7 @@ export default function App() {
                 <textarea
                   value={slide.notes || ""}
                   disabled={!!error}
-                  placeholder="添加这一页的讲述思路，演示时仅你可见…"
+                  placeholder="添加演讲者备注"
                   onChange={(e) => changeSlide({ notes: e.target.value })}
                 />
               </div>
@@ -540,10 +559,6 @@ export default function App() {
               />
             )}
             <div className="canvas-tip">
-              <Command size={13} />
-              <span>⌘ / Ctrl + V 粘贴图片</span>
-              <i />
-              <span>⌘ / Ctrl + S 保存工程</span>
               <span className="autosave">
                 <Check size={13} />
                 {saved}
@@ -835,15 +850,13 @@ export default function App() {
                 <FolderOpen size={15} />
                 {folder ? folder.name : "打开本地文件夹"}
               </button>
-              <p className="muted">
-                读取文件夹中的工程和图片。首次需要浏览器授予目录访问权限；工程保存时写入所选目录。
-              </p>
+              <p className="muted">打开工程 ZIP、解压后的工程或图片文件夹。</p>
               <button
                 className="wide-button"
                 onClick={() => importRef.current?.click()}
               >
                 <Upload size={15} />
-                导入工程 / DSL
+                导入工程
               </button>
             </div>
           )}
@@ -915,6 +928,18 @@ export default function App() {
                 <h2>导出</h2>
                 <button
                   className="export-option"
+                  onClick={exportArchive}
+                  disabled={busy || !!error}
+                >
+                  <FolderOpen />
+                  <div>
+                    工程压缩包 <b>.zip</b>
+                    <small>DSL、工程配置和全部图片</small>
+                  </div>
+                  <Download size={17} />
+                </button>
+                <button
+                  className="export-option"
                   disabled={busy || !!error}
                   onClick={() =>
                     task(async () => {
@@ -933,18 +958,6 @@ export default function App() {
                 </button>
                 <button
                   className="export-option"
-                  onClick={save}
-                  disabled={busy}
-                >
-                  <FolderOpen />
-                  <div>
-                    完整工程 <b>.json</b>
-                    <small>包含 DSL 与全部图片，支持重新导入</small>
-                  </div>
-                  <Download size={17} />
-                </button>
-                <button
-                  className="export-option"
                   onClick={() =>
                     download(
                       new Blob([source], { type: "text/plain" }),
@@ -955,7 +968,7 @@ export default function App() {
                   <Code2 />
                   <div>
                     纯文本 DSL <b>.slide</b>
-                    <small>易于版本管理，图片需单独保留</small>
+                    <small>仅源码，不包含图片</small>
                   </div>
                   <Download size={17} />
                 </button>
@@ -968,7 +981,6 @@ export default function App() {
             ) : modal === "templates" ? (
               <>
                 <h2>选择示例</h2>
-                <p>选择适合你的场景，替换为自己的内容。</p>
                 <div
                   className="template-card"
                   onClick={() => template(showcaseDeck)}
@@ -1048,7 +1060,7 @@ Slide(title: "计算数据") {
                   reduce，以及 sum、mean、round、fixed、percent
                   等函数。计算在本地解释执行；错误会显示行列位置。表格可设置表头、列宽、对齐、数字格式、行高与边框。
                 </p>
-                <h3>精确控制</h3>
+                <h3>布局与动画</h3>
                 <p>
                   使用 HStack / VStack / ZStack / Grid 自由嵌套，Spacer
                   分配空白。修饰符
