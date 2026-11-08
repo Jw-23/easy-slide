@@ -1,7 +1,7 @@
 import { get, set } from "idb-keyval";
 import { validateProject, type Project } from "./dsl";
-export const loadDraft = () => get<Project>("draft");
-export const saveDraft = (p: Project) => set("draft", p);
+export const loadDraft = (key = "draft") => get<Project>(key);
+export const saveDraft = (p: Project, key = "draft") => set(key, p);
 export type FolderHandle = {
   name: string;
   getFileHandle: (

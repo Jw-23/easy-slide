@@ -387,3 +387,36 @@ test("the full startup tour renders without missing assets or clipped text and c
     /^data:image\/png;base64,/,
   );
 });
+test("direct feature tour isolates its saved draft from the existing working project", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "页标题", exact: true })
+    .fill("保留的工作工程");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page.goto("/?example=features");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(page.locator(".preview-wrap")).toContainText("Easy Slide");
+  await expect(page.locator(".preview-wrap")).not.toContainText(
+    "保留的工作工程",
+  );
+  await page
+    .getByRole("textbox", { name: "页标题", exact: true })
+    .fill("演示里的修改");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page.goto("/");
+  await expect(page.locator(".preview-wrap")).toContainText("保留的工作工程");
+  await page.goto("/?example=features");
+  await expect(page.locator(".preview-wrap")).toContainText("演示里的修改");
+});

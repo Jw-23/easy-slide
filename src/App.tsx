@@ -59,6 +59,10 @@ import {
   type FolderHandle,
 } from "./storage";
 export default function App() {
+  // The versioned feature tour has its own draft; visiting it never replaces a user's working project.
+  const featureTour =
+    new URLSearchParams(window.location.search).get("example") === "features";
+  const draftKey = featureTour ? "draft:feature-tour:1" : "draft";
   const [source, setSource] = useState(initialSource),
     [assets, setAssets] = useState<Record<string, string>>({
       ...initialAssets,
@@ -100,7 +104,7 @@ export default function App() {
     setToast(m);
   }
   useEffect(() => {
-    loadDraft()
+    loadDraft(draftKey)
       .then((p) => {
         if (p) {
           setSource(p.source);
@@ -115,7 +119,7 @@ export default function App() {
     if (!ready) return;
     setSaved("保存中…");
     const t = setTimeout(() => {
-      saveDraft(project())
+      saveDraft(project(), draftKey)
         .then(() => setSaved("已保存在此浏览器"))
         .catch(() => setSaved("保存失败，请导出备份"));
     }, 700);
@@ -201,7 +205,7 @@ export default function App() {
       return;
     }
     await task(async () => {
-      await saveDraft(project());
+      await saveDraft(project(), draftKey);
       if (folder) {
         await writeFolder(folder, project());
         notify("工程已保存到 " + folder.name);
@@ -431,7 +435,7 @@ export default function App() {
         <main className="main">
           <div className="workspace-toolbar">
             <div className="breadcrumbs">
-              我的工作台
+              {featureTour ? "功能示例" : "我的工作台"}
               <ChevronRight size={13} />
               <strong>{deck.title}</strong>
             </div>
