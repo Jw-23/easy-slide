@@ -283,9 +283,8 @@ export default function App() {
     const slides = [...deck.slides];
     slides.splice(active + 1, 0, {
       layout,
-      title: "一个新的想法",
+      title: "新页面",
       eyebrow: `${String(active + 2).padStart(2, "0")} / YOUR NEXT IDEA`,
-      subtitle: "用清晰的内容，让想法被看见。",
       blocks:
         layout === "section"
           ? []
@@ -341,7 +340,6 @@ export default function App() {
             <Layers size={20} />
           </span>
           easy<span>slide</span>
-          <b>LOCAL</b>
         </a>
         <div className="document-name">
           <span className="status-dot" />
@@ -412,10 +410,6 @@ export default function App() {
             <Plus size={16} />
             添加幻灯片 <span>＋</span>
           </button>
-          <div className="sidebar-bottom">
-            <span className="status-dot" />
-            仅在本地 · 内容属于你
-          </div>
         </aside>
         <main className="main">
           <div className="workspace-toolbar">
@@ -431,18 +425,6 @@ export default function App() {
             </button>
           </div>
           <div className="canvas-area">
-            <div className="canvas-heading">
-              <div>
-                <span className="overline">YOUR IDEAS, BEAUTIFULLY TOLD.</span>
-                <h1>
-                  让想法，自然成篇<span>。</span>
-                </h1>
-              </div>
-              <span className="local-badge">
-                <span className="status-dot" />
-                本地工作空间
-              </span>
-            </div>
             <div className="preview-wrap">
               <SlideView
                 deck={deck}
@@ -505,7 +487,6 @@ export default function App() {
                 <div>
                   <FileText size={15} />
                   <span>演讲者备注</span>
-                  <small>给自己的一点提示</small>
                 </div>
                 <textarea
                   value={slide.notes || ""}
@@ -537,12 +518,6 @@ export default function App() {
               </span>
             </div>
           </div>
-          <footer>
-            <span>少一些排版，多一些思考。</span>
-            <span>
-              EASY SLIDE <b>✦</b> MADE FOR IDEAS
-            </span>
-          </footer>
         </main>
         <aside className="inspector">
           <div className="tabs">
@@ -619,7 +594,7 @@ export default function App() {
               <button className="edit-dsl" onClick={() => setTab("dsl")}>
                 <Code2 size={15} />
                 <div>
-                  用 DSL 编辑完整内容<small>文字、公式、图片，一处掌控</small>
+                  编辑 DSL<small>组件、布局与动画</small>
                 </div>
                 <ArrowUpRight size={15} />
               </button>
@@ -813,17 +788,15 @@ export default function App() {
               </button>
             </div>
           )}
-          <div className="inspector-bottom">
-            <FolderOpen size={16} />
-            <div>
-              {folder ? folder.name : "本地优先，安心创作"}
-              <small>
-                {folder
-                  ? "点击顶部保存工程写入文件夹"
-                  : "无需账号，无需上传到云端"}
-              </small>
+          {folder && (
+            <div className="inspector-bottom">
+              <FolderOpen size={16} />
+              <div>
+                {folder.name}
+                <small>点击保存工程写入文件夹</small>
+              </div>
             </div>
-          </div>
+          )}
         </aside>
       </div>
       {error && (
@@ -880,9 +853,7 @@ export default function App() {
             </button>
             {modal === "export" ? (
               <>
-                <span className="overline">TAKE YOUR IDEAS WITH YOU</span>
-                <h2>让想法，走得更远。</h2>
-                <p>本地导出，随时继续。</p>
+                <h2>导出</h2>
                 <button
                   className="export-option"
                   disabled={busy || !!error}
@@ -937,8 +908,7 @@ export default function App() {
               </>
             ) : modal === "templates" ? (
               <>
-                <span className="overline">A GOOD PLACE TO START</span>
-                <h2>从一个好故事开始。</h2>
+                <h2>选择示例</h2>
                 <p>选择适合你的场景，替换为自己的内容。</p>
                 <div
                   className="template-card"
@@ -966,7 +936,7 @@ export default function App() {
             ) : (
               <>
                 <span className="overline">EASY SLIDE DSL / V1</span>
-                <h2>内容有结构，表达有自由。</h2>
+                <h2>DSL 语法指南</h2>
                 <p>
                   用类似 SwiftUI
                   的声明式语法描述演示文稿，支持嵌套布局与链式修饰符。所有尺寸使用

@@ -204,7 +204,7 @@ Slide(.content, title: "定义出现顺序") {
  Text("接续出现").appear(.zoom, step: 1, order: 1, delay: 150, duration: 500, easing: .linear)
  Text("下一次点击").appear(.fade, step: 3, duration: 300)
 }`);
-  await expect(page.locator(".dsl-validation")).toContainText("语法正确");
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
   await expect(page.locator(".preview-wrap")).toContainText("定义出现顺序");
   await page.getByRole("button", { name: /动画编排/ }).click();
   await expect(page.locator(".motion-panel")).toContainText("550–1050 ms");

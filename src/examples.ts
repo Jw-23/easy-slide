@@ -112,7 +112,7 @@ export const mathDeck: Deck = {
       layout: "grid",
       eyebrow: "05 / TAKEAWAYS",
       title: "带走三个关键想法",
-      subtitle: "把复杂留给推导，把清晰留给听众。",
+      subtitle: "局部信息、步长与全局保证",
       blocks: [
         {
           type: "metric",

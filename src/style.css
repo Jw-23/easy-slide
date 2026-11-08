@@ -1511,3 +1511,13 @@ textarea {
     display: none;
   }
 }
+.canvas-area {
+  justify-content: center;
+}
+.preview-wrap {
+  margin: 0;
+}
+.dsl-validation {
+  color: #9ca9a1;
+  font-size: 10px;
+}

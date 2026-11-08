@@ -198,8 +198,9 @@ export function DslEditor({
         </div>
       ) : null}
       <div className={"dsl-validation " + (error ? "invalid" : "")}>
-        <span className="status-dot" />
-        {error ? "修复上方错误后自动同步" : "语法正确 · 实时同步"}
+        {error
+          ? "1 个错误"
+          : `${value.split("\n").length} 行 · ${value.length} 字符`}
       </div>
     </div>
   );
