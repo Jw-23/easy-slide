@@ -40,12 +40,15 @@ export async function exportPptx(deck: Deck, assets: Record<string, string>) {
           },
         });
       } else if (e.kind === "rect")
-        slide.addShape(pptx.ShapeType.roundRect, {
-          ...pos,
-          rectRadius: 0.15,
-          fill: { color: e.fill!.slice(1) },
-          line: { color: e.fill!.slice(1), transparency: 100 },
-        });
+        slide.addShape(
+          e.radius === 0 ? pptx.ShapeType.rect : pptx.ShapeType.roundRect,
+          {
+            ...pos,
+            rectRadius: 0.15,
+            fill: { color: e.fill!.slice(1) },
+            line: { color: e.fill!.slice(1), transparency: 100 },
+          },
+        );
       else if (e.kind === "text")
         slide.addText(e.text || "", {
           ...pos,
@@ -53,6 +56,7 @@ export async function exportPptx(deck: Deck, assets: Record<string, string>) {
           fontSize: (e.size || 24) * 0.75,
           color: e.color?.slice(1),
           bold: e.bold,
+          align: e.align || "left",
           margin: 0,
           breakLine: false,
           valign: "top",

@@ -10,7 +10,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(page.locator(".slide-item")).toHaveCount(20);
   await page
     .getByRole("textbox", { name: "页标题", exact: true })
     .fill("本地测试标题");
@@ -59,7 +59,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   const zip = await JSZip.loadAsync(await readFile((await file.path())!));
   expect(
     Object.keys(zip.files).filter((x) => /^ppt\/slides\/slide\d+.xml$/.test(x)),
-  ).toHaveLength(18);
+  ).toHaveLength(20);
   const first = await zip.file("ppt/slides/slide1.xml")!.async("string");
   expect(first).toContain("本地测试标题");
   expect(first).toContain("<p:transition");
@@ -318,11 +318,11 @@ test("the full startup tour renders without missing assets or clipped text and c
   page,
 }) => {
   await page.goto("/");
-  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(page.locator(".slide-item")).toHaveCount(20);
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 20; i++) {
     await page.locator(".slide-item").nth(i).click();
     await expect(page.locator(".preview-wrap .missing-image")).toHaveCount(0);
     await expect
@@ -373,13 +373,13 @@ test("the full startup tour renders without missing assets or clipped text and c
     .locator(".modal")
     .getByRole("button", { name: "切换示例", exact: true })
     .click();
-  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(page.locator(".slide-item")).toHaveCount(20);
   await expect(page.locator(".asset-list img")).toHaveCount(1);
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
   await page.reload();
-  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(page.locator(".slide-item")).toHaveCount(20);
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
   const p = JSON.parse(await readFile((await (await dl).path())!, "utf8"));
@@ -404,7 +404,7 @@ test("direct feature tour isolates its saved draft from the existing working pro
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".slide-item")).toHaveCount(18);
+  await expect(page.locator(".slide-item")).toHaveCount(20);
   await expect(page.locator(".preview-wrap")).toContainText("Easy Slide");
   await expect(page.locator(".preview-wrap")).not.toContainText(
     "保留的工作工程",
@@ -419,4 +419,60 @@ test("direct feature tour isolates its saved draft from the existing working pro
   await expect(page.locator(".preview-wrap")).toContainText("保留的工作工程");
   await page.goto("/?example=features");
   await expect(page.locator(".preview-wrap")).toContainText("演示里的修改");
+});
+test("calculated table updates, survives visual edits and exports aligned data", async ({
+  page,
+}) => {
+  await page.goto("/?example=features");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  const source = `Deck("计算报表")
+let rate = 0.2
+let data = range(0,4).map(k => [k, (1-rate)^k])
+Slide(title:"计算表格") {
+ Glass {
+  Table(columns:[Column("k",width:1,align:.center),Column("x",width:3,align:.right,format:"0.000")], rows:data)
+   .tableStyle(rowHeight:50,borders:.all,zebra:true,headerFill:"#23796e")
+ }
+}`;
+  await editor.fill(source);
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
+  await expect(page.locator(".preview-wrap")).toContainText("0.640");
+  const cell = page
+    .locator(".preview-wrap div")
+    .filter({ hasText: /^0\.640$/ })
+    .last();
+  await expect(cell).toHaveCSS("text-align", "right");
+  await editor.fill(source.replace("let rate = 0.2", "let rate = 0.5"));
+  await expect(page.locator(".preview-wrap")).toContainText("0.250");
+  await page
+    .locator(".tabs")
+    .getByRole("button", { name: "页面", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "页标题", exact: true })
+    .fill("改过标题");
+  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await expect(editor).toContainText("let rate = 0.5");
+  await expect(editor).toContainText("rows:data");
+  await editor.fill(source.replace("rows:data", "rows: [[1 / 0]]"));
+  await expect(page.locator(".editor-diagnostic")).toContainText(
+    "除数不能为 0",
+  );
+  await expect(page.locator(".preview-wrap")).toContainText("0.250");
+  await editor.fill(source.replace("let rate = 0.2", "let rate = 0.5"));
+  const dl = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出", exact: true }).click();
+  await page.getByRole("button", { name: /PowerPoint/ }).click();
+  const zip = await JSZip.loadAsync(await readFile((await (await dl).path())!));
+  const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+  expect(xml).toContain("0.250");
+  expect(xml).toContain('algn="r"');
+  await page.screenshot({
+    path: "test-results/computed-table.png",
+    fullPage: true,
+  });
 });

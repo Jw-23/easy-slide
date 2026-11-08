@@ -1,5 +1,13 @@
 import { DslError } from "./diagnostics";
-/** A small declarative language. No eval, Function, dynamic imports or executable expressions. */
+import { tokenize, type Token } from "./tokens";
+import {
+  Scope,
+  parseExpression,
+  evaluate,
+  dynamicExpression,
+  type Cursor,
+  type Budget,
+} from "./expressions";
 export type Call = {
   name: string;
   from: number;
@@ -10,183 +18,74 @@ export type Call = {
   named: Record<string, unknown>;
   children: Call[];
   modifiers: Call[];
+  bindings?: string[];
+  expressionSource?: string;
 };
-type Token = {
-  from: number;
-  to: number;
-  kind: "id" | "string" | "number" | "punct" | "eof";
-  value: string;
-  line: number;
-  col: number;
-};
+/** Declarations and bounded expressions are interpreted, never executed as JavaScript. */
 export function readSyntax(source: string): Call {
-  const ts: Token[] = [];
-  let i = 0,
-    line = 1,
-    col = 1;
-  const advance = () => {
-    const c = source[i++];
-    if (c === "\n") {
-      line++;
-      col = 1;
-    } else col++;
-    return c;
-  };
-  const error = (m: string): never => {
-    throw new DslError(m, i, i + 1, line, col);
-  };
-  while (i < source.length) {
-    if (/\s/.test(source[i])) {
-      advance();
-      continue;
-    }
-    if (source.slice(i, i + 2) === "//") {
-      while (i < source.length && advance() !== "\n") {}
-      continue;
-    }
-    const start = i;
-    const l = line,
-      c = col;
-    if (source[i] === '"' || source.slice(i, i + 2) === '#"') {
-      const raw = source[i] === "#";
-      if (raw) advance();
-      const triple = source.slice(i, i + 3) === '"""';
-      const open = triple ? '"""' : '"';
-      for (let n = 0; n < open.length; n++) advance();
-      const end = open + (raw ? "#" : "");
-      let v = "",
-        closed = false;
-      while (i < source.length) {
-        if (source.slice(i, i + end.length) === end) {
-          for (let n = 0; n < end.length; n++) advance();
-          closed = true;
-          break;
-        }
-        const ch = advance();
-        if (ch === "\\" && !raw) {
-          const esc = advance();
-          const map: Record<string, string> = {
-            n: "\n",
-            t: "\t",
-            r: "\r",
-            '"': '"',
-            "\\": "\\",
-          };
-          if (!(esc in map)) error('不支持的转义，请用 #"..."# 包裹公式');
-          v += map[esc];
-        } else v += ch;
-      }
-      if (!closed) error("字符串缺少结束引号");
-      ts.push({
-        kind: "string",
-        value: v,
-        line: l,
-        col: c,
-        from: start,
-        to: i,
-      });
-      continue;
-    }
-    const num = source.slice(i).match(/^-?\d+(?:\.\d+)?/);
-    if (num) {
-      for (let n = 0; n < num[0].length; n++) advance();
-      ts.push({
-        kind: "number",
-        value: num[0],
-        line: l,
-        col: c,
-        from: start,
-        to: i,
-      });
-      continue;
-    }
-    const id = source.slice(i).match(/^[A-Za-z_][A-Za-z_0-9]*/);
-    if (id) {
-      for (let n = 0; n < id[0].length; n++) advance();
-      ts.push({
-        kind: "id",
-        value: id[0],
-        line: l,
-        col: c,
-        from: start,
-        to: i,
-      });
-      continue;
-    }
-    if ("(){}[]:,.".includes(source[i])) {
-      ts.push({
-        kind: "punct",
-        value: advance(),
-        line: l,
-        col: c,
-        from: start,
-        to: i,
-      });
-      continue;
-    }
-    error(`无法识别字符 ${source[i]}`);
-  }
-  ts.push({ kind: "eof", value: "", line, col, from: i, to: i });
+  const ts = tokenize(source);
   let pos = 0,
     depth = 0;
-  const peek = () => ts[pos];
+  const budget: Budget = { operations: 0, calls: 0 };
+  const peek = (offset = 0) => ts[Math.min(pos + offset, ts.length - 1)];
+  const fail = (message: string, t = peek()): never => {
+    throw new DslError(
+      message,
+      t.from,
+      t.to,
+      t.line,
+      t.col,
+      "检查此处的声明、参数类型与括号。变量先用 let 定义，再在当前作用域中使用。",
+    );
+  };
   const take = (v?: string) => {
-    const t = ts[pos];
+    const t = peek();
     if (v !== undefined && t.value !== v)
-      throw new DslError(
-        `需要 ${v}，得到 ${t.value || "文件结尾"}`,
-        t.from,
-        t.to,
-        t.line,
-        t.col,
-        `在此处补上 ${v}，并检查上一项是否缺少逗号。`,
-      );
+      fail(`需要 ${v}，得到 ${t.value || "文件结尾"}`, t);
     pos++;
     return t;
   };
-  const fail = (m: string): never => {
-    const t = peek();
-    throw new DslError(m, t.from, t.to, t.line, t.col);
-  };
-  function value(): unknown {
-    const t = peek();
-    if (t.kind === "string") {
-      take();
-      return t.value;
-    }
-    if (t.kind === "number") {
-      take();
-      return Number(t.value);
-    }
-    if (t.value === ".") {
-      take();
-      if (peek().kind !== "id") fail("需要枚举名称");
-      return take().value;
-    }
-    if (t.value === "[") {
-      take();
-      const a: unknown[] = [];
-      while (peek().value !== "]") {
-        a.push(value());
-        if (peek().value !== ",") break;
-        take();
-      }
-      take("]");
-      return a;
-    }
-    return fail("参数应为字符串、数字、数组或 .枚举");
+  const cursor: Cursor = { peek, take, fail };
+  const global = new Scope();
+  const snippet = (from: number, to: number, col: number) =>
+    source
+      .slice(from, to)
+      .split("\n")
+      .map((line, i) =>
+        i ? line.slice(Math.min(col - 1, line.match(/^ */)![0].length)) : line,
+      )
+      .join("\n");
+  function binding(scope: Scope) {
+    const origin = take("let");
+    if (peek().kind !== "id") fail("let 后需要变量名");
+    const name = take().value;
+    if (scope.values.has(name)) fail(`变量 ${name} 已在此作用域定义`, origin);
+    if (["true", "false", "null", "let"].includes(name))
+      fail(`不能将 ${name} 用作变量名`, origin);
+    take("=");
+    const node = parseExpression(cursor);
+    const result = evaluate(node, scope, budget);
+    scope.values.set(name, result);
+    if (peek().value === ";") take();
+    scope.bindings.push(snippet(origin.from, ts[pos - 1].to, origin.col));
   }
-  function call(modifier = false): Call {
+  function call(scope: Scope, modifier = false): Call {
     if (++depth > 30) fail("布局嵌套不得超过 30 层");
-    if (peek().kind !== "id") fail("需要声明名称");
-    const origin = peek();
-    const name = take().value,
+    if (peek().kind !== "id") fail("需要组件声明或 let");
+    const origin = peek(),
+      name = take().value,
       args: unknown[] = [],
-      named: Record<string, unknown> = {};
+      named: Record<string, unknown> = Object.create(null);
+    let dynamic = false;
+    const value = () => {
+      const node = parseExpression(cursor);
+      dynamic ||= dynamicExpression(node);
+      return evaluate(node, scope, budget);
+    };
     if (peek().value === "(") {
       take();
       while (peek().value !== ")") {
-        if (peek().kind === "id" && ts[pos + 1]?.value === ":") {
+        if (peek().kind === "id" && peek(1).value === ":") {
           const key = take().value;
           take(":");
           if (Object.hasOwn(named, key)) fail(`参数 ${key} 重复`);
@@ -197,13 +96,21 @@ export function readSyntax(source: string): Call {
       }
       take(")");
     }
-    const children: Call[] = [];
+    const children: Call[] = [],
+      childScope = name === "Deck" ? scope : new Scope(scope);
+    let seenContent = false;
     if (peek().value === "{") {
-      if (modifier) fail("修饰符不能包含内容");
+      if (modifier) fail("修饰符不能包含组件");
       take();
       while (peek().value !== "}") {
         if (peek().kind === "eof") fail("缺少 }");
-        children.push(call());
+        if (peek().value === "let") {
+          if (seenContent) fail("请把当前作用域的 let 声明放在组件之前");
+          binding(childScope);
+        } else {
+          children.push(call(childScope));
+          seenContent = true;
+        }
       }
       take("}");
     }
@@ -211,8 +118,16 @@ export function readSyntax(source: string): Call {
     if (!modifier)
       while (peek().value === ".") {
         take();
-        modifiers.push(call(true));
+        modifiers.push(call(scope, true));
       }
+    const bindings =
+      name !== "Deck" && childScope.bindings.length
+        ? childScope.bindings
+        : undefined;
+    dynamic ||=
+      !!bindings ||
+      children.some((c) => !!c.expressionSource) ||
+      modifiers.some((c) => !!c.expressionSource);
     depth--;
     return {
       name,
@@ -224,9 +139,18 @@ export function readSyntax(source: string): Call {
       to: ts[pos - 1].to,
       line: origin.line,
       col: origin.col,
+      ...(bindings ? { bindings } : {}),
+      ...(dynamic
+        ? { expressionSource: snippet(origin.from, ts[pos - 1].to, origin.col) }
+        : {}),
     };
   }
-  const root = call();
-  while (peek().kind !== "eof") root.children.push(call());
+  while (peek().value === "let") binding(global);
+  const root = call(global);
+  while (peek().kind !== "eof") {
+    if (peek().value === "let") binding(global);
+    else root.children.push(call(global));
+  }
+  if (global.bindings.length) root.bindings = global.bindings;
   return root;
 }

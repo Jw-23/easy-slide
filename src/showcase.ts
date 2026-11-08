@@ -5,9 +5,14 @@ Deck("Easy Slide 功能示例", author: "示例工程")
     .transition(.slide, duration: 650, direction: .left, easing: .easeOut)
 Theme(accent: "#23796e", background: "#fafbf9", color: "#1c3430", font: "Arial", material: .glass)
 
+let demoRate = 0.2
+let demoLoss = x => x ^ 2 / 2
+let demoRows = range(0, 6).map(k => row(k, (1 - demoRate) ^ k, demoLoss((1 - demoRate) ^ k)))
+let demoCosts = [120, 180, 95, 240]
+
 Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、材质与动画编排") {
     Cover {
-        Text("18 页示例 · 在 DSL 面板中查看和修改源码").font(18)
+        Text("20 页示例 · 在 DSL 面板中查看和修改源码").font(18)
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
@@ -132,7 +137,35 @@ Slide(title: "代码、表格与行级动画", eyebrow: "12 / CODE + TABLE", sub
     }
 }.notes("Code 使用等宽字体，展示而不执行代码。Table 接受二维文本数组；数值内容要写为字符串。表格使用 stagger 逐行启动动画，表头与每行文字一起出现。数据仅用于演示。")
 
-Slide(title: "六种内容入场效果", eyebrow: "13 / ENTRANCE EFFECTS", subtitle: "点击一次，按 order 顺序查看所有效果") {
+Slide(title: "用 DSL 计算表格数据", eyebrow: "13 / COMPUTED TABLE", subtitle: "修改顶部 demoRate；表格会重新计算每次迭代的数值") {
+    Glass {
+        Table(
+            columns: [Column("迭代 k", width: 1, align: .center), Column("当前位置 x", width: 2, align: .right, format: "0.000"), Column("目标值 f(x)", width: 2, align: .right, format: "0.0000")],
+            rows: demoRows
+        ).tableStyle(rowHeight: 44, zebra: true, borders: .all, headerFill: "#23796e", borderColor: "#cddfd5")
+         .appear(.fade, step: 1, duration: 350).stagger(70)
+    }
+}.notes("顶部 let 定义步长、损失函数和数据。range(0, 6) 不含终点，map 生成六行。Column 定义标题、宽度权重、对齐与数字格式。修改 demoRate 后，数据重新求值。样式编辑与布局切换会保留计算源码，PPTX 输出计算后的数值。")
+
+Slide(title: "数组统计、筛选与条件表达式", eyebrow: "14 / EXPRESSIONS", subtitle: "数据、统计与显示格式分别定义") {
+    Split(spacing: 28) {
+        Glass {
+            Code("let demoCosts = [120, 180, 95, 240]\n\nsum(demoCosts)\nmean(demoCosts)\ndemoCosts.filter(x => x > 150)\ndemoCosts.reduce((sum, x) => sum + x, 0)\npercent(0.15, 0)").font(19)
+        }
+        Glass {
+            Table(columns: [Column("统计项", width: 2), Column("结果", width: 2, align: .right, format: "0.00")], rows: [
+                ["合计", sum(demoCosts)],
+                ["均值", mean(demoCosts)],
+                ["大于 150", str(demoCosts.filter(x => x > 150).length) + " 项"],
+                ["折扣", percent(0.15, 0)],
+                ["折后合计", demoCosts.reduce((sum, x) => sum + x, 0) * 0.85],
+                ["预算判断", sum(demoCosts) > 500 ? "超过预算" : "预算内"]
+            ]).tableStyle(rowHeight: 42, zebra: true, borders: .horizontal)
+        }
+    }
+}.notes("支持算术、幂、比较、布尔与条件表达式，数组下标从 0 开始。map 转换、filter 筛选、reduce 累计。fixed、percent、format 返回格式化文字；Column format 仅格式化数值，文字保持不变。计算有调用深度和工作量上限，不接触浏览器或网络 API。")
+
+Slide(title: "六种内容入场效果", eyebrow: "15 / ENTRANCE EFFECTS", subtitle: "点击一次，按 order 顺序查看所有效果") {
     Cards(columns: 3, spacing: 20) {
         Text("淡入", title: "fade").font(23).appear(.fade, step: 1, order: 0, duration: 450)
         Text("向上浮入", title: "rise").font(23).appear(.rise, step: 1, order: 1, duration: 450)
@@ -143,7 +176,7 @@ Slide(title: "六种内容入场效果", eyebrow: "13 / ENTRANCE EFFECTS", subti
     }
 }.notes("appear 的六种效果分别为 fade、rise、slideLeft、slideRight、zoom、none。这里全部在 step 1 触发，order 决定组内先后。同一个 order 可有多个并行项，下一组等待上一组最晚完成的项。")
 
-Slide(title: "四种缓动与点击阶段", eyebrow: "14 / EASING + STEPS", subtitle: "第一次点击显示前三项，下一次点击直接进入 step 3") {
+Slide(title: "四种缓动与点击阶段", eyebrow: "16 / EASING + STEPS", subtitle: "第一次点击显示前三项，下一次点击直接进入 step 3") {
     Flow(spacing: 12) {
         Text("linear · 匀速").font(23).glass(opacity: 0.58).padding(16)
             .appear(.slideLeft, step: 1, order: 0, duration: 850, easing: .linear)
@@ -156,7 +189,7 @@ Slide(title: "四种缓动与点击阶段", eyebrow: "14 / EASING + STEPS", subt
     }
 }.notes("step 编号不必连续：此页只需两次点击，第二次直接触发 step 3。delay 在每个点击阶段内重新计算。PPTX 中的 spring 会近似为原生减速；其余缓动映射为加速与减速比例。")
 
-Slide(title: "位置、字体与面板样式", eyebrow: "15 / STYLE + FRAME", subtitle: "所有坐标基于 1280 × 720 画布") {
+Slide(title: "位置、字体与面板样式", eyebrow: "17 / STYLE + FRAME", subtitle: "所有坐标基于 1280 × 720 画布") {
     ZStack {
         Text("固定位置的正文", title: "frame + font")
             .frame(x: 90, y: 270, width: 500, height: 290)
@@ -167,7 +200,7 @@ Slide(title: "位置、字体与面板样式", eyebrow: "15 / STYLE + FRAME", su
     }
 }.notes("对比纯色 background 与毛玻璃 glass。frame 支持 x/y/width/height，font、foreground、padding、title 控制层次。右侧默认卡片材质影响 Cards 等自动卡片；显式 Glass 与 .glass() 会保留自己的材质。")
 
-Slide(title: "页面样式覆盖与无过渡", eyebrow: "16 / PAGE OVERRIDES", subtitle: "页面可覆盖背景、文字色、过渡方式和演讲备注") {
+Slide(title: "页面样式覆盖与无过渡", eyebrow: "18 / PAGE OVERRIDES", subtitle: "页面可覆盖背景、文字色、过渡方式和演讲备注") {
     Flow(spacing: 24) {
         Text("本页使用独立的背景色和文字色。", title: "页面设置").font(27)
         Bullets(["background 覆盖当前页背景", "foreground 覆盖当前页默认文字色", "transition(.none) 关闭页级过渡"]).font(23)
@@ -175,14 +208,14 @@ Slide(title: "页面样式覆盖与无过渡", eyebrow: "16 / PAGE OVERRIDES", s
 }.background("#eef2f8").foreground("#263b59").transition(.none)
 .notes("全局 Theme 与页面覆盖的作用不同：在 Theme 中更改 accent、font、background、color、material 会影响默认主题；页面 background、foreground 仅覆盖当前页。Deck 的默认过渡在本页被 none 覆盖。")
 
-Slide(title: "编辑、素材与工程文件", eyebrow: "17 / LOCAL WORKFLOW", subtitle: "示例中的操作均可在当前编辑器中完成") {
+Slide(title: "编辑、素材与工程文件", eyebrow: "19 / LOCAL WORKFLOW", subtitle: "示例中的操作均可在当前编辑器中完成") {
     Compare(spacing: 28) {
         Bullets(["DSL 补全：Ctrl / ⌘ + Space", "错误面板：行列位置、定位与建议", "粘贴图片：Ctrl / ⌘ + V", "素材面板：插入图片或连接文件夹"], title: "编辑与素材").font(21)
         Bullets(["保存工程：Ctrl / ⌘ + S", "完整 JSON：DSL 与内嵌图片", "纯 .slide：只含声明式源码", "PPTX：文本、公式、材质与动画"], title: "保存与导出").font(21)
     }
 }.notes("浏览器自动保存至 IndexedDB；重要内容请导出完整工程。直接目录访问需要支持 File System Access 的浏览器及用户选择目录；连接目录后点击保存工程才会写入文件。备注只在编辑器显示，PPTX 中保存为演讲备注。")
 
-Slide(title: "功能示例结束", eyebrow: "18 / REFERENCE", subtitle: "修改源码、重播动画，或导出完整工程与 PPTX") {
+Slide(title: "功能示例结束", eyebrow: "20 / REFERENCE", subtitle: "修改源码、重播动画，或导出完整工程与 PPTX") {
     Section {
         Text("切换示例可打开数学论坛与工程汇报工程。").font(18)
     }

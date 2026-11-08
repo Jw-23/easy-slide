@@ -1,3 +1,5 @@
+import { validateTable, tableKeys, type TableOptions } from "./table";
+import type { Cell } from "./number-format";
 import { mathError } from "./math";
 import { DslError, closest } from "./diagnostics";
 import { readSyntax, type Call } from "./syntax";
@@ -50,6 +52,9 @@ export const layoutComponents: Record<Layout, string> = {
   image: "ImageText",
 };
 export type Block = {
+  expressionSource?: string;
+  bindings?: string[];
+  table?: TableOptions;
   preset?: Layout;
   glass?: GlassStyle;
   appear?: Motion;
@@ -76,7 +81,7 @@ export type Block = {
   src?: string;
   value?: string;
   label?: string;
-  rows?: string[][];
+  rows?: Cell[][];
   x?: number;
   y?: number;
   w?: number;
@@ -91,6 +96,7 @@ export type Block = {
   columns?: number;
 };
 export type Slide = {
+  bindings?: string[];
   id?: string;
   /** Legacy input only; canonical DSL uses dedicated layout components. */
   layout?: Layout;
@@ -107,6 +113,7 @@ export type Slide = {
   blocks: Block[];
 };
 export type Deck = {
+  bindings?: string[];
   version: 1;
   title: string;
   author?: string;
@@ -200,15 +207,7 @@ export function validateDeck(input: unknown): Deck {
           b.items.some((x: unknown) => typeof x !== "string"))
       )
         fail(`${p}：items 必须是文本数组`);
-      if (
-        b.rows !== undefined &&
-        (!Array.isArray(b.rows) ||
-          b.rows.some(
-            (r: unknown) =>
-              !Array.isArray(r) || r.some((c) => typeof c !== "string"),
-          ))
-      )
-        fail(`${p}：rows 必须是二维文本数组`);
+      if (b.type === "table") validateTable(b.rows || [], b.table);
       for (const k of [
         "x",
         "y",
@@ -460,6 +459,16 @@ const apply = (
       } else if (kind === "block" && m.name === "glass") {
         plain(m, ["blur", "opacity", "radius"]);
         target.glass = { ...m.named };
+      } else if (kind === "block" && m.name === "tableStyle") {
+        if (target.type !== "table") fail(".tableStyle 仅用于 Table");
+        plain(
+          m,
+          tableKeys.filter((k) => !["columns", "headers"].includes(k)),
+        );
+        target.table = {
+          ...((target.table as TableOptions) || {}),
+          ...m.named,
+        };
       } else if (kind === "block" && m.name === "frame") {
         plain(m, ["x", "y", "width", "height"]);
         for (const [k, v] of Object.entries(m.named))
@@ -468,9 +477,12 @@ const apply = (
         fail(
           `${kind} 不支持修饰符 .${m.name}${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"]) ? `，是否想写 .${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"])}？` : ""}`,
         );
-      if (m.args.length !== (["frame", "glass"].includes(m.name) ? 0 : 1))
+      if (
+        m.args.length !==
+        (["frame", "glass", "tableStyle"].includes(m.name) ? 0 : 1)
+      )
         fail(
-          `.${m.name} ${["frame", "glass"].includes(m.name) ? "仅接受命名参数" : "需要一个未命名参数"}`,
+          `.${m.name} ${["frame", "glass", "tableStyle"].includes(m.name) ? "仅接受命名参数" : "需要一个未命名参数"}`,
         );
       if (kind === "block")
         validateDeck({
@@ -501,8 +513,21 @@ function compileBlock(c: Call): Block {
       "rows",
       "spacing",
       "columns",
+      ...(type === "table" ? tableKeys : []),
     ]);
     const b: Record<string, unknown> = { type, ...c.named };
+    if (type === "table") {
+      const opts: Record<string, unknown> = {};
+      for (const key of tableKeys) {
+        if (c.named[key] !== undefined) {
+          opts[key] = c.named[key];
+          delete b[key];
+        }
+      }
+      if (Object.keys(opts).length) b.table = opts;
+    }
+    if (c.bindings) b.bindings = c.bindings;
+    if (c.expressionSource) b.expressionSource = c.expressionSource;
     if (type === "layout")
       b.preset = Object.entries(layoutComponents).find(
         ([, name]) => name === c.name,
@@ -550,6 +575,7 @@ export function parseDeck(source: string): Deck {
       title: root.args[0],
       ...(root.named.author !== undefined ? { author: root.named.author } : {}),
       slides: [],
+      ...(root.bindings ? { bindings: root.bindings } : {}),
     };
     for (const c of root.children) {
       at(c, () => {
@@ -565,6 +591,7 @@ export function parseDeck(source: string): Deck {
             fail("Slide 只接受命名参数，布局请使用 Split / Cards 等组件");
           const s: Record<string, unknown> = {
             ...c.named,
+            ...(c.bindings ? { bindings: c.bindings } : {}),
             blocks: c.children.map(compileBlock),
           };
           if (c.args.length) {
@@ -597,6 +624,13 @@ function modifiers(b: Block): string {
     out += `.glass(${Object.entries(b.glass)
       .map(([k, v]) => `${k}: ${v}`)
       .join(", ")})`;
+  if (b.table) {
+    const styles = Object.entries(b.table).filter(
+      ([k]) => !["columns", "headers"].includes(k),
+    );
+    if (styles.length)
+      out += `.tableStyle(${styles.map(([k, v]) => `${k}: ${k === "borders" ? "." + v : str(v)}`).join(", ")})`;
+  }
   if (b.stagger !== undefined) out += `.stagger(${b.stagger})`;
   if (b.size !== undefined) out += `.font(${b.size})`;
   if (b.color) out += `.foreground(${str(b.color)})`;
@@ -621,6 +655,8 @@ function modifiers(b: Block): string {
   return out;
 }
 function writeBlock(b: Block, indent: string): string {
+  if (b.expressionSource)
+    return indent + b.expressionSource.split("\n").join("\n" + indent);
   const field =
     b.type === "image"
       ? "src"
@@ -636,6 +672,28 @@ function writeBlock(b: Block, indent: string): string {
     args.push(str(b[field as keyof Block]));
   for (const k of ["title", "text", "label"] as const)
     if (k !== field && b[k] !== undefined) args.push(`${k}: ${str(b[k])}`);
+  if (b.type === "table") {
+    if (b.table?.headers) args.push(`headers: ${str(b.table.headers)}`);
+    if (b.table?.columns)
+      args.push(
+        "columns: [" +
+          b.table.columns
+            .map(
+              (c) =>
+                "Column(" +
+                str(c.label) +
+                Object.entries(c)
+                  .filter(([k]) => k !== "label")
+                  .map(
+                    ([k, v]) => `, ${k}: ${k === "align" ? "." + v : str(v)}`,
+                  )
+                  .join("") +
+                ")",
+            )
+            .join(", ") +
+          "]",
+      );
+  }
   if (b.gap !== undefined) args.push(`spacing: ${b.gap}`);
   if (b.columns !== undefined) args.push(`columns: ${b.columns}`);
   let result =
@@ -645,7 +703,12 @@ function writeBlock(b: Block, indent: string): string {
   if (b.children)
     result +=
       " {\n" +
-      b.children.map((x) => writeBlock(x, indent + "    ")).join("\n") +
+      [
+        ...(b.bindings || []).map(
+          (v) => indent + "    " + v.split("\n").join("\n" + indent + "    "),
+        ),
+        ...b.children.map((x) => writeBlock(x, indent + "    ")),
+      ].join("\n") +
       "\n" +
       indent +
       "}";
@@ -663,6 +726,7 @@ function transitionText(s: Deck | Slide, fallback = "fade"): string {
 }
 export function serialize(d: Deck): string {
   const parts = [
+    ...(d.bindings || []),
     `Deck(${str(d.title)}${d.author ? `, author: ${str(d.author)}` : ""})` +
       transitionText(d),
   ];
@@ -682,12 +746,13 @@ export function serialize(d: Deck): string {
       "Slide(" +
       args.join(", ") +
       ") {\n" +
-      (s.layout
-        ? [{ type: "layout", preset: s.layout, children: s.blocks } as Block]
-        : s.blocks
-      )
-        .map((b) => writeBlock(b, "    "))
-        .join("\n") +
+      [
+        ...(s.bindings || []).map((v) => "    " + v.split("\n").join("\n    ")),
+        ...(s.layout
+          ? [{ type: "layout", preset: s.layout, children: s.blocks } as Block]
+          : s.blocks
+        ).map((b) => writeBlock(b, "    ")),
+      ].join("\n") +
       "\n}";
     if (s.background) t += `.background(${str(s.background)})`;
     if (s.color) t += `.foreground(${str(s.color)})`;
@@ -720,6 +785,7 @@ export function withLayout(s: Slide, preset: Layout): Slide {
           : {}),
         type: "layout",
         preset,
+        expressionSource: undefined,
         children: pageContent(s),
       },
     ],

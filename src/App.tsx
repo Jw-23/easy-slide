@@ -62,7 +62,11 @@ export default function App() {
   // The versioned feature tour has its own draft; visiting it never replaces a user's working project.
   const featureTour =
     new URLSearchParams(window.location.search).get("example") === "features";
-  const draftKey = featureTour ? "draft:feature-tour:1" : "draft";
+  const draftKey = featureTour
+    ? new URLSearchParams(window.location.search).get("revision") === "1"
+      ? "draft:feature-tour:1"
+      : "draft:feature-tour:2"
+    : "draft";
   const [source, setSource] = useState(initialSource),
     [assets, setAssets] = useState<Record<string, string>>({
       ...initialAssets,
@@ -141,7 +145,9 @@ export default function App() {
       slide.blocks[0].type === "layout" &&
       !(p.blocks as import("./dsl").Block[]).some((b) => b.type === "layout")
     )
-      p.blocks = [{ ...slide.blocks[0], children: p.blocks }];
+      p.blocks = [
+        { ...slide.blocks[0], expressionSource: undefined, children: p.blocks },
+      ];
     update({
       ...deck,
       slides: deck.slides.map((s, i) => (i === active ? { ...s, ...p } : s)),
@@ -965,7 +971,7 @@ export default function App() {
                   <BookOpen />
                   <div>
                     <h3>功能示例</h3>
-                    <p>18 页 · 全部组件、LaTeX、素材、材质与动画</p>
+                    <p>20 页 · 全部组件、LaTeX、素材、材质与动画</p>
                   </div>
                   <ArrowUpRight />
                 </div>
@@ -1023,6 +1029,19 @@ Slide(title: "一个清晰的结论") {
                   Text / Quote / Code 接受文字；Bullets 接受文本数组；Equation
                   接受 LaTeX 原始字符串；Image 接受素材路径；Metric 接受指标值和
                   label；Table 接受二维数组。
+                </p>
+                <h3>计算与表格</h3>
+                <pre>{`let data = range(0, 6).map(k => [k, k^2])
+Slide(title: "计算数据") {
+    Table(columns: [Column("k", align: .center),
+                    Column("k²", align: .right, format: "0.00")],
+          rows: data)
+        .tableStyle(zebra: true, borders: .all)
+}`}</pre>
+                <p>
+                  支持 let 常量、算术与条件表达式、数组下标、map / filter /
+                  reduce，以及 sum、mean、round、fixed、percent
+                  等函数。计算在本地解释执行；错误会显示行列位置。表格可设置表头、列宽、对齐、数字格式、行高与边框。
                 </p>
                 <h3>精确控制</h3>
                 <p>

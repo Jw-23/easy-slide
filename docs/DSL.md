@@ -37,11 +37,11 @@ Slide(title: "每一步，都更接近答案") {
 
 字符串使用双引号，支持 `\n`、`\t`、`\r`、`\"`、`\\`。公式推荐原始字符串 `#"\frac{a}{b}"#`，无需双写反斜杠；三引号支持多行。`//` 开头为行尾注释。数组使用 `[...]`，可嵌套。命名参数使用 `name: value`，枚举使用 `.name`。数值形式的正文、指标要用双引号。
 
-专用解析器不会执行声明中的代码；不支持变量、循环、函数或远程代码导入。
+专用解释器支持 let 常量、表达式和有界数组计算，不执行 JavaScript 或远程代码。使用 range、map、filter、reduce 生成数据，不提供通用命令执行或浏览器 API 访问。
 
 ## 工程与页面
 
-`Deck("名称", author: "作者")` 为唯一工程头，必须位于首个声明。可选 `version: 1`，默认为 1。之后为一个可选 `Theme` 和 1–200 个 `Slide`。
+`Deck("名称", author: "作者")` 为唯一工程头；前后可声明 let 常量，变量必须先定义再使用。可选 `version: 1`，默认为 1。之后为一个可选 `Theme` 和 1–200 个 `Slide`。
 
 `Theme` 可设置 `accent`、`background`、`color`、`font`、`material`。颜色为 `"#RRGGBB"`。字体需本机安装。
 
@@ -200,3 +200,92 @@ Slide(title: "主要结论") {
 支持 `Equation(#"\frac{a}{b}"#)` 原始字符串，也支持需要双写反斜杠的普通字符串。未知命令、不匹配括号等会显示在 Equation 声明所在位置，并尽可能给出相近命令。出错时保留最后有效预览；不能导出包含错误公式的工程。
 
 旧版 `Slide(.split, ...)` 仍可读取，保存/整理后统一写成独立 Split 组件。
+
+## 变量、表达式与计算表格
+
+```swift
+Deck("优化过程")
+
+let rate = 0.2
+let loss = x => x ^ 2 / 2
+let data = range(0, 6).map(k => [k, (1-rate)^k, loss((1-rate)^k)])
+
+Slide(title: "迭代数据") {
+    Glass {
+        Table(
+            columns: [
+                Column("k", width: 1, align: .center),
+                Column("x", width: 2, align: .right, format: "0.000"),
+                Column("f(x)", width: 2, align: .right, format: "0.0000")
+            ],
+            rows: data
+        ).tableStyle(rowHeight: 44, zebra: true, borders: .all)
+    }
+}
+```
+
+`let` 定义不可变常量，也可定义箭头函数。全局常量可放在 Deck 前或后；局部常量可放在 Slide 或布局容器中，必须在当前作用域的组件之前声明。内层可遮蔽外层变量，同一作用域不能重复声明。
+
+### 表达式
+
+- 数值：整数、小数、科学计数法，例如 `-3`、`.25`、`1e-3`。
+- 算术：`+ - * / %`；幂使用 `^` 或 `**`，从右向左结合。支持括号、一元正负号。
+- 比较：`< <= > >= == !=`；逻辑：`&& || !`；条件：`test ? yes : no`。逻辑和条件分支按需求值。
+- `+` 也可拼接两个数组，或拼接文字与标量。文字示例：`"第 " + k + " 次"`。
+- 数组：`[1, 2, 3]`，下标从 0 开始，例如 `values[0]`；长度为 `values.length`。
+- 标量包括数值、文字、布尔和 null。Table 可直接接收这些标量，null 显示为破折号。Text 与 Metric 仍接收文字，数值可通过 `str`、`fixed`、`percent` 转换。
+
+计算使用双精度浮点数；列格式控制显示精度，不提供任意精度算术。
+
+### 函数与数组生成
+
+| 函数                                                 | 含义                                                |
+| ---------------------------------------------------- | --------------------------------------------------- |
+| `range(end)` / `range(start, end, step)`             | 不包含终点的范围，默认从 0 开始、步长 1；支持负步长 |
+| `repeat(value, count)`                               | 重复值生成数组                                      |
+| `values.map((value, index) => ...)`                  | 生成新数组；index 参数可省略                        |
+| `values.filter(value => condition)`                  | 根据布尔条件筛选                                    |
+| `values.reduce((acc, value, index) => ..., initial)` | 累计计算；index 可省略                              |
+| `sum` / `mean` / `min` / `max`                       | 接受数值数组，或一组数值参数                        |
+| `pow` / `sqrt` / `abs` / `round` / `floor` / `ceil`  | 数值运算；round 可传第二个小数位参数                |
+| `sin` / `cos` / `tan` / `exp` / `log` / `log10`      | 常用数学函数；三角函数使用弧度                      |
+| `clamp(value, min, max)`                             | 限制范围                                            |
+| `fixed(value, digits)` / `percent(value, digits)`    | 返回定点或百分比文字，小数位为 0–10                 |
+| `format(value, "0.000")`                             | 按指定格式返回文字                                  |
+| `str(value)` / `len(value)`                          | 标量转文字、数组或文字长度                          |
+| `concat(a, b)` / `zip(a, b)` / `transpose(matrix)`   | 拼接数组、按最短长度配对、矩阵转置                  |
+| `row(a, b, c)`                                       | 生成一行数据，等同 `[a, b, c]`                      |
+
+例如：
+
+```swift
+let costs = [120, 180, 95, 240]
+let total = sum(costs)
+let high = costs.filter(x => x > 150)
+let discounted = costs.map(x => round(x * 0.85, 2))
+let status = total > 500 ? "超过预算" : "预算内"
+let label = "合计：" + fixed(total, 2)
+```
+
+解释器不暴露网络、文件或浏览器对象。数组最多 2000 项，单次文稿求值最多 100000 步，函数调用最多 60 层。除零、无效开方、无限数值、未定义变量、下标越界及超限计算都会给出带行列位置的错误。箭头函数中的计算同样受限制。
+
+### 表格组件
+
+`Table(rows: data, columns: [Column(...)])` 可以使用变量或计算表达式。`Column("标题", width: 1, align: .right, format: "0.00")` 定义列：width 是正数权重，align 支持 left / center / right。格式支持 `0`、`0.000`、`0.0%`，也支持 `.3f`、`.1%`。格式只作用于数值，文字原样显示。
+
+没有 columns 时，可使用 `headers: ["k", "value"]`。若两者均未定义，第一行沿用旧版行为作为表头。`header: false` 隐藏表头。每张表最多 100 行、20 列；演示页面建议只放适合阅读的行数，超多数据应分表或分页。
+
+样式参数可直接写在 Table 中，或使用 `.tableStyle(...)`：
+
+| 参数                          | 含义                                      |
+| ----------------------------- | ----------------------------------------- |
+| `rowHeight`                   | 期望行高，24–120 像素；空间不足时自动压缩 |
+| `zebra`                       | true / false，控制交替行底色              |
+| `borders`                     | none / horizontal / all                   |
+| `headerFill` / `headerColor`  | 表头底色与文字色                          |
+| `stripeColor` / `borderColor` | 交替行底色与边框色                        |
+| `cellPadding`                 | 水平内边距，0–40 像素                     |
+
+`.font()`、`.foreground()`、`.frame()`、`.appear()` 与 `.stagger()` 继续适用。表格文字与边框在 PPTX 中为独立可编辑对象；PPTX 保存求值后的结果，工程 JSON 和 .slide 保存计算源码，重新导入后再次求值。
+
+可视化编辑和布局切换会保留计算型内容块及 let 声明的源码，避免表格表达式被自动替换为静态数值。编辑器提供变量、计算函数、数组方法、Column 参数与表格样式补全。

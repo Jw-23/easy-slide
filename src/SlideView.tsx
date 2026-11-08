@@ -80,6 +80,7 @@ function SceneElement({
       fontSize: e.size,
       color: e.color,
       fontWeight: e.bold ? 650 : 400,
+      textAlign: e.align || "left",
       whiteSpace: "pre-wrap",
       lineHeight: 1.42,
       fontFamily: e.mono ? "monospace" : undefined,

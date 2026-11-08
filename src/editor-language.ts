@@ -1,3 +1,5 @@
+import { tokenize } from "./tokens";
+import { calculationNames } from "./expressions";
 import { completeLatex } from "./latex";
 import { StreamLanguage } from "@codemirror/language";
 import {
@@ -36,6 +38,7 @@ export const slideLanguage = StreamLanguage.define({
       }
     if (stream.match(/^-?\d+(\.\d+)?/)) return "number";
     if (stream.match(/^\.[A-Za-z_]\w*/)) return "atom";
+    if (stream.match(/^(?:let|true|false|null)\b/)) return "keyword";
     if (stream.match(/^[A-Za-z_]\w*/))
       return /^[A-Z]/.test(stream.current()) ? "keyword" : "propertyName";
     stream.next();
@@ -43,6 +46,12 @@ export const slideLanguage = StreamLanguage.define({
   },
 });
 const declarations = [
+  ["let", "let ${name} = ${value}", "定义局部或全局常量"],
+  [
+    "Column",
+    'Column("${标题}", width: ${1}, align: .${right}, format: "${0.00}")',
+    "表格列：标题、宽度权重、对齐、数字格式",
+  ],
   ["Deck", 'Deck("${名称}", author: "${作者}")', "工程配置，与 Slide 并列书写"],
   ["Theme", 'Theme(accent: "${#16766d}", background: "#fafbf9")', "全局主题"],
   [
@@ -75,6 +84,11 @@ const declarations = [
   ["Spacer", "Spacer", "留白"],
 ];
 const modifiers = [
+  [
+    "tableStyle",
+    'tableStyle(zebra: ${true}, borders: .${horizontal}, headerFill: "${#23796e}")',
+    "表头、斑马纹、边框与行高",
+  ],
   [
     "glass",
     "glass(blur: ${24}, opacity: ${0.68}, radius: ${28})",
@@ -122,6 +136,32 @@ const parameters: Record<string, string[]> = {
   Bullets: ["title"],
   Metric: ["title", "label", "text"],
   Image: ["title"],
+  Table: [
+    "columns",
+    "rows",
+    "headers",
+    "header",
+    "rowHeight",
+    "zebra",
+    "borders",
+    "headerFill",
+    "headerColor",
+    "stripeColor",
+    "borderColor",
+    "cellPadding",
+  ],
+  Column: ["width", "align", "format"],
+  tableStyle: [
+    "header",
+    "rowHeight",
+    "zebra",
+    "borders",
+    "headerFill",
+    "headerColor",
+    "stripeColor",
+    "borderColor",
+    "cellPadding",
+  ],
 };
 export function completeDsl(
   context: CompletionContext,
@@ -140,7 +180,9 @@ export function completeDsl(
     prefix = context.state.sliceDoc(0, from),
     near = prefix.slice(-180);
   let enums: readonly string[] | undefined;
-  if (/material:\s*\.$/.test(near)) enums = ["glass", "solid"];
+  if (/align:\s*\.$/.test(near)) enums = ["left", "center", "right"];
+  else if (/borders:\s*\.$/.test(near)) enums = ["none", "horizontal", "all"];
+  else if (/material:\s*\.$/.test(near)) enums = ["glass", "solid"];
   else if (/easing:\s*\.$/.test(near)) enums = easings;
   else if (/direction:\s*\.$/.test(near))
     enums = ["left", "right", "up", "down"];
@@ -156,6 +198,53 @@ export function completeDsl(
         type: "enum",
         info: "可用枚举值",
       })),
+    };
+  const arrayCall = () => {
+    try {
+      const tokens = tokenize(prefix.slice(0, -1)).slice(0, -1);
+      let balance = 0;
+      for (let i = tokens.length - 1; i >= 0; i--) {
+        if (tokens[i].value === ")") balance++;
+        else if (tokens[i].value === "(" && --balance === 0)
+          return [
+            "range",
+            "repeat",
+            "concat",
+            "zip",
+            "transpose",
+            "map",
+            "filter",
+          ].includes(tokens[i - 1]?.value);
+      }
+    } catch {}
+    return false;
+  };
+  if (
+    prefix.endsWith(".") &&
+    (/\b[a-z_]\w*\.$/.test(prefix) ||
+      /let [^\n]*\)\.$/.test(prefix) ||
+      arrayCall())
+  )
+    return {
+      from,
+      options: [
+        snippetCompletion("map(${x} => ${x})", {
+          label: "map",
+          type: "method",
+          info: "将每项映射为新数据",
+        }),
+        snippetCompletion("filter(${x} => ${x} > 0)", {
+          label: "filter",
+          type: "method",
+          info: "按条件筛选",
+        }),
+        snippetCompletion("reduce((${acc}, ${x}) => ${acc} + ${x}, ${0})", {
+          label: "reduce",
+          type: "method",
+          info: "归约为一个值",
+        }),
+        { label: "length", type: "property", info: "数组或文字长度" },
+      ],
     };
   if (prefix.endsWith("."))
     return {
@@ -189,6 +278,53 @@ export function completeDsl(
       detail: info,
       info,
     }),
+  );
+  const specs: Record<string, string> = {
+    range: "range(${0}, ${6})",
+    repeat: "repeat(${0}, ${5})",
+    pow: "pow(${x}, ${2})",
+    round: "round(${x}, ${2})",
+    fixed: "fixed(${x}, ${3})",
+    percent: "percent(${x}, ${1})",
+    format: 'format(${x}, "${0.000}")',
+    clamp: "clamp(${x}, ${0}, ${1})",
+    Column:
+      'Column("${标题}", width: ${1}, align: .${right}, format: "${0.00}")',
+  };
+  options.push(
+    ...calculationNames
+      .filter((n) => n !== "Column")
+      .map((label) =>
+        snippetCompletion(specs[label] || label + "(${value})", {
+          label,
+          type: "function",
+          detail: "计算函数",
+          info: "本地解释计算；数组下标从 0 开始，range 不包含终点",
+        }),
+      ),
+  );
+  const variables = [
+    ...new Set(
+      [
+        ...context.state
+          .sliceDoc(0, context.pos)
+          .matchAll(/\blet\s+([A-Za-z_]\w*)\s*=/g),
+      ].map((m) => m[1]),
+    ),
+  ];
+  options.push(
+    ...variables.map((label) => ({
+      label,
+      type: "variable",
+      detail: "已声明常量",
+    })),
+  );
+  options.push(
+    ...["true", "false", "null"].map((label) => ({
+      label,
+      type: "keyword",
+      detail: "标量值",
+    })),
   );
   if (call && parameters[call])
     options.unshift(

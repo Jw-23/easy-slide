@@ -1,3 +1,4 @@
+import { tableModel } from "./table";
 import { backdropData } from "./materials";
 import { pageLayout } from "./dsl";
 import type { Block, Deck, Slide, Motion, GlassStyle } from "./dsl";
@@ -14,6 +15,7 @@ export type Element = {
   size?: number;
   color?: string;
   bold?: boolean;
+  align?: "left" | "center" | "right";
   fill?: string;
   radius?: number;
   step: number;
@@ -331,10 +333,11 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         activeKey = oldKey;
       });
     } else if (b.type === "table") {
-      const rows = b.rows || [];
-      const cols = Math.max(1, ...rows.map((r) => r.length)),
-        rh = Math.min(64, h / Math.max(rows.length, 1));
-      rows.forEach((r, i) => {
+      const opts = b.table || {},
+        model = tableModel(b.rows || [], opts),
+        rh = Math.min(opts.rowHeight ?? 56, h / Math.max(model.rows.length, 1)),
+        border = opts.borders ?? "horizontal";
+      model.rows.forEach((row, i) => {
         const oldMotion = activeMotion,
           oldKey = activeKey;
         if (b.stagger !== undefined) {
@@ -344,20 +347,58 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           };
           activeKey = oldKey + "-row-" + i;
         }
-        rect(x, y + i * rh, w, rh - 2, i === 0 ? accent : panel, 4, step);
-        r.forEach((v, j) =>
+        const fill = row.header
+          ? opts.headerFill || accent
+          : opts.zebra !== false && i % 2 === 0
+            ? opts.stripeColor || panel
+            : dark
+              ? "#20322b"
+              : "#ffffff";
+        rect(x, y + i * rh, w, rh, fill, i === 0 ? 6 : 0, step);
+        let cx = x;
+        row.cells.forEach((value, j) => {
+          const cw = w * model.widths[j],
+            pad = Math.min(opts.cellPadding ?? 12, cw / 4),
+            vpad = Math.min(8, rh * 0.15);
           text(
-            v,
-            x + 16 + (j * w) / cols,
-            y + i * rh + 12,
-            w / cols - 28,
-            rh - 16,
-            b.size || 18,
-            i === 0 ? "#ffffff" : c,
-            i === 0,
+            value,
+            cx + pad,
+            y + i * rh + vpad,
+            Math.max(0, cw - pad * 2),
+            Math.max(0, rh - vpad * 2),
+            Math.min(b.size || 18, rh * 0.48),
+            row.header ? opts.headerColor || "#ffffff" : c,
+            row.header,
             step,
-          ),
-        );
+          );
+          e[e.length - 1].align = model.columns[j].align || "left";
+          if (border === "all" && j > 0)
+            rect(cx, y + i * rh, 1, rh, opts.borderColor || "#d8e4dc", 0, step);
+          cx += cw;
+        });
+        if (border !== "none")
+          rect(
+            x,
+            y + (i + 1) * rh - 1,
+            w,
+            1,
+            opts.borderColor || "#d8e4dc",
+            0,
+            step,
+          );
+        if (border === "all") {
+          rect(x, y + i * rh, 1, rh, opts.borderColor || "#d8e4dc", 0, step);
+          rect(
+            x + w - 1,
+            y + i * rh,
+            1,
+            rh,
+            opts.borderColor || "#d8e4dc",
+            0,
+            step,
+          );
+          if (i === 0) rect(x, y, w, 1, opts.borderColor || "#d8e4dc", 0, step);
+        }
         activeMotion = oldMotion;
         activeKey = oldKey;
       });
