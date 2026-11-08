@@ -152,6 +152,16 @@ export function completeDsl(
   }
   // Never interpret text inside a closed string's delimiters as a declaration.
   if (token?.kind === "string" && pos < token.to) return null;
+  if (
+    path.some(
+      (n) =>
+        n.kind === "parameter" ||
+        (n.kind === "binding" &&
+          pos >= n.from + 3 &&
+          pos < (n.equals ?? n.to + 1)),
+    )
+  )
+    return null;
   const word =
     token?.kind === "id" && pos > token.from && pos <= token.to
       ? token

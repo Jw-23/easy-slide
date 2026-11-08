@@ -187,6 +187,12 @@ describe("scope-aware static inference", () => {
   });
 });
 describe("semantic completions and signatures", () => {
+  it("does not suggest expressions while a new binding or lambda parameter name is being defined", () => {
+    expect(at("let newNa¦me = range(3)").result).toBeNull();
+    expect(at("let ¦").result).toBeNull();
+    expect(at("let rows=range(3).map((it¦em,index)=>item)").result).toBeNull();
+    expect(at("let rows=ra¦").labels).toContain("range");
+  });
   it("restricts modifiers by the receiver, including across modifier chains", () => {
     expect(at('Deck("A").¦').labels).toEqual(["transition"]);
     expect(at('Slide(title:"A").¦').labels.sort()).toEqual([

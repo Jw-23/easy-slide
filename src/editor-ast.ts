@@ -40,6 +40,7 @@ export type AstNode = {
   params?: AstNode[];
   initializer?: AstNode;
   colon?: number;
+  equals?: number;
   open?: number;
   close?: number;
 };
@@ -83,7 +84,7 @@ export function parseEditorAst(source: string): EditorAst {
       if (at("let")) {
         const start = take();
         const id = peek().kind === "id" ? take() : undefined;
-        if (at("=")) take();
+        const equals = at("=") ? take().to : undefined;
         const initializer = startsStatement() ? missing() : expression();
         result.push(
           make("binding", start.from, [initializer], {
@@ -91,6 +92,7 @@ export function parseEditorAst(source: string): EditorAst {
             nameFrom: id?.from,
             nameTo: id?.to,
             initializer,
+            equals,
           }),
         );
       } else if (at(";")) take();
