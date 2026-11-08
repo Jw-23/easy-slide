@@ -53,7 +53,7 @@ export async function folderProject(
 }
 export async function folderImages(
   dir: FolderHandle,
-  prefix = "assets/",
+  prefix = "",
   depth = 0,
 ): Promise<Record<string, string>> {
   const result: Record<string, string> = {};
@@ -67,8 +67,12 @@ export async function folderImages(
         );
     } else if (/\.(png|jpe?g|webp|gif)$/i.test(entry.name)) {
       const f = await entry.getFile();
-      if (f.size <= 20 * 1024 * 1024)
-        result[prefix + entry.name] = await readData(f);
+      if (f.size <= 20 * 1024 * 1024) {
+        const relative = prefix + entry.name;
+        result[
+          relative.startsWith("assets/") ? relative : "assets/" + relative
+        ] = await readData(f);
+      }
     }
   }
   return result;
