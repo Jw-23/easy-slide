@@ -7,14 +7,12 @@ import { pptxTiming, sceneShapeIds } from "./pptx-motion";
 import { renderExportLayers } from "./pptx-render";
 import { attachSvg, patchSlideMotion, deduplicateMedia } from "./pptx-package";
 import type { Deck } from "./dsl";
-export type PptxOptions = { textMode?: "faithful" | "editable" };
-export function download(blob: Blob, name: string) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-}
+export type PptxOptions = {
+  textMode?: "faithful" | "editable";
+  onProgress?: (page: number, total: number) => void;
+};
+import { download } from "./download";
+export { download } from "./download";
 /** Preserve every scene layer as an independently animated native PowerPoint shape. */
 export async function buildPptx(
   deck: Deck,
@@ -100,6 +98,7 @@ export async function buildPptx(
     }
     page.addNotes(s.notes || "");
     pages.push({ elements, active: layers.map(Boolean), vectors });
+    options.onProgress?.(index + 1, deck.slides.length);
     // Let the browser release per-slide decoded textures before processing the next page.
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }

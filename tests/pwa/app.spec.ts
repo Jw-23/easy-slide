@@ -117,7 +117,7 @@ test("unsupported native prompts show installation instructions and cache readin
   await expect(guide).toBeVisible();
   await expect(guide).toContainText("添加到主屏幕");
   await expect(guide).toContainText("离线资源已就绪");
-  await page.getByRole("button", { name: "关闭安装说明" }).click();
+  await page.getByRole("button", { name: "关闭窗口" }).click();
   await expect(guide).toHaveCount(0);
 });
 test("a waiting version updates only after saving and leaves other windows open", async ({

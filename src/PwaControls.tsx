@@ -1,3 +1,4 @@
+import { Dialog } from "./components/Dialog";
 import { useEffect, useRef, useState } from "react";
 import {
   Download,
@@ -206,71 +207,59 @@ export function PwaControls({
         </section>
       )}
       {guide && (
-        <div className="modal-backdrop" onClick={() => setGuide(false)}>
-          <section
-            className="modal pwa-install-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="安装 Easy Slide"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="modal-close icon-button"
-              aria-label="关闭安装说明"
-              onClick={() => setGuide(false)}
+        <Dialog
+          title="安装 Easy Slide"
+          className="pwa-install-modal"
+          onClose={() => setGuide(false)}
+        >
+          <p>安装后可从桌面或主屏幕打开独立窗口。</p>
+          <ul>
+            <li>
+              <strong>Chrome / Edge</strong>
+              <span>使用地址栏的安装图标，或浏览器菜单中的“安装应用”。</span>
+            </li>
+            <li>
+              <strong>iPhone / iPad Safari</strong>
+              <span>打开分享菜单，选择“添加到主屏幕”，然后添加。</span>
+            </li>
+            <li>
+              <strong>macOS Safari</strong>
+              <span>使用“文件 → 添加到程序坞”。</span>
+            </li>
+          </ul>
+          {window.top !== window.self && (
+            <a
+              className="pwa-external-link"
+              href={window.location.href}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <X size={20} />
+              <ExternalLink size={14} />
+              在独立标签页中打开后安装
+            </a>
+          )}
+          <div className="pwa-cache-state">
+            {offlineReady ? (
+              <>
+                <Check size={15} />
+                离线资源已就绪
+              </>
+            ) : (
+              <>
+                <WifiOff size={15} />
+                {!import.meta.env.PROD
+                  ? "开发模式不启用离线缓存"
+                  : problem || "首次加载完成后，应用资源将可离线使用"}
+              </>
+            )}
+          </div>
+          <p className="muted">草稿保存在当前浏览器中，可导出为工程 ZIP。</p>
+          {promptAvailable && (
+            <button className="primary" onClick={requestInstall}>
+              打开安装窗口
             </button>
-            <h2>安装 Easy Slide</h2>
-            <p>安装后可从桌面或主屏幕打开独立窗口。</p>
-            <ul>
-              <li>
-                <strong>Chrome / Edge</strong>
-                <span>使用地址栏的安装图标，或浏览器菜单中的“安装应用”。</span>
-              </li>
-              <li>
-                <strong>iPhone / iPad Safari</strong>
-                <span>打开分享菜单，选择“添加到主屏幕”，然后添加。</span>
-              </li>
-              <li>
-                <strong>macOS Safari</strong>
-                <span>使用“文件 → 添加到程序坞”。</span>
-              </li>
-            </ul>
-            {window.top !== window.self && (
-              <a
-                className="pwa-external-link"
-                href={window.location.href}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink size={14} />
-                在独立标签页中打开后安装
-              </a>
-            )}
-            <div className="pwa-cache-state">
-              {offlineReady ? (
-                <>
-                  <Check size={15} />
-                  离线资源已就绪
-                </>
-              ) : (
-                <>
-                  <WifiOff size={15} />
-                  {!import.meta.env.PROD
-                    ? "开发模式不启用离线缓存"
-                    : problem || "首次加载完成后，应用资源将可离线使用"}
-                </>
-              )}
-            </div>
-            <p className="muted">草稿保存在当前浏览器中，可导出为工程 ZIP。</p>
-            {promptAvailable && (
-              <button className="primary" onClick={requestInstall}>
-                打开安装窗口
-              </button>
-            )}
-          </section>
-        </div>
+          )}
+        </Dialog>
       )}
     </>
   );

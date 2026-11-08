@@ -6,9 +6,9 @@ export const MANIFEST_FILE = "project.easy-slide.json";
 export const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const SOURCE_FILE = "slides.slide";
 const MAX_SOURCE = 2_000_000;
-const MAX_IMAGE = 20 * 1024 * 1024;
-const MAX_TOTAL = 200 * 1024 * 1024;
-const MAX_ASSETS = 1000;
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+export const MAX_PROJECT_BYTES = 200 * 1024 * 1024;
+export const MAX_ASSET_COUNT = 1000;
 const MAX_MANIFEST = 8 * 1024 * 1024;
 const imageTypes = new Set([
   "image/png",
@@ -61,14 +61,14 @@ export function validatePortableProject(input: unknown): Project {
     keys = Object.keys(project.assets);
   if (encoder.encode(project.source).byteLength > MAX_SOURCE)
     throw Error("DSL 源码最多 2 MB");
-  if (keys.length > MAX_ASSETS)
-    throw Error(`工程最多包含 ${MAX_ASSETS} 个素材`);
+  if (keys.length > MAX_ASSET_COUNT)
+    throw Error(`工程最多包含 ${MAX_ASSET_COUNT} 个素材`);
   let total = encoder.encode(project.source).byteLength;
   for (const key of keys) {
     validateAssetPath(key);
     const { bytes } = decodeImage(project.assets[key], key);
     total += bytes.byteLength;
-    if (total > MAX_TOTAL) throw Error("工程内容超过 200 MB");
+    if (total > MAX_PROJECT_BYTES) throw Error("工程内容超过 200 MB");
   }
   const blocks = parseDeck(project.source).slides.flatMap(
     (slide) => slide.blocks,
@@ -85,7 +85,7 @@ function decodeImage(data: string, path: string) {
   const match = data.match(
     /^data:(image\/(?:png|jpeg|webp|gif));base64,([\s\S]*)$/,
   );
-  if (!match || match[2].length > Math.ceil(MAX_IMAGE / 3) * 4)
+  if (!match || match[2].length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4)
     throw Error(`图片无效或超过 20 MB：${path}`);
   let raw: string;
   try {
@@ -93,7 +93,7 @@ function decodeImage(data: string, path: string) {
   } catch {
     throw Error(`图片编码无效：${path}`);
   }
-  if (!raw.length || raw.length > MAX_IMAGE)
+  if (!raw.length || raw.length > MAX_IMAGE_BYTES)
     throw Error(`图片无效或超过 20 MB：${path}`);
   const bytes = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
@@ -154,8 +154,8 @@ export async function readProjectManifest(
   )
     throw Error("不是支持的 Easy Slide 工程清单");
   const entries = Object.entries(value.assets);
-  if (entries.length > MAX_ASSETS)
-    throw Error(`工程最多包含 ${MAX_ASSETS} 个素材`);
+  if (entries.length > MAX_ASSET_COUNT)
+    throw Error(`工程最多包含 ${MAX_ASSET_COUNT} 个素材`);
   const descriptors = entries.map(([path, asset]) => {
     validateAssetPath(path);
     if (!asset || !assetPath(asset.file) || !imageTypes.has(asset.mime))
@@ -172,10 +172,10 @@ export async function readProjectManifest(
   const assets: Record<string, string> = Object.create(null);
   let total = sourceBytes.length;
   for (const { path, file, mime } of descriptors) {
-    const bytes = await read(file, MAX_IMAGE);
+    const bytes = await read(file, MAX_IMAGE_BYTES);
     if (!bytes.length) throw Error(`图片文件为空：${file}`);
     total += bytes.length;
-    if (total > MAX_TOTAL) throw Error("工程内容超过 200 MB");
+    if (total > MAX_PROJECT_BYTES) throw Error("工程内容超过 200 MB");
     assets[path] = imageData(bytes, mime);
   }
   return validatePortableProject({
@@ -239,7 +239,7 @@ export async function importProjectArchive(
     throw Error("无法打开工程压缩包，请选择有效的 Easy Slide ZIP 文件");
   }
   const files = Object.values(zip.files);
-  if (files.length > MAX_ASSETS * 32 + 10) throw Error("压缩包内文件过多");
+  if (files.length > MAX_ASSET_COUNT * 32 + 10) throw Error("压缩包内文件过多");
   for (const entry of files) {
     const original =
       (entry as JSZip.JSZipObject & { unsafeOriginalName?: string })

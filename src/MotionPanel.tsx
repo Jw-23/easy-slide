@@ -30,7 +30,6 @@ export function MotionPanel({
       <div className="motion-toolbar">
         <div>
           <strong>动画编排</strong>
-          <span>同序号并行 · 后序号接续</span>
         </div>
         <button onClick={() => onPreview(0)} title="重播入场">
           <RotateCcw size={12} />
@@ -87,9 +86,6 @@ export function MotionPanel({
           ))}
         </div>
       )}
-      <div className="motion-caption">
-        order 控制先后 · delay / duration 使用毫秒 · easing 控制缓动
-      </div>
     </div>
   );
 }

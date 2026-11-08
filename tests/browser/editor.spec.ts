@@ -21,7 +21,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   ).toBeVisible();
   await page.reload();
   await expect(page.locator(".preview-wrap")).toContainText("本地测试标题");
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   const backup = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
@@ -110,7 +110,7 @@ test("ZIP project restores clipboard images in a clean browser and rejects missi
     window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt }));
   });
   await expect(page.getByRole("status")).toContainText("1 张图片");
-  await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
   await expect(page.locator(".asset-list img")).toHaveCount(2);
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
@@ -131,7 +131,7 @@ test("ZIP project restores clipboard images in a clean browser and rejects missi
     buffer: archive,
   });
   await expect(imported.getByRole("status")).toContainText("工程已导入");
-  await imported.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await imported.locator(".tabs").getByRole("tab", { name: "素材" }).click();
   await expect(imported.locator(".asset-list img")).toHaveCount(2);
   await expect(
     imported.locator('.preview-wrap img[alt$="pasted.png"]'),
@@ -152,7 +152,7 @@ test("ZIP project restores clipboard images in a clean browser and rejects missi
       mimeType: "application/zip",
       buffer: await broken.generateAsync({ type: "nodebuffer" }),
     });
-  await expect(imported.getByRole("status")).toContainText(image);
+  await expect(imported.getByRole("alert")).toContainText(image);
   await expect(imported.locator(".asset-list img")).toHaveCount(2);
   await expect(
     imported.locator('.preview-wrap img[alt$="pasted.png"]'),
@@ -200,9 +200,10 @@ test("folder access loads assets and writes a self contained project locally", a
     };
     (window as any).showDirectoryPicker = async () => directory;
   });
-  await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
+  await page.getByRole("button", { name: "工程", exact: true }).click();
   await page
-    .getByRole("button", { name: "打开本地文件夹", exact: true })
+    .getByRole("menuitem", { name: "打开本地文件夹", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("已连接文件夹");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
@@ -247,7 +248,7 @@ test("flat authoring offers completion, located diagnostics and timed playback",
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   await editor.fill('Deck("提示")\nSlide(.content, title: "测试") {\n    Te');
   await page.keyboard.press("Control+Space");
@@ -320,7 +321,7 @@ test("independent layouts, LaTeX completion and glass export work together", asy
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   await editor.fill('Deck("公式")\nSlide(title:"公式提示"){Equation(#"\\fr');
   await page.keyboard.press("Control+Space");
@@ -434,16 +435,18 @@ test("the full startup tour renders without missing assets or clipped text and c
         animations: "disabled",
       });
   }
-  await page.getByRole("button", { name: "切换示例", exact: true }).click();
+  await page.getByRole("button", { name: "工程", exact: true }).click();
+  await page.getByRole("menuitem", { name: "切换示例", exact: true }).click();
   await page.locator(".template-card").filter({ hasText: "数学论坛" }).click();
   await page
     .locator(".modal")
     .getByRole("button", { name: "切换示例", exact: true })
     .click();
   await expect(page.locator(".slide-item")).toHaveCount(7);
-  await page.locator(".tabs").getByRole("button", { name: "素材" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
   await expect(page.locator(".asset-list img")).toHaveCount(0);
-  await page.getByRole("button", { name: "切换示例", exact: true }).click();
+  await page.getByRole("button", { name: "工程", exact: true }).click();
+  await page.getByRole("menuitem", { name: "切换示例", exact: true }).click();
   await page.locator(".template-card").filter({ hasText: "功能示例" }).click();
   await page
     .locator(".modal")
@@ -505,7 +508,7 @@ test("calculated table updates, survives visual edits and exports aligned data",
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   const source = `Deck("计算报表")
 let rate = 0.2
@@ -528,12 +531,12 @@ Slide(title:"计算表格") {
   await expect(page.locator(".preview-wrap")).toContainText("0.250");
   await page
     .locator(".tabs")
-    .getByRole("button", { name: "页面", exact: true })
+    .getByRole("tab", { name: "页面", exact: true })
     .click();
   await page
     .getByRole("textbox", { name: "页标题", exact: true })
     .fill("改过标题");
-  await page.locator(".tabs").getByRole("button", { name: "DSL" }).click();
+  await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   await expect(editor).toContainText("let rate = 0.5");
   await expect(editor).toContainText("rows:data");
   await editor.fill(source.replace("rows:data", "rows: [[1 / 0]]"));

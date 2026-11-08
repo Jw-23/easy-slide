@@ -1,0 +1,200 @@
+.modal {
+  margin: auto;
+  padding: 0;
+  width: min(520px, calc(100vw - 28px));
+  max-height: calc(100dvh - 32px);
+  border: 1px solid #dce4de;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 20px 80px #132b2430;
+  overflow: hidden;
+}
+.modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+.modal::backdrop {
+  background: #1e2c265c;
+  backdrop-filter: blur(4px);
+}
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.dialog-heading h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+.dialog-content {
+  padding: 16px 18px 20px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.dialog-content > p {
+  color: var(--muted);
+}
+.export-option {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 12px;
+  text-align: left;
+  padding: 14px 12px;
+  margin-top: 8px;
+  border-radius: 8px;
+}
+.export-option > svg:first-child {
+  color: var(--accent);
+  width: 20px;
+}
+.export-option div {
+  flex: 1;
+  font-size: 13px;
+}
+.export-option b {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.export-option small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.export-note {
+  font-size: 11px;
+  margin: 16px 0 0;
+}
+.pptx-text-mode {
+  padding: 14px 0 4px;
+  margin: 0;
+  border: 0;
+}
+.pptx-text-mode legend {
+  padding: 12px 0 0;
+  font-size: 11px;
+}
+.pptx-text-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 18px;
+  font-size: 12px;
+}
+.pptx-text-mode input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.pptx-text-mode small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.template-card {
+  display: flex;
+  width: 100%;
+  gap: 14px;
+  text-align: left;
+  padding: 15px;
+  margin-bottom: 9px;
+}
+.template-card > svg {
+  color: var(--accent);
+}
+.template-card h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.template-card p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.help-modal {
+  width: min(700px, calc(100vw - 28px));
+}
+.help-modal pre {
+  padding: 12px;
+  background: var(--subtle);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font:
+    11px/1.8 SFMono-Regular,
+    Consolas,
+    monospace;
+  overflow: auto;
+}
+.help-modal h3 {
+  margin: 20px 0 6px;
+  font-size: 13px;
+}
+.inline-error {
+  color: #a04f32 !important;
+}
+.presentation {
+  margin: 0;
+  padding: 20px 20px 70px;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  background: #101714;
+  color: #c1d7c8;
+}
+.presentation[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.presentation::backdrop {
+  background: #101714;
+}
+.presentation-slide {
+  width: min(100%, calc((100dvh - 110px) * 16 / 9));
+  cursor: pointer;
+}
+.presentation-controls {
+  position: absolute;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.presentation-controls button {
+  background: #253c30;
+  border-color: #344b3d;
+  color: inherit;
+}
+.presentation-hint {
+  margin: 0 10px;
+  color: #90a397;
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .presentation {
+    padding: 10px 8px 65px;
+  }
+  .presentation-hint {
+    display: none;
+  }
+}

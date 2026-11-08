@@ -3,6 +3,9 @@ import type { Project } from "./dsl";
 import {
   ARCHIVE_FILE,
   MAX_ARCHIVE_BYTES,
+  MAX_IMAGE_BYTES,
+  MAX_PROJECT_BYTES,
+  MAX_ASSET_COUNT,
   MANIFEST_FILE,
   exportProjectArchive,
   importProjectArchive,
@@ -30,6 +33,7 @@ type FileHandle = {
   createWritable: () => Promise<{
     write: (data: string | Blob) => Promise<void>;
     close: () => Promise<void>;
+    abort?: () => Promise<void>;
   }>;
 };
 export async function chooseFolder(): Promise<FolderHandle> {
@@ -46,7 +50,8 @@ export const readData = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result));
-    r.onerror = reject;
+    r.onerror = () => reject(r.error || Error(`无法读取图片：${file.name}`));
+    r.onabort = () => reject(new DOMException("图片读取已取消", "AbortError"));
     r.readAsDataURL(file);
   });
 export async function folderProject(
@@ -93,6 +98,7 @@ export async function folderImages(
   dir: FolderHandle,
   prefix = "",
   depth = 0,
+  budget = { count: 0, bytes: 0 },
 ): Promise<Record<string, string>> {
   const result: Record<string, string> = {};
   if (depth > 5) return result;
@@ -101,11 +107,21 @@ export async function folderImages(
       if (!entry.name.startsWith(".") && entry.name !== "node_modules")
         Object.assign(
           result,
-          await folderImages(entry, prefix + entry.name + "/", depth + 1),
+          await folderImages(
+            entry,
+            prefix + entry.name + "/",
+            depth + 1,
+            budget,
+          ),
         );
     } else if (/\.(png|jpe?g|webp|gif)$/i.test(entry.name)) {
       const f = await entry.getFile();
-      if (f.size <= 20 * 1024 * 1024) {
+      if (f.size <= MAX_IMAGE_BYTES) {
+        if (++budget.count > MAX_ASSET_COUNT)
+          throw Error(`文件夹最多导入 ${MAX_ASSET_COUNT} 张图片`);
+        budget.bytes += f.size;
+        if (budget.bytes > MAX_PROJECT_BYTES)
+          throw Error("文件夹图片总量超过 200 MB");
         const relative = prefix + entry.name;
         result[
           relative.startsWith("assets/") ? relative : "assets/" + relative
@@ -121,6 +137,15 @@ export async function writeFolder(dir: FolderHandle, p: Project) {
     create: true,
   });
   const writer = await file.createWritable();
-  await writer.write(archive);
-  await writer.close();
+  try {
+    await writer.write(archive);
+    await writer.close();
+  } catch (error) {
+    try {
+      await writer.abort?.();
+    } catch {
+      /* Preserve the original write failure. */
+    }
+    throw error;
+  }
 }
