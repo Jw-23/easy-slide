@@ -1,3 +1,4 @@
+import { themeIds } from "./themes";
 import { effects, easings, layouts, layoutComponents } from "./dsl";
 
 export type ValueType = {
@@ -163,15 +164,16 @@ add(
 add(
   "Theme",
   "root",
-  "全局主题",
+  "全局主题，预设可叠加自定义颜色、字体与材质",
   [
+    enumParam("preset", [...themeIds], "内置主题"),
     color("accent"),
     color("background"),
     color("color"),
     named("font", string, "字体名称"),
     enumParam("material", ["glass", "solid"], "默认面板材质"),
   ],
-  'Theme(accent: "${#16766d}", background: "#fafbf9")',
+  "Theme(preset: .${aurora})",
 );
 add(
   "Slide",

@@ -3,20 +3,20 @@ import { parseDeck } from "./dsl";
 export const showcaseDeck = parseDeck(String.raw`
 Deck("Easy Slide 功能示例", author: "示例工程")
     .transition(.slide, duration: 650, direction: .left, easing: .easeOut)
-Theme(accent: "#23796e", background: "#fafbf9", color: "#1c3430", font: "Arial", material: .glass)
+Theme(preset: .aurora)
 
 let demoRate = 0.2
 let demoLoss = x => x ^ 2 / 2
 let demoRows = range(0, 6).map(k => row(k, (1 - demoRate) ^ k, demoLoss((1 - demoRate) ^ k)))
 let demoCosts = [120, 180, 95, 240]
 
-Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、材质与动画编排") {
+Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、主题与动画") {
     Cover {
         Text("20 页示例 · 在 DSL 面板中查看和修改源码").font(18)
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
-}.notes("此工程展示现有的全部组件与编排方式。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
+}.notes("此工程展示现有的全部组件与编排方式。上方主题菜单提供 10 套样式，切换时保留所有页面源码。Theme(preset: .aurora) 可在 DSL 中声明主题，页面和组件的显式颜色优先。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
 
 Slide(title: "页面与布局\n分别声明", eyebrow: "02 / STRUCTURE", subtitle: "Deck、Theme 与 Slide 并列；布局由独立组件负责") {
     Section {
@@ -43,7 +43,7 @@ Slide(title: "正文、引用与字号", eyebrow: "04 / FLOW", subtitle: "Flow �
         Text("一个页面只保留一个主要结论。正文解释依据，引用补充讨论角度。", title: "正文块")
             .font(25).frame(height: 150)
         Quote("局部信息在适当的结构假设下，能够导向全局结论。")
-            .font(29).foreground("#23796e").glass(opacity: 0.56).padding(24)
+            .font(29).glass(opacity: 0.56).padding(24)
     }
 }.notes("这里使用 Text 的 title 参数与 Quote。font 控制正文大小，foreground 控制颜色，frame 的固定高度优先分配空间，padding 控制内部留白。")
 
@@ -142,7 +142,7 @@ Slide(title: "用 DSL 计算表格数据", eyebrow: "13 / COMPUTED TABLE", subti
         Table(
             columns: [Column("迭代 k", width: 1, align: .center), Column("当前位置 x", width: 2, align: .right, format: "0.000"), Column("目标值 f(x)", width: 2, align: .right, format: "0.0000")],
             rows: demoRows
-        ).tableStyle(rowHeight: 44, zebra: true, borders: .all, headerFill: "#23796e", borderColor: "#cddfd5")
+        ).tableStyle(rowHeight: 44, zebra: true, borders: .all)
          .appear(.fade, step: 1, duration: 350).stagger(70)
     }
 }.notes("顶部 let 定义步长、损失函数和数据。range(0, 6) 不含终点，map 生成六行。Column 定义标题、宽度权重、对齐与数字格式。修改 demoRate 后，数据重新求值。样式编辑与布局切换会保留计算源码，PPTX 输出计算后的数值。")

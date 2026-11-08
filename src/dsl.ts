@@ -1,3 +1,4 @@
+import { themeIds, type ThemeOptions } from "./themes";
 import { validateTable, tableKeys, type TableOptions } from "./table";
 import type { Cell } from "./number-format";
 import { mathError } from "./math";
@@ -117,13 +118,7 @@ export type Deck = {
   version: 1;
   title: string;
   author?: string;
-  theme?: {
-    accent?: string;
-    background?: string;
-    color?: string;
-    font?: string;
-    material?: "glass" | "solid";
-  };
+  theme?: ThemeOptions;
   transition?: "fade" | "slide" | "zoom" | "none";
   duration?: number;
   easing?: (typeof easings)[number];
@@ -310,6 +305,10 @@ export function validateDeck(input: unknown): Deck {
   if (d.theme) {
     if (typeof d.theme !== "object" || Array.isArray(d.theme))
       fail("theme 必须为对象");
+    if (d.theme.preset !== undefined && !themeIds.includes(d.theme.preset))
+      fail(
+        `未知主题 ${d.theme.preset}，支持 ${themeIds.map((id) => "." + id).join(" / ")}`,
+      );
     for (const k of ["accent", "background", "color"])
       if (d.theme[k] && !color.test(d.theme[k]))
         fail(`theme.${k} 使用 #RRGGBB`);
@@ -580,7 +579,14 @@ export function parseDeck(source: string): Deck {
     for (const c of root.children) {
       at(c, () => {
         if (c.name === "Theme") {
-          plain(c, ["accent", "background", "color", "font", "material"]);
+          plain(c, [
+            "preset",
+            "accent",
+            "background",
+            "color",
+            "font",
+            "material",
+          ]);
           if (c.args.length || c.children.length || c.modifiers.length)
             fail("Theme 只接受命名参数");
           if (d.theme) fail("Theme 不可重复");
@@ -734,7 +740,10 @@ export function serialize(d: Deck): string {
     parts.push(
       "Theme(" +
         Object.entries(d.theme)
-          .map(([k, v]) => `${k}: ${k === "material" ? "." + v : str(v)}`)
+          .map(
+            ([k, v]) =>
+              `${k}: ${k === "material" || k === "preset" ? "." + v : str(v)}`,
+          )
           .join(", ") +
         ")",
     );

@@ -1,3 +1,10 @@
+import {
+  themePresets,
+  resolveTheme,
+  type ThemeId,
+  type ThemeOptions,
+} from "./themes";
+import { replaceTheme } from "./theme-source";
 import { PwaControls } from "./PwaControls";
 import { pageLayout, withLayout, pageContent } from "./dsl";
 import { MotionPanel } from "./MotionPanel";
@@ -107,6 +114,7 @@ export default function App() {
   }
   const active = Math.min(index, deck.slides.length - 1),
     slide = deck.slides[active];
+  const theme = resolveTheme(deck.theme);
   const project = (): Project => ({
     format: "easy-slide",
     version: 1,
@@ -145,6 +153,9 @@ export default function App() {
   }, [toast]);
   function update(d: Deck) {
     setSource(serialize(d));
+  }
+  function changeTheme(theme: ThemeOptions) {
+    if (!error) setSource(replaceTheme(source, theme));
   }
   function changeSlide(p: Record<string, unknown>) {
     if (error) return;
@@ -391,11 +402,7 @@ export default function App() {
           </span>
           easy<span>slide</span>
         </a>
-        <div className="document-name">
-          <span className="status-dot" />
-          {deck.title}
-          <span className="file-tag">.slide</span>
-        </div>
+        <div className="document-name">{deck.title}</div>
         <div className="top-actions">
           <PwaControls
             beforeUpdate={() => saveDraft(project(), draftKey)}
@@ -467,11 +474,37 @@ export default function App() {
         </aside>
         <main className="main">
           <div className="workspace-toolbar">
-            <div className="breadcrumbs">
-              {featureTour ? "功能示例" : "工程"}
-              <ChevronRight size={13} />
-              <strong>{deck.title}</strong>
-            </div>
+            <label className="theme-picker">
+              <span
+                className="theme-swatch"
+                aria-hidden="true"
+                style={{
+                  background: theme.background,
+                  color: theme.accent,
+                  borderRadius: Math.min(theme.radius, 6),
+                  fontFamily: theme.font,
+                }}
+              >
+                Aa
+              </span>
+              <select
+                aria-label="演示主题"
+                disabled={!!error}
+                value={deck.theme?.preset || ""}
+                onChange={(e) =>
+                  changeTheme({ preset: e.target.value as ThemeId })
+                }
+              >
+                <option value="" disabled>
+                  自定义主题
+                </option>
+                {themePresets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className="quiet" onClick={() => setModal("templates")}>
               <Layers size={14} />
               切换示例
@@ -538,11 +571,8 @@ export default function App() {
             </div>
             {bottomTab === "notes" ? (
               <div className="notes-panel">
-                <div>
-                  <FileText size={15} />
-                  <span>演讲者备注</span>
-                </div>
                 <textarea
+                  aria-label="演讲者备注"
                   value={slide.notes || ""}
                   disabled={!!error}
                   placeholder="添加演讲者备注"
@@ -597,7 +627,6 @@ export default function App() {
             <div className="inspector-content">
               <div className="section-heading">
                 <span>布局组件</span>
-                <span>LAYOUT</span>
               </div>
               <div className="layout-grid">
                 {layouts.map((l) => (
@@ -628,7 +657,6 @@ export default function App() {
               </div>
               <div className="section-heading separated">
                 <span>内容</span>
-                <span>CONTENT</span>
               </div>
               <label>
                 页标题
@@ -650,14 +678,11 @@ export default function App() {
               </label>
               <button className="edit-dsl" onClick={() => setTab("dsl")}>
                 <Code2 size={15} />
-                <div>
-                  编辑 DSL<small>组件、布局与动画</small>
-                </div>
+                <div>编辑 DSL</div>
                 <ArrowUpRight size={15} />
               </button>
               <div className="section-heading separated">
                 <span>动画与过渡</span>
-                <span>MOTION</span>
               </div>
               <label>
                 过渡效果
@@ -666,9 +691,9 @@ export default function App() {
                   value={slide.transition || deck.transition || "fade"}
                   onChange={(e) => changeSlide({ transition: e.target.value })}
                 >
-                  <option value="fade">柔和淡入 · Fade</option>
-                  <option value="slide">自然推移 · Slide</option>
-                  <option value="zoom">轻盈缩放 · Zoom</option>
+                  <option value="fade">淡入</option>
+                  <option value="slide">推移</option>
+                  <option value="zoom">缩放</option>
                   <option value="none">无过渡</option>
                 </select>
               </label>
@@ -695,10 +720,10 @@ export default function App() {
                     value={slide.easing || deck.easing || "easeOut"}
                     onChange={(e) => changeSlide({ easing: e.target.value })}
                   >
-                    <option value="easeOut">柔和减速</option>
+                    <option value="easeOut">减速</option>
                     <option value="easeInOut">缓入缓出</option>
                     <option value="linear">匀速</option>
-                    <option value="spring">轻盈弹性</option>
+                    <option value="spring">弹性</option>
                   </select>
                 </label>
               </div>
@@ -718,21 +743,17 @@ export default function App() {
               </label>
               <div className="section-heading separated">
                 <span>演示主题</span>
-                <span>THEME</span>
               </div>
               <label>
                 默认卡片材质
                 <select
                   aria-label="默认卡片材质"
-                  value={deck.theme?.material || "solid"}
+                  value={theme.material}
                   disabled={!!error}
                   onChange={(e) =>
-                    update({
-                      ...deck,
-                      theme: {
-                        ...deck.theme,
-                        material: e.target.value as "glass" | "solid",
-                      },
+                    changeTheme({
+                      ...deck.theme,
+                      material: e.target.value as "glass" | "solid",
                     })
                   }
                 >
@@ -745,13 +766,10 @@ export default function App() {
                   强调色
                   <input
                     type="color"
-                    value={deck.theme?.accent || "#16766d"}
+                    value={theme.accent}
                     disabled={!!error}
                     onChange={(e) =>
-                      update({
-                        ...deck,
-                        theme: { ...deck.theme, accent: e.target.value },
-                      })
+                      changeTheme({ ...deck.theme, accent: e.target.value })
                     }
                   />
                 </label>
@@ -759,13 +777,10 @@ export default function App() {
                   背景色
                   <input
                     type="color"
-                    value={deck.theme?.background || "#fafbf9"}
+                    value={theme.background}
                     disabled={!!error}
                     onChange={(e) =>
-                      update({
-                        ...deck,
-                        theme: { ...deck.theme, background: e.target.value },
-                      })
+                      changeTheme({ ...deck.theme, background: e.target.value })
                     }
                   />
                 </label>
@@ -1058,7 +1073,7 @@ export default function App() {
                   画布像素。
                 </p>
                 <pre>{`Deck("我的研究").transition(.slide, duration: 650)
-Theme(accent: "#16766d")
+Theme(preset: .aurora)
 
 Slide(title: "一个清晰的结论") {
   Split {
@@ -1069,6 +1084,13 @@ Slide(title: "一个清晰的结论") {
                 delay: 150, duration: 700, easing: .easeOut)
   }
 }.notes("先解释直觉，再展示公式")`}</pre>
+                <h3>主题</h3>
+                <p>
+                  上方主题菜单提供 10 套样式。Theme(preset: .paper)
+                  切换预设，可追加 accent、background、color、font、material
+                  覆盖默认值。切换菜单只修改 Theme
+                  声明；页面和组件的显式样式优先。
+                </p>
                 <h3>八种布局</h3>
                 <p>
                   Cover 封面 · Section 章节 · Flow 正文 · Split 双栏 · Cards

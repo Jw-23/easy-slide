@@ -1,3 +1,4 @@
+import { resolveTheme } from "./themes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Deck, Slide } from "./dsl";
 import { scene, TEXT_LINE_HEIGHT, type Element } from "./scene";
@@ -157,8 +158,8 @@ export function SlideView({
         style={
           {
             transform: `scale(${scale})`,
-            background: slide.background || deck.theme?.background || "#fafbf9",
-            fontFamily: deck.theme?.font || "Arial, sans-serif",
+            background: resolveTheme(deck.theme, slide.background).background,
+            fontFamily: resolveTheme(deck.theme).font,
             "--duration": `${slide.duration ?? deck.duration ?? 600}ms`,
             "--easing": easingCss[slide.easing || deck.easing || "easeOut"],
             "--slide-offset": offset,

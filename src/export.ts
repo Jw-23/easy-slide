@@ -1,3 +1,4 @@
+import { resolveTheme } from "./themes";
 import PptxGenJS from "pptxgenjs";
 import JSZip from "jszip";
 import { scene, TEXT_LINE_HEIGHT } from "./scene";
@@ -35,7 +36,7 @@ export async function buildPptx(
   for (const [index, s] of deck.slides.entries()) {
     const page = pptx.addSlide();
     page.background = {
-      color: (s.background || deck.theme?.background || "#fafbf9").slice(1),
+      color: resolveTheme(deck.theme, s.background).background.slice(1),
     };
     const elements = scene(deck, s, index),
       layers = await renderExportLayers(deck, s, elements, assets),
@@ -54,8 +55,8 @@ export async function buildPptx(
           objectName,
           fontFace: e.mono
             ? "Courier New"
-            : (deck.theme?.font || "Arial")
-                .split(",")[0]
+            : resolveTheme(deck.theme)
+                .font.split(",")[0]
                 .replace(/["']/g, "")
                 .trim(),
           fontSize: size * 0.75,

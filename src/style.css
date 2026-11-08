@@ -68,21 +68,21 @@ a:focus-visible {
   font-size: 12px;
 }
 .topbar {
-  height: 70px;
+  height: 50px;
   background: #fff;
   border-bottom: 1px solid #e7ebe8;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 26px;
-  gap: 20px;
+  padding: 0 16px;
+  gap: 12px;
 }
 .brand {
   display: flex;
   align-items: center;
   text-decoration: none;
   color: #253a32;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.9px;
   gap: 0;
@@ -91,15 +91,14 @@ a:focus-visible {
   font-weight: 400;
 }
 .brand-icon {
-  width: 32px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   background: #23786b;
   color: white;
-  border-radius: 10px;
-  margin-right: 10px;
-  transform: rotate(-4deg);
+  border-radius: 7px;
+  margin-right: 7px;
 }
 .brand b {
   font-size: 8px;
@@ -118,7 +117,10 @@ a:focus-visible {
   align-items: center;
   gap: 9px;
   color: #6d7873;
-  margin-left: 70px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .file-tag {
   color: #b7bfba;
@@ -133,7 +135,7 @@ a:focus-visible {
 }
 .top-actions {
   display: flex;
-  gap: 9px;
+  gap: 6px;
   align-items: center;
 }
 .top-actions button {
@@ -141,9 +143,9 @@ a:focus-visible {
 }
 .workspace {
   display: grid;
-  grid-template-columns: 218px minmax(450px, 1fr) 282px;
-  height: calc(100vh - 70px);
-  min-height: 650px;
+  grid-template-columns: 178px minmax(340px, 1fr) 254px;
+  height: calc(100vh - 50px);
+  min-height: 500px;
 }
 .sidebar {
   background: #fcfcfc;
@@ -153,11 +155,11 @@ a:focus-visible {
   min-height: 0;
 }
 .sidebar-top {
-  height: 63px;
+  height: 42px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 20px;
+  padding: 0 12px;
   font-size: 12px;
   font-weight: 600;
 }
@@ -172,7 +174,7 @@ a:focus-visible {
 .slide-list {
   overflow: auto;
   flex: 1;
-  padding: 0 11px 15px;
+  padding: 0 6px 8px;
   scrollbar-width: thin;
 }
 .slide-item {
@@ -181,8 +183,8 @@ a:focus-visible {
   width: 100%;
   border: 1px solid transparent;
   background: transparent;
-  padding: 8px 9px 7px 25px;
-  margin-bottom: 7px;
+  padding: 5px 5px 5px 20px;
+  margin-bottom: 4px;
   border-radius: 9px;
   text-align: left;
 }
@@ -240,7 +242,7 @@ a:focus-visible {
   margin-left: 4px;
 }
 .add-slide {
-  margin: 7px 18px 19px;
+  margin: 6px 10px 10px;
   font-size: 11px;
   border: 1px dashed #ccd8cf;
   background: transparent;
@@ -267,11 +269,11 @@ a:focus-visible {
   background: #f5f6f8;
 }
 .workspace-toolbar {
-  height: 63px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 31px;
+  padding: 0 16px;
   border-bottom: 1px solid #e8ebe9;
   flex-shrink: 0;
 }
@@ -288,7 +290,7 @@ a:focus-visible {
 }
 .canvas-area {
   flex: 1;
-  padding: 29px 34px 15px;
+  padding: 14px 18px 8px;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -333,9 +335,7 @@ a:focus-visible {
 }
 .preview-wrap > .slide-frame {
   border-radius: 8px;
-  box-shadow:
-    0 12px 34px #23372b0c,
-    0 1px 5px #23372b12;
+  box-shadow: 0 2px 12px #23372b0c;
   border: 1px solid #dfe5df;
 }
 .preview-under {
@@ -344,7 +344,7 @@ a:focus-visible {
   justify-content: space-between;
   color: #839087;
   font-size: 10px;
-  padding: 14px 1px;
+  padding: 6px 1px;
 }
 .preview-under > span,
 .preview-under > div {
@@ -374,7 +374,7 @@ a:focus-visible {
   background: #fafbfb;
   border: 1px solid #e3e8e4;
   border-radius: 8px;
-  padding: 15px 17px;
+  padding: 8px 10px;
   margin-top: 6px;
 }
 .notes-panel > div {
@@ -396,8 +396,8 @@ a:focus-visible {
   width: 100%;
   color: #7a897f;
   font-size: 11px;
-  min-height: 48px;
-  padding: 13px 0 0;
+  min-height: 34px;
+  padding: 0;
   outline: none;
   line-height: 1.7;
 }
@@ -405,7 +405,7 @@ a:focus-visible {
   color: #acb7ae;
 }
 .canvas-tip {
-  margin: 18px 0 10px;
+  margin: 6px 0 0;
   font-size: 9px;
   color: #a0aba3;
   display: flex;
@@ -458,7 +458,7 @@ footer b {
   border-bottom: 1px solid #e5ebe6;
   padding: 0 15px;
   gap: 9px;
-  height: 63px;
+  height: 42px;
   flex-shrink: 0;
 }
 .tabs button {
@@ -484,7 +484,7 @@ footer b {
   content: "";
 }
 .inspector-content {
-  padding: 22px 20px;
+  padding: 12px 14px;
   overflow: auto;
   flex: 1;
   scrollbar-width: thin;
@@ -494,10 +494,10 @@ footer b {
   justify-content: space-between;
   font-size: 11px;
   font-weight: 600;
-  margin-bottom: 17px;
+  margin-bottom: 9px;
   color: #68786e;
 }
-.section-heading span:last-child {
+.section-heading span + span {
   color: #b0b9b2;
   font-size: 8px;
   letter-spacing: 1px;
@@ -506,7 +506,7 @@ footer b {
 .layout-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 9px 7px;
+  gap: 5px 4px;
 }
 .layout-option {
   position: relative;
@@ -610,14 +610,14 @@ footer b {
 }
 .separated {
   border-top: 1px solid #edf0ed;
-  padding-top: 22px;
-  margin-top: 23px;
+  padding-top: 12px;
+  margin-top: 14px;
 }
 label {
   display: block;
   color: #8a988e;
   font-size: 10px;
-  margin-top: 13px;
+  margin-top: 9px;
 }
 input:not([type="color"]):not([type="range"]),
 select,
@@ -627,14 +627,14 @@ textarea {
   border-radius: 6px;
   background: #fbfcfb;
   color: #55695b;
-  padding: 9px 10px;
+  padding: 6px 8px;
   outline: none;
   transition: border-color 0.15s;
 }
 label textarea,
 label input,
 label select {
-  margin-top: 8px;
+  margin-top: 5px;
   font-size: 11px;
 }
 textarea:focus,
@@ -865,7 +865,7 @@ textarea {
 }
 .asset-list img {
   width: 100%;
-  height: 70px;
+  height: 50px;
   object-fit: contain;
 }
 .asset-list small {
@@ -975,7 +975,7 @@ textarea {
   text-align: left;
   padding: 20px 16px;
   border: 1px solid #dde8df;
-  margin-top: 13px;
+  margin-top: 9px;
   border-radius: 9px;
 }
 .export-option > svg:first-child {
@@ -1124,10 +1124,10 @@ textarea {
 }
 @media (min-width: 1600px) {
   .workspace {
-    grid-template-columns: 240px minmax(450px, 1fr) 300px;
+    grid-template-columns: 190px minmax(450px, 1fr) 270px;
   }
   .canvas-area {
-    padding: 40px 55px 20px;
+    padding: 18px 26px 10px;
   }
   .canvas-heading {
     margin-bottom: 35px;
@@ -1145,10 +1145,10 @@ textarea {
 }
 @media (max-width: 1150px) {
   .workspace {
-    grid-template-columns: 170px minmax(390px, 1fr) 248px;
+    grid-template-columns: 150px minmax(300px, 1fr) 240px;
   }
   .canvas-area {
-    padding: 25px 22px 12px;
+    padding: 12px 14px 8px;
   }
   .topbar {
     padding: 0 18px;
@@ -1160,7 +1160,7 @@ textarea {
     font-size: 19px;
   }
   .inspector-content {
-    padding: 20px 15px;
+    padding: 12px;
   }
   .local-badge {
     display: none;
@@ -1192,9 +1192,9 @@ textarea {
 }
 @media (max-width: 850px) {
   .workspace {
-    grid-template-columns: 135px minmax(330px, 1fr);
+    grid-template-columns: 110px minmax(0, 1fr);
     height: auto;
-    min-height: calc(100vh - 70px);
+    min-height: calc(100vh - 50px);
   }
   .inspector {
     grid-column: 1/-1;
@@ -1206,7 +1206,7 @@ textarea {
     max-height: 800px;
   }
   .main {
-    min-height: 650px;
+    min-height: 480px;
   }
   .document-name {
     display: none;
@@ -1371,14 +1371,14 @@ textarea {
   padding: 1px 5px;
 }
 .notes-panel {
-  margin-top: 11px;
+  margin-top: 6px;
 }
 .motion-panel {
   background: #fafcfb;
   border: 1px solid #e1e9e3;
   border-radius: 8px;
   padding: 14px 15px;
-  margin-top: 11px;
+  margin-top: 6px;
 }
 .motion-toolbar {
   display: flex;
@@ -1489,7 +1489,7 @@ textarea {
 .empty-motion {
   font-size: 9px;
   color: #a7b6ac;
-  margin-top: 13px;
+  margin-top: 9px;
 }
 .motion-settings {
   display: flex;
@@ -1511,10 +1511,10 @@ textarea {
 }
 @media (min-width: 1100px) {
   .workspace.editing {
-    grid-template-columns: 180px minmax(340px, 1fr) minmax(470px, 43vw);
+    grid-template-columns: 150px minmax(280px, 1fr) minmax(410px, 41vw);
   }
   .workspace.editing .canvas-area {
-    padding: 25px 24px 15px;
+    padding: 12px 14px 8px;
   }
   .workspace.editing .local-badge {
     display: none;
@@ -1544,7 +1544,7 @@ textarea {
     font-size: 18px;
   }
   .workspace.editing .canvas-area {
-    padding: 20px 15px;
+    padding: 12px;
   }
   .workspace.editing .error-banner {
     left: 140px;
@@ -1666,17 +1666,17 @@ textarea {
 @media (display-mode: standalone) {
   .topbar {
     padding-top: env(safe-area-inset-top);
-    min-height: 70px;
-    height: calc(70px + env(safe-area-inset-top));
+    min-height: 50px;
+    height: calc(50px + env(safe-area-inset-top));
   }
   .workspace {
-    height: calc(100dvh - 70px - env(safe-area-inset-top));
+    height: calc(100dvh - 50px - env(safe-area-inset-top));
   }
 }
 @media (max-width: 600px) {
   .topbar {
     height: auto;
-    min-height: 70px;
+    min-height: 50px;
     flex-wrap: wrap;
     gap: 9px;
     padding: 12px 14px;
@@ -1695,5 +1695,88 @@ textarea {
   }
   .pwa-install-modal {
     padding: 35px 23px;
+  }
+}
+
+/* Keep theme switching available while editing the DSL. */
+.theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+.theme-picker select {
+  margin: 0;
+  width: 130px;
+  padding: 4px 6px;
+  font-size: 11px;
+  background: #fff;
+}
+.theme-swatch {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border: 1px solid #ccd3d8;
+  font-size: 13px;
+  font-weight: 600;
+}
+.theme-row {
+  gap: 12px;
+  margin-top: 10px;
+}
+.top-actions button {
+  padding: 6px 9px;
+}
+.notes-panel textarea {
+  color: #58675f;
+}
+@media (max-width: 850px) {
+  .main {
+    min-height: 420px;
+  }
+  .canvas-area {
+    padding: 10px;
+  }
+  .workspace-toolbar {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .theme-picker select {
+    width: 112px;
+  }
+  .workspace-toolbar .quiet {
+    font-size: 10px;
+    padding: 4px;
+  }
+  .workspace-toolbar .quiet > svg {
+    display: none;
+  }
+  .layout-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .topbar {
+    padding: 8px 10px;
+  }
+  .brand {
+    font-size: 16px;
+  }
+  .top-actions {
+    gap: 3px;
+  }
+  .top-actions button {
+    padding: 5px;
+  }
+  .workspace {
+    grid-template-columns: 86px minmax(0, 1fr);
+  }
+  .sidebar-top > span:first-child {
+    display: none;
+  }
+  .theme-swatch {
+    display: none;
   }
 }

@@ -1,3 +1,4 @@
+import { resolveTheme } from "./themes";
 import type { Deck, Slide } from "./dsl";
 import { TEXT_LINE_HEIGHT, type Element } from "./scene";
 import { mathSvg } from "./math";
@@ -189,7 +190,7 @@ export async function renderExportLayers(
       continue;
     }
     if (e.kind === "text") {
-      layers.push(await textLayer(e, deck.theme?.font || "Arial, sans-serif"));
+      layers.push(await textLayer(e, resolveTheme(deck.theme).font));
       continue;
     }
     if (e.kind === "rect") {
@@ -214,8 +215,7 @@ export async function renderExportLayers(
           e.h + 2 * margin,
         );
         back.scale(EXPORT_SCALE, EXPORT_SCALE);
-        back.fillStyle =
-          slide.background || deck.theme?.background || "#fafbf9";
+        back.fillStyle = resolveTheme(deck.theme, slide.background).background;
         back.fillRect(
           0,
           0,

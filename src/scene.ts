@@ -1,3 +1,4 @@
+import { resolveTheme, headerText } from "./themes";
 import { tableModel } from "./table";
 import { backdropData } from "./materials";
 import { pageLayout } from "./dsl";
@@ -26,15 +27,9 @@ export type Element = {
   motionKey?: string;
 };
 export function scene(deck: Deck, s: Slide, index: number): Element[] {
-  const accent = deck.theme?.accent || "#16766d",
-    fg = s.color || deck.theme?.color || "#192c2a";
-  const dark =
-    parseInt(
-      (s.background || deck.theme?.background || "#fafbf9").slice(1),
-      16,
-    ) < 0x444444;
-  const muted = dark ? "#b6c1c1" : "#71817e",
-    panel = dark ? "#263633" : "#eef2ef";
+  const theme = resolveTheme(deck.theme, s.background),
+    { accent, muted, panel } = theme,
+    fg = s.color || theme.color;
   const e: Element[] = [];
   let activeMotion: Motion | undefined,
     activeKey: string | undefined,
@@ -79,7 +74,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     bs.some(
       (b) => b.glass || b.type === "glass" || glassBlocks(b.children || []),
     );
-  if (deck.theme?.material === "glass" || glassBlocks(s.blocks))
+  if (theme.material === "glass" || glassBlocks(s.blocks))
     push({
       kind: "image",
       data: backdropData(deck, s),
@@ -138,19 +133,19 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     const step = b.step || 0,
       c = b.color || fg;
     if (card) {
-      if (deck.theme?.material === "glass" || b.glass)
+      if (theme.material === "glass" || b.glass)
         push({
           kind: "rect",
           x,
           y,
           w,
           h,
-          fill: dark ? "#24312f" : "#ffffff",
-          radius: b.glass?.radius ?? 28,
+          fill: theme.surface,
+          radius: b.glass?.radius ?? theme.radius,
           glass: b.glass || {},
           step,
         });
-      else rect(x, y, w, h, panel, 24, step);
+      else rect(x, y, w, h, panel, theme.radius, step);
       x += 30;
       y += 28;
       w -= 60;
@@ -163,8 +158,8 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         y,
         w,
         h,
-        fill: dark ? "#24312f" : "#ffffff",
-        radius: b.glass.radius ?? 28,
+        fill: theme.surface,
+        radius: b.glass.radius ?? theme.radius,
         glass: b.glass,
         step,
       });
@@ -352,9 +347,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           ? opts.headerFill || accent
           : opts.zebra !== false && i % 2 === 0
             ? opts.stripeColor || panel
-            : dark
-              ? "#20322b"
-              : "#ffffff";
+            : theme.surface;
         rect(x, y + i * rh, w, rh, fill, i === 0 ? 6 : 0, step);
         let cx = x;
         row.cells.forEach((value, j) => {
@@ -368,13 +361,23 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
             Math.max(0, cw - pad * 2),
             Math.max(0, rh - vpad * 2),
             Math.min(b.size || 18, rh * 0.48),
-            row.header ? opts.headerColor || "#ffffff" : c,
+            row.header
+              ? opts.headerColor || headerText(opts.headerFill || accent)
+              : c,
             row.header,
             step,
           );
           e[e.length - 1].align = model.columns[j].align || "left";
           if (border === "all" && j > 0)
-            rect(cx, y + i * rh, 1, rh, opts.borderColor || "#d8e4dc", 0, step);
+            rect(
+              cx,
+              y + i * rh,
+              1,
+              rh,
+              opts.borderColor || theme.border,
+              0,
+              step,
+            );
           cx += cw;
         });
         if (border !== "none")
@@ -383,22 +386,23 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
             y + (i + 1) * rh - 1,
             w,
             1,
-            opts.borderColor || "#d8e4dc",
+            opts.borderColor || theme.border,
             0,
             step,
           );
         if (border === "all") {
-          rect(x, y + i * rh, 1, rh, opts.borderColor || "#d8e4dc", 0, step);
+          rect(x, y + i * rh, 1, rh, opts.borderColor || theme.border, 0, step);
           rect(
             x + w - 1,
             y + i * rh,
             1,
             rh,
-            opts.borderColor || "#d8e4dc",
+            opts.borderColor || theme.border,
             0,
             step,
           );
-          if (i === 0) rect(x, y, w, 1, opts.borderColor || "#d8e4dc", 0, step);
+          if (i === 0)
+            rect(x, y, w, 1, opts.borderColor || theme.border, 0, step);
         }
         activeMotion = oldMotion;
         activeKey = oldKey;
@@ -417,7 +421,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         step,
       );
     } else if (b.type === "code") {
-      rect(x, y, w, h, dark ? "#142320" : "#e5ebe8", 12, step);
+      rect(x, y, w, h, theme.code, 12, step);
       text(
         b.text || "",
         x + 24,
