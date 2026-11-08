@@ -6,22 +6,22 @@
 
 在 Cloudflare 控制台进入 **Workers & Pages → Create application → 连接 GitHub 仓库**，选择 `Jw-23/easy-slide`，使用 Workers 部署流程。
 
-| 设置                             | 值                                              |
-| -------------------------------- | ----------------------------------------------- |
-| Worker 名称                      | `easy-slide`，与 `wrangler.jsonc` 的 name 一致  |
-| 生产分支                         | `feat/local-slide-studio`，当前完整代码所在分支 |
-| 根目录                           | 仓库根目录，保持默认                            |
-| 构建命令                         | **留空**                                        |
-| 部署命令                         | `npx wrangler deploy`                           |
-| 非生产分支部署命令（如显示此项） | `npx wrangler versions upload`                  |
-| Node.js                          | 仓库的 `.node-version` / `.nvmrc` 指定 Node 22  |
-| 构建变量、运行时变量             | 无需设置                                        |
+| 设置                             | 值                                                   |
+| -------------------------------- | ---------------------------------------------------- |
+| Worker 名称                      | `easy-slide`，与 `wrangler.jsonc` 的 name 一致       |
+| 生产分支                         | `main`；预览未合并更新可选 `feat/local-slide-studio` |
+| 根目录                           | 仓库根目录，保持默认                                 |
+| 构建命令                         | **留空**                                             |
+| 部署命令                         | `npx wrangler deploy`                                |
+| 非生产分支部署命令（如显示此项） | `npx wrangler versions upload`                       |
+| Node.js                          | 仓库的 `.node-version` / `.nvmrc` 指定 Node 22       |
+| 构建变量、运行时变量             | 无需设置                                             |
 
 构建命令留空是因为 `wrangler.jsonc` 的 `build.command` 已定义 `npm run build`。Wrangler 在部署前自动运行 TypeScript 检查和 Vite 构建，然后从 `dist` 上传静态文件。无需在控制台重复配置同一个构建命令。
 
 Cloudflare 的 Git 集成会安装仓库锁定的依赖并在后续推送时自动部署。Wrangler 版本已固定在 package.json 和 package-lock.json 中。
 
-**当前 main 分支尚未合并完整实现。** 首次请选择 `feat/local-slide-studio`；合并 PR 后，可在 Cloudflare 设置中把生产分支改为 main。创建项目时若使用其他名称，应同时修改 wrangler.jsonc 的 name，以保持一致。
+基础编辑器与 Cloudflare 配置已经合并到 `main`。PWA 更新合并前，需选择 `feat/local-slide-studio` 体验安装与离线功能；合并后可使用 `main`。创建项目时若使用其他名称，应同时修改 wrangler.jsonc 的 name，以保持一致。
 
 首次连接 GitHub 需要你在 Cloudflare 页面授权仓库访问。仓库配置本身不会代替账户授权或创建 Cloudflare 项目。
 
