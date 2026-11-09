@@ -19,7 +19,13 @@ import {
 } from "./editor-schema";
 import { completeLatex, equationContext } from "./latex";
 export const slideLanguage = StreamLanguage.define({
-  languageData: { commentTokens: { line: "//" } },
+  languageData: {
+    commentTokens: { line: "//" },
+    closeBrackets: {
+      brackets: ["(", "[", "{", '"', "`", "```"],
+      stringPrefixes: ["#"],
+    },
+  },
   startState: () => ({ end: "" }),
   token(stream, state) {
     if (state.end) {
@@ -38,6 +44,8 @@ export const slideLanguage = StreamLanguage.define({
       return "comment";
     }
     for (const [open, end] of [
+      ["```", "```"],
+      ["`", "`"],
       ['#"""', '"""#'],
       ['"""', '"""'],
       ['#"', '"#'],

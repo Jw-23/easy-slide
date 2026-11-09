@@ -243,7 +243,7 @@ for (const [name, description, field, type, template, kind] of [
     '["${要点一}", "${要点二}"]',
     undefined,
   ],
-  ["Equation", "LaTeX 公式", "text", string, '#"${E = mc^2}"#', "latex"],
+  ["Equation", "LaTeX 公式", "text", string, "`${E = mc^2}`", "latex"],
   ["Image", "工程内图片", "src", string, '"${assets/image.png}"', "asset"],
   ["Metric", "醒目指标", "value", string, '"${99.95%}"', undefined],
   ["Quote", "引用文字", "text", string, '"${引用}"', undefined],

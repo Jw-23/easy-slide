@@ -504,7 +504,7 @@ function at<T>(c: Call, fn: () => T): T {
         ? `此元素由第 ${c.definitionLine} 行定义的布局函数生成；检查函数定义与此调用参数。 `
         : "") +
         (detail.includes("LaTeX")
-          ? '检查命令拼写与花括号；建议使用 #"..."# 原始字符串。在公式中输入反斜杠呼出 LaTeX 补全。'
+          ? '检查命令拼写与花括号；建议使用反引号或 #"..."# 原始字符串。在公式中输入反斜杠呼出 LaTeX 补全。'
           : detail.includes("未知")
             ? "检查拼写；按 Ctrl / ⌘ + Space 查看可用声明与参数。"
             : "请根据提示修改此声明。尺寸、时长和顺序均使用非负数字。"),
@@ -796,7 +796,14 @@ export function parseDeck(source: string): Deck {
     return validateDeck(d);
   });
 }
-const str = (v: unknown) => JSON.stringify(v);
+function str(v: unknown): string {
+  if (typeof v === "string" && v.includes("\\")) {
+    if (!v.includes("`")) return "`" + v + "`";
+    if (!v.includes("```") && !v.endsWith("`")) return "```" + v + "```";
+  }
+  if (Array.isArray(v)) return "[" + v.map(str).join(", ") + "]";
+  return JSON.stringify(v);
+}
 function modifiers(b: Block): string {
   let out = "";
   if (b.glass && b.type !== "glass")

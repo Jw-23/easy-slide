@@ -55,16 +55,24 @@ export function tokenize(
     const start = i;
     const l = line,
       c = col;
-    if (source[i] === '"' || source.slice(i, i + 2) === '#"') {
-      const raw = source[i] === "#";
-      if (raw) advance();
-      const triple = source.slice(i, i + 3) === '"""';
-      const open = triple ? '"""' : '"';
+    if (
+      source[i] === '"' ||
+      source[i] === "`" ||
+      source.slice(i, i + 2) === '#"'
+    ) {
+      const backtick = source[i] === "`",
+        prefixed = source[i] === "#",
+        raw = backtick || prefixed,
+        quote = backtick ? "`" : '"';
+      if (prefixed) advance();
+      const triple = source.slice(i, i + 3) === quote.repeat(3);
+      const open = triple ? quote.repeat(3) : quote;
       for (let n = 0; n < open.length; n++) advance();
-      const end = open + (raw ? "#" : "");
+      const end = open + (prefixed ? "#" : "");
       const contentFrom = i;
       let contentTo = i;
-      let newline: { i: number; line: number; col: number } | undefined;
+      let newline:
+        { i: number; line: number; col: number; value: string } | undefined;
       let v = "",
         closed = false;
       while (i < source.length) {
@@ -75,7 +83,7 @@ export function tokenize(
           break;
         }
         if (!triple && !newline && source[i] === "\n")
-          newline = { i, line, col };
+          newline = { i, line, col, value: v };
         const ch = advance();
         if (ch === "\\" && !raw) {
           const esc = i < source.length ? advance() : "";
@@ -87,7 +95,7 @@ export function tokenize(
             "\\": "\\",
           };
           if (!(esc in map) && !options.tolerant)
-            error('不支持的转义，请用 #"..."# 包裹公式');
+            error('不支持的转义，请用反引号或 #"..."# 包裹公式');
           v += map[esc] ?? esc;
         } else v += ch;
       }
@@ -102,11 +110,23 @@ export function tokenize(
       )
         closed = false;
       if (!closed) {
-        if (!options.tolerant) error("字符串缺少结束引号");
+        if (!options.tolerant) {
+          if (backtick)
+            throw new DslError(
+              `反引号字符串缺少结束 ${end}`,
+              start,
+              start + open.length,
+              l,
+              c,
+              "使用相同数量的反引号结束字符串；内容含反引号时可使用三个反引号包裹。",
+            );
+          error("字符串缺少结束引号");
+        }
         if (newline) {
           i = newline.i;
           line = newline.line;
           col = newline.col;
+          v = newline.value;
         }
         contentTo = i;
       }

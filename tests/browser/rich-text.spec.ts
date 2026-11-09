@@ -101,3 +101,37 @@ test("exports native styles and mixed paragraph vectors with valid motion target
     }
   }
 });
+
+test("backtick strings keep single LaTeX backslashes through completion and formatting", async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .locator(".tabs")
+    .getByRole("tab", { name: "DSL", exact: true })
+    .click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  await editor.fill('Deck("Raw") Slide(title:"A"){Equation(`\\fr');
+  await page.keyboard.press("Control+Space");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText(
+    "\\frac",
+  );
+  await page
+    .locator(".cm-tooltip-autocomplete li")
+    .filter({ hasText: "\\frac" })
+    .first()
+    .click();
+  await expect(editor).toContainText("`\\frac{分子}{分母}");
+  await expect(editor).not.toContainText("`\\\\frac");
+  await editor.fill(
+    'Deck("Raw") Slide(title:"A"){Text(`**误差**为 $\\frac{1}{n}$`) Equation(`\\nabla f(x)`)}',
+  );
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
+  await expect(page.locator(".preview-wrap img[data-inline-math]")).toHaveCount(
+    1,
+  );
+  await editor.focus();
+  await page.keyboard.press("Control+Shift+f");
+  await expect(editor).toContainText("`\\nabla f(x)`");
+  await expect(page.locator(".preview-wrap")).toContainText("误差");
+});
