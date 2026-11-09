@@ -1,4 +1,5 @@
 import { whitespaceSelection } from "./studio/format-source";
+import { dslEditingKeymap, toggleDslComment } from "./studio/editor-commands";
 import type {
   EditorContext,
   RevealRequest,
@@ -37,7 +38,7 @@ import {
   signatureHelp,
   semanticHover,
 } from "./editor-language";
-import { BookOpen, Code2, MapPin, Sparkles } from "lucide-react";
+import { BookOpen, Code2, MapPin, MessageSquare, Sparkles } from "lucide-react";
 const externalChange = Annotation.define<boolean>();
 export function DslEditor({
   value,
@@ -55,7 +56,7 @@ export function DslEditor({
   onMessage,
 }: {
   value: string;
-  onChange: (s: string) => void;
+  onChange: (s: string, independent?: boolean) => void;
   assets: string[];
   onFormat: () => void;
   onHelp: () => void;
@@ -188,6 +189,11 @@ export function DslEditor({
                 copy,
                 cut,
                 paste,
+                toggleComment: () => {
+                  check();
+                  toggleDslComment(editor);
+                  editor.focus();
+                },
                 selectAll: () => {
                   editor.dispatch({
                     selection: { anchor: 0, head: editor.state.doc.length },
@@ -201,14 +207,7 @@ export function DslEditor({
           readOnlyConfig.current.of(EditorState.readOnly.of(readOnly)),
           Prec.highest(
             keymap.of([
-              {
-                key: "Mod-Shift-f",
-                run: (editor) => {
-                  if (editor.state.readOnly) return true;
-                  format.current();
-                  return true;
-                },
-              },
+              ...dslEditingKeymap(() => format.current()),
               {
                 key: "Mod-z",
                 run: () => {
@@ -300,7 +299,10 @@ export function DslEditor({
               update.docChanged &&
               !update.transactions.some((t) => t.annotation(externalChange))
             )
-              change.current(update.state.doc.toString());
+              change.current(
+                update.state.doc.toString(),
+                update.transactions.some((t) => t.isUserEvent("input.comment")),
+              );
           }),
         ],
       }),
@@ -396,8 +398,25 @@ export function DslEditor({
             <Sparkles size={15} />
           </button>
           <button
+            aria-label="切换行注释"
+            aria-keyshortcuts="Control+/ Meta+/"
+            title="切换行注释（Ctrl / ⌘ + /）"
+            className="icon-button"
+            disabled={readOnly}
+            onClick={() => {
+              if (view.current) {
+                toggleDslComment(view.current);
+                view.current.focus();
+              }
+            }}
+          >
+            <MessageSquare size={15} />
+            <span>注释</span>
+          </button>
+          <button
             aria-label="格式化 DSL"
-            title="格式化 DSL（Ctrl / ⌘ + Shift + F）"
+            aria-keyshortcuts="Control+Shift+F Meta+Shift+F Alt+Shift+F"
+            title="格式化 DSL（Ctrl / ⌘ + Shift + F，或 Shift + Alt + F）"
             className="icon-button"
             disabled={!!error || readOnly}
             onClick={onFormat}

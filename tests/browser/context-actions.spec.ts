@@ -119,6 +119,12 @@ test("formatting wraps parameters, retains comments, supports undo and context m
   await expect(editor).toContainText("rows = range");
   await page.keyboard.press("Control+z");
   await expect(editor).toContainText("step:2,order:1");
+  await page.keyboard.press("Shift+Alt+f");
+  await expect(
+    page.locator(".cm-line").filter({ hasText: /^\s+step: 2,$/ }),
+  ).toHaveCount(1);
+  await page.keyboard.press("Control+z");
+  await expect(editor).toContainText("step:2,order:1");
   const frame = page.getByLabel("幻灯片画布", { exact: true }),
     box = (await frame.boundingBox())!;
   await frame.click({
@@ -134,4 +140,40 @@ test("formatting wraps parameters, retains comments, supports undo and context m
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
+});
+
+test("line comments work through shortcuts, the toolbar and the context menu with independent undo", async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .locator(".tabs")
+    .getByRole("tab", { name: "DSL", exact: true })
+    .click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  await editor.fill(
+    'Deck("Shortcuts")\nSlide(title:"A"){\n    Text("one")\n    Text("two")\n}',
+  );
+  await editor.press("Control+Home");
+  await editor.press("ArrowDown");
+  await editor.press("ArrowDown");
+  await editor.press("Home");
+  await editor.press("Control+/");
+  await expect(editor).toContainText('// Text("one")');
+  await editor.press("Control+z");
+  await expect(editor).not.toContainText('// Text("one")');
+  await expect(editor).toContainText('Text("two")');
+  await page.getByRole("button", { name: "切换行注释", exact: true }).click();
+  await expect(editor).toContainText('// Text("one")');
+  const line = page.locator(".cm-line").filter({ hasText: '// Text("one")' });
+  await line.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "切换行注释", exact: true }).click();
+  await expect(editor).not.toContainText('// Text("one")');
+  await editor.press("Home");
+  await editor.press("Shift+ArrowDown");
+  await editor.press("Shift+ArrowDown");
+  await editor.press("Control+/");
+  await expect(editor).toContainText('// Text("one")');
+  await expect(editor).toContainText('// Text("two")');
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
 });

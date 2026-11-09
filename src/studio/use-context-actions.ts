@@ -46,6 +46,7 @@ export type EditorContext = {
   cut: () => Promise<void>;
   paste: () => Promise<void>;
   selectAll: () => void;
+  toggleComment: () => void;
 };
 export function useContextActions(
   s: Studio,
@@ -430,12 +431,19 @@ export function useContextActions(
           separator: i === 0,
         })),
       );
-    items.push({
-      label: "格式化文档",
-      separator: true,
-      disabled: !s.editable,
-      action: s.format,
-    });
+    items.push(
+      {
+        label: "切换行注释",
+        separator: true,
+        disabled: !s.ready || s.busy,
+        action: safe(context.toggleComment),
+      },
+      {
+        label: "格式化文档",
+        disabled: !s.editable,
+        action: s.format,
+      },
+    );
     items.push(...history());
     setMenu({
       x: context.x,
