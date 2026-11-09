@@ -1,3 +1,17 @@
+import {
+  mathEnvironments,
+  isMathEnvironment,
+  numberMath,
+  type MathEnvironment,
+} from "./math-environments";
+import {
+  needsPagination,
+  paginateSlide,
+  markSource,
+  type DynamicInfo,
+  type PaginationOptions,
+} from "./pagination";
+import { resolveTheme } from "./themes";
 import { themeIds, type ThemeOptions } from "./themes";
 import { validateTable, tableKeys, type TableOptions } from "./table";
 import type { Cell } from "./number-format";
@@ -81,6 +95,21 @@ export const layoutComponents: Record<Layout, string> = {
   focus: "Focus",
 };
 export type Block = {
+  environment?: MathEnvironment;
+  number?: string | number;
+  numbered?: boolean;
+  displayNumber?: string;
+  start?: number;
+  reason?: string;
+  qed?: boolean;
+  keepTogether?: boolean;
+  continued?: boolean;
+  fragment?: boolean;
+  flowGenerated?: boolean;
+  measured?: boolean;
+  sourcePath?: number[];
+  side?: "left" | "right";
+  repeat?: boolean;
   expressionSource?: string;
   componentName?: string;
   bindings?: string[];
@@ -116,7 +145,11 @@ export type Block = {
     | "rectangle"
     | "circle"
     | "badge"
-    | "progress";
+    | "progress"
+    | "math"
+    | "columnFlow"
+    | "pageBreak"
+    | "columnBreak";
   text?: string;
   title?: string;
   items?: string[];
@@ -153,6 +186,8 @@ export type Block = {
   showValue?: boolean;
 };
 export type Slide = {
+  dynamic?: DynamicInfo;
+  autoPages?: boolean;
   bindings?: string[];
   id?: string;
   /** Legacy input only; canonical DSL uses dedicated layout components. */
@@ -201,7 +236,7 @@ function validateRich(value: unknown, label: string) {
       if (issue) fail(`${label}，文本第 ${run.node.from + 1} 个字符：${issue}`);
     }
 }
-export function validateDeck(input: unknown): Deck {
+export function validateDeck(input: unknown, allowLongContent = false): Deck {
   const d = input as any;
   if (!d || d.version !== 1) fail("version 必须为 1");
   if (d.author !== undefined && typeof d.author !== "string")
@@ -214,12 +249,17 @@ export function validateDeck(input: unknown): Deck {
     const p = `第 ${i + 1} 页`;
     if (!s || (s.layout !== undefined && !layouts.includes(s.layout)))
       fail(`${p}：未知 layout`);
+    if (s.autoPages !== undefined && typeof s.autoPages !== "boolean")
+      fail(`${p}：autoPages 使用 true / false`);
     if (typeof s.title !== "string") fail(`${p}：title 必须是文本`);
     for (const key of ["title", "subtitle", "eyebrow"])
       validateRich(s[key], `${p}：${key}`);
     if (s.blocks === undefined) s.blocks = [];
-    if (!Array.isArray(s.blocks) || s.blocks.length > 30)
-      fail(`${p}：blocks 必须是数组，最多 30 项`);
+    if (
+      !Array.isArray(s.blocks) ||
+      s.blocks.length > (allowLongContent ? 3000 : 30)
+    )
+      fail(`${p}：blocks 必须是数组，最多 ${allowLongContent ? 3000 : 30} 项`);
     const all: Block[] = [];
     const collect = (blocks: Block[], depth = 0) => {
       if (depth > 30) fail(`${p}：布局嵌套过深`);
@@ -232,7 +272,7 @@ export function validateDeck(input: unknown): Deck {
       }
     };
     collect(s.blocks);
-    if (all.length > 300) fail(`${p}：内容块过多`);
+    if (all.length > (allowLongContent ? 3000 : 300)) fail(`${p}：内容块过多`);
     for (const b of all) {
       if (
         !b ||
@@ -264,16 +304,20 @@ export function validateDeck(input: unknown): Deck {
           "circle",
           "badge",
           "progress",
+          "math",
+          "columnFlow",
+          "pageBreak",
+          "columnBreak",
         ].includes(b.type)
       )
         fail(`${p}：未知内容 type`);
-      for (const key of ["text", "title", "src", "value", "label"])
+      for (const key of ["text", "title", "src", "value", "label", "reason"])
         if (
           (b as any)[key] !== undefined &&
           typeof (b as any)[key] !== "string"
         )
           fail(`${p}：${key} 必须是文本（数字请加引号）`);
-      for (const key of ["text", "title", "label", "value"] as const)
+      for (const key of ["text", "title", "label", "value", "reason"] as const)
         if (!(key === "text" && ["code", "equation"].includes(b.type)))
           validateRich(b[key], `${p}：${key}`);
       for (const item of Array.isArray(b.items) ? b.items : [])
@@ -345,7 +389,30 @@ export function validateDeck(input: unknown): Deck {
           (!Number.isFinite(b[key]) || b[key] < 0 || b[key] > 100)
         )
           fail(`${p}：${key} 范围 0–100`);
+      if (
+        b.start !== undefined &&
+        (!Number.isInteger(b.start) || b.start < 1 || b.start > 100000)
+      )
+        fail(`${p}：start 范围为 1–100000 的整数`);
       if (b.type === "table") validateTable(b.rows || [], b.table);
+      if (
+        b.type === "math" &&
+        (!b.environment || !isMathEnvironment(b.environment))
+      )
+        fail(`${p}：未知数学环境`);
+      if (
+        b.number !== undefined &&
+        typeof b.number !== "string" &&
+        (typeof b.number !== "number" || !Number.isFinite(b.number))
+      )
+        fail(`${p}：number 使用文字或有限数字`);
+      if (typeof b.number === "string") validateRich(b.number, `${p}：number`);
+      for (const key of ["numbered", "qed", "keepTogether", "repeat"] as const)
+        if (b[key] !== undefined && typeof b[key] !== "boolean")
+          fail(`${p}：${key} 使用 true / false`);
+      if (b.type === "columnFlow" && !["left", "right"].includes(b.side!))
+        fail(`${p}：未知数学栏`);
+
       if (b.position !== undefined) {
         const pos = b.position;
         if (!pos || typeof pos !== "object" || Array.isArray(pos))
@@ -420,6 +487,8 @@ export function validateDeck(input: unknown): Deck {
             "panel",
             "columns",
             "rows",
+            "math",
+            "columnFlow",
             "numbered",
           ].includes(b.type)
         )
@@ -580,6 +649,13 @@ const blockNames: Record<string, Block["type"]> = {
   Badge: "badge",
   Progress: "progress",
   ...Object.fromEntries(
+    Object.keys(mathEnvironments).map((name) => [name, "math" as const]),
+  ),
+  LeftColumn: "columnFlow",
+  RightColumn: "columnFlow",
+  PageBreak: "pageBreak",
+  ColumnBreak: "columnBreak",
+  ...Object.fromEntries(
     Object.values(layoutComponents).map((n) => [n, "layout" as const]),
   ),
 };
@@ -681,13 +757,19 @@ const apply = (
           `.${m.name} ${["frame", "position", "glass", "tableStyle"].includes(m.name) ? "仅接受命名参数" : "需要一个未命名参数"}`,
         );
       if (kind === "block")
-        validateDeck({
-          version: 1,
-          title: "validation",
-          slides: [{ ...sampleSlide, blocks: [target] }],
-        });
+        validateDeck(
+          {
+            version: 1,
+            title: "validation",
+            slides: [{ ...sampleSlide, blocks: [target] }],
+          },
+          true,
+        );
       else if (kind === "slide")
-        validateDeck({ version: 1, title: "validation", slides: [target] });
+        validateDeck(
+          { version: 1, title: "validation", slides: [target] },
+          true,
+        );
       else validateDeck({ ...target, slides: [sampleSlide] });
     });
   }
@@ -718,11 +800,26 @@ function compileBlock(c: Call): Block {
         "direction",
         "level",
         "showValue",
+        "number",
+        "numbered",
+        "start",
+        "reason",
+        "qed",
+        "keepTogether",
+        "repeat",
         ...(type === "table" ? tableKeys : []),
       ]);
     const b: Record<string, unknown> = c.custom
       ? { type, componentName: c.name }
       : { type, ...c.named };
+    if (
+      ["pageBreak", "columnBreak"].includes(type) &&
+      (c.args.length || Object.keys(c.named).length)
+    )
+      fail(`${c.name} 不接受参数`);
+    if (type === "math") b.environment = c.name;
+    if (type === "columnFlow")
+      b.side = c.name === "LeftColumn" ? "left" : "right";
     if (type === "divider" && c.named.direction !== undefined) {
       b.orientation = c.named.direction;
       delete b.direction;
@@ -750,17 +847,19 @@ function compileBlock(c: Call): Block {
     }
     if (!c.custom && c.args.length > 1) fail(`${c.name} 只接受一个未命名参数`);
     const field =
-      type === "image"
-        ? "src"
-        : type === "metric"
-          ? "value"
-          : ["bullets", "numbered"].includes(type)
-            ? "items"
-            : type === "table"
-              ? "rows"
-              : type === "progress"
-                ? "progress"
-                : "text";
+      type === "math"
+        ? "title"
+        : type === "image"
+          ? "src"
+          : type === "metric"
+            ? "value"
+            : ["bullets", "numbered"].includes(type)
+              ? "items"
+              : type === "table"
+                ? "rows"
+                : type === "progress"
+                  ? "progress"
+                  : "text";
     if (!c.custom && c.args.length) b[field] = c.args[0];
     if (type === "progress" && c.named.value !== undefined) {
       b.progress = c.named.value;
@@ -778,16 +877,21 @@ function compileBlock(c: Call): Block {
         "panel",
         "columns",
         "rows",
+        "math",
+        "columnFlow",
       ].includes(type)
     )
       b.children = c.children.map(compileBlock);
     else if (c.children.length) fail(`${c.name} 不能嵌套内容`);
     apply(b, c.modifiers, "block");
-    validateDeck({
-      version: 1,
-      title: "validation",
-      slides: [{ ...sampleSlide, blocks: [b] }],
-    });
+    validateDeck(
+      {
+        version: 1,
+        title: "validation",
+        slides: [{ ...sampleSlide, blocks: [b] }],
+      },
+      true,
+    );
     return b as Block;
   });
 }
@@ -806,6 +910,8 @@ export function parseDeck(source: string): Deck {
       ...(root.functions ? { functions: root.functions } : {}),
       ...(root.bindings ? { bindings: root.bindings } : {}),
     };
+    const counters = new Map<string, number>();
+    let sourceIndex = 0;
     for (const c of root.children) {
       at(c, () => {
         if (c.name === "Theme") {
@@ -821,14 +927,25 @@ export function parseDeck(source: string): Deck {
             fail("Theme 只接受命名参数");
           if (d.theme) fail("Theme 不可重复");
           d.theme = c.named;
-        } else if (c.name === "Slide") {
-          plain(c, ["title", "eyebrow", "subtitle", "notes", "id"]);
+        } else if (c.name === "Slide" || c.name === "DynamicSlide") {
+          plain(c, [
+            "title",
+            "eyebrow",
+            "subtitle",
+            "notes",
+            "id",
+            "autoPages",
+            "columns",
+            "spacing",
+            "fontSize",
+            "maxPages",
+          ]);
           if (c.args.length > 1)
             fail("Slide 只接受命名参数，布局请使用 Split / Cards 等组件");
           const s: Record<string, unknown> = {
             ...c.named,
             ...(c.bindings ? { bindings: c.bindings } : {}),
-            blocks: c.children.map(compileBlock),
+            blocks: numberMath(c.children.map(compileBlock), counters),
           };
           if (c.args.length) {
             if (!layouts.includes(c.args[0] as Layout)) fail("未知 layout");
@@ -837,7 +954,46 @@ export function parseDeck(source: string): Deck {
             ];
           }
           apply(s, c.modifiers, "slide");
-          (d.slides as unknown[]).push(s);
+          const automatic =
+            c.name === "DynamicSlide" ||
+            c.named.autoPages === true ||
+            (c.named.autoPages !== false &&
+              (needsPagination(s.blocks as Block[]) ||
+                c.named.columns !== undefined));
+          for (const key of ["columns", "spacing", "fontSize", "maxPages"])
+            delete s[key];
+          if (automatic) {
+            if (c.args.length) {
+              const root = (s.blocks as Block[])[0];
+              root.children = markSource(root.children || []);
+              root.flowGenerated = true;
+            }
+            let columns = c.named.columns as number | undefined;
+            const roots = s.blocks as Block[];
+            if (
+              columns === undefined &&
+              (roots.some((b) => b.type === "columnFlow") ||
+                (roots.length === 1 &&
+                  ((roots[0].type === "layout" &&
+                    ["split", "compare", "image"].includes(
+                      roots[0].preset || "",
+                    )) ||
+                    roots[0].type === "columns")))
+            )
+              columns = 2;
+            (d.slides as unknown[]).push(
+              ...paginateSlide(
+                s as Slide,
+                { ...c.named, columns } as PaginationOptions,
+                { sourceIndex, source: source.slice(c.from, c.to) },
+                resolveTheme(
+                  (root.children.find((call) => call.name === "Theme")?.named ||
+                    {}) as ThemeOptions,
+                ).font,
+              ),
+            );
+          } else (d.slides as unknown[]).push(s);
+          sourceIndex++;
         } else fail(`顶层不支持 ${c.name}，请使用 Theme 或 Slide`);
         validateDeck({
           ...d,
@@ -904,15 +1060,17 @@ function writeBlock(b: Block, indent: string): string {
   if (b.expressionSource)
     return indent + b.expressionSource.split("\n").join("\n" + indent);
   const field =
-    b.type === "image"
-      ? "src"
-      : b.type === "metric"
-        ? "value"
-        : ["bullets", "numbered"].includes(b.type)
-          ? "items"
-          : b.type === "table"
-            ? "rows"
-            : "text";
+    b.type === "math"
+      ? "title"
+      : b.type === "image"
+        ? "src"
+        : b.type === "metric"
+          ? "value"
+          : ["bullets", "numbered"].includes(b.type)
+            ? "items"
+            : b.type === "table"
+              ? "rows"
+              : "text";
   const args: string[] = [];
   if (b[field as keyof Block] !== undefined)
     args.push(str(b[field as keyof Block]));
@@ -948,6 +1106,13 @@ function writeBlock(b: Block, indent: string): string {
     "thickness",
     "level",
     "showValue",
+    "number",
+    "numbered",
+    "start",
+    "reason",
+    "qed",
+    "keepTogether",
+    "repeat",
   ] as const)
     if (b[key] !== undefined) args.push(`${key}: ${str(b[key])}`);
   if (b.alignment) args.push(`alignment: .${b.alignment}`);
@@ -960,7 +1125,13 @@ function writeBlock(b: Block, indent: string): string {
       ? layoutComponents[b.preset!]
       : b.type === "component"
         ? "VStack"
-        : names[b.type]) +
+        : b.type === "math"
+          ? b.environment
+          : b.type === "columnFlow"
+            ? b.side === "left"
+              ? "LeftColumn"
+              : "RightColumn"
+            : names[b.type]) +
     (args.length ? "(" + args.join(", ") + ")" : "");
   if (b.children)
     result +=
@@ -1005,9 +1176,14 @@ export function serialize(d: Deck): string {
         ")",
     );
   for (const s of d.slides) {
+    if (s.dynamic) {
+      if (s.dynamic.part === 0) parts.push(s.dynamic.source);
+      continue;
+    }
     const args = [`title: ${str(s.title)}`];
     for (const k of ["eyebrow", "subtitle", "id"] as const)
       if (s[k] !== undefined) args.push(`${k}: ${str(s[k])}`);
+    if (s.autoPages !== undefined) args.push(`autoPages: ${s.autoPages}`);
     let t =
       "Slide(" +
       args.join(", ") +

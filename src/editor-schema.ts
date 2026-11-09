@@ -1,3 +1,4 @@
+import { mathEnvironments } from "./math-environments";
 import { themeIds } from "./themes";
 import {
   effects,
@@ -396,6 +397,67 @@ add(
   [p("index", number, "从 0 开始的内容序号")],
   "Slot(\${0})",
 );
+
+for (const [name, label] of Object.entries(mathEnvironments))
+  add(
+    name,
+    "container",
+    label + "环境；普通 Slide 内自动续页",
+    [
+      p("title", string, "环境标题", { optional: true }),
+      named("title", string, "环境标题"),
+      named("text", string, "正文，支持行内公式"),
+      named("number", union([string, number]), "自定义编号"),
+      named("numbered", boolean, "是否编号"),
+      named("reason", string, "推理依据"),
+      named("qed", boolean, "Proof 结束时显示证毕符号"),
+      named("keepTogether", boolean, "保持整个环境在同一栏"),
+      spacing,
+    ],
+    name + '("${标题}") {\n    Text(`${正文}`)\n}',
+  );
+for (const name of ["LeftColumn", "RightColumn"])
+  add(
+    name,
+    "container",
+    "自动双栏的独立内容流",
+    [named("repeat", boolean, "在续页重复此栏")],
+    name + " {\n    ${}\n}",
+  );
+for (const name of ["PageBreak", "ColumnBreak"])
+  add(
+    name,
+    "view",
+    name === "PageBreak" ? "手动开始下一页" : "手动开始下一栏",
+    [],
+    name + "()",
+  );
+add(
+  "DynamicSlide",
+  "root",
+  "按内容高度自动续页，支持单栏和双栏",
+  [
+    ...["title", "subtitle", "eyebrow", "notes", "id"].map((n) =>
+      named(n, string, "页面" + n),
+    ),
+    named("columns", number, "1 或 2 栏"),
+    spacing,
+    named("fontSize", number, "正文默认字号，16–40"),
+    named("maxPages", number, "最多生成页数，1–200"),
+  ],
+  'DynamicSlide(title: "${证明}", columns: 2) {\n    LeftColumn(repeat: true) { Theorem("${结论}") { Text(`${命题}`) } }\n    RightColumn { Proof { ProofStep("${第一步}") { Text(`${推理}`) } } }\n}',
+);
+signatures
+  .get("Numbered")!
+  .params.push(named("start", number, "起始编号，默认 1"));
+const slideSpec = signatures.get("Slide")!;
+slideSpec.params.push(
+  spacing,
+  named("autoPages", boolean, "数学环境默认自动续页，false 使用手动排版"),
+  named("columns", number, "自动续页栏数，1 或 2"),
+  named("fontSize", number, "自动续页默认字号"),
+  named("maxPages", number, "最大续页数"),
+);
 const views = [...signatures.values()]
   .filter(
     (s) =>
@@ -415,7 +477,7 @@ add(
   ],
   "transition(.${slide}, duration: ${650}, direction: .${left}, easing: .${easeOut})",
   unknown,
-  ["Deck", "Slide"],
+  ["Deck", "Slide", "DynamicSlide"],
 );
 add(
   "appear",
@@ -457,7 +519,7 @@ for (const [name, type, detail, snippet] of [
     snippet,
     unknown,
     name === "notes"
-      ? ["Slide"]
+      ? ["Slide", "DynamicSlide"]
       : name === "stagger"
         ? [
             "Bullets",
@@ -465,7 +527,7 @@ for (const [name, type, detail, snippet] of [
             ...views.filter((v) => signatures.get(v)?.category === "container"),
           ]
         : ["foreground", "background"].includes(name)
-          ? ["Slide", ...views]
+          ? ["Slide", "DynamicSlide", ...views]
           : views,
   );
 add(

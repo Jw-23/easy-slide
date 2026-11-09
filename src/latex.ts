@@ -60,9 +60,12 @@ export function equationContext(
               "rows",
               "headers",
               "author",
+              "reason",
             ].includes(argument.name) &&
             !(owner.name === "Code" && argument.name === "text")
-          : !["Code", "Image", "Slide"].includes(owner.name || ""));
+          : !["Code", "Image", "Slide", "DynamicSlide"].includes(
+              owner.name || "",
+            ));
       if (prose) {
         const content = stringContent(source, token),
           p = content.at(pos),

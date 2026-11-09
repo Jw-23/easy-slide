@@ -36,6 +36,12 @@ function snapshot(block: Block, paths: Record<string, string> = {}): Block {
   const { expressionSource, bindings, children, ...rest } = block;
   void expressionSource;
   void bindings;
+  if (rest.measured) delete rest.h;
+  if (rest.flowGenerated) {
+    delete rest.position;
+    delete rest.w;
+    delete rest.h;
+  }
   return {
     ...rest,
     ...(rest.src ? { src: paths[rest.src] || rest.src } : {}),
@@ -100,6 +106,8 @@ const containers = new Set([
   "panel",
   "columns",
   "rows",
+  "math",
+  "columnFlow",
 ]);
 export function insertionPoint(
   deck: Deck,
@@ -110,6 +118,14 @@ export function insertionPoint(
   const selected = blockAt(deck, target),
     record = map.get(target);
   if (selected && record) {
+    if (
+      record.synthetic &&
+      !record.generated &&
+      deck.slides[target.page]?.dynamic
+    ) {
+      const owner = map.get({ scope: "slide", page: target.page });
+      if (owner) return { record: owner, inside: true };
+    }
     if (record.generated) {
       const owner = map.records.find(
         (r) =>
@@ -126,6 +142,30 @@ export function insertionPoint(
   }
   const slide = deck.slides[target.page];
   if (!slide) return;
+  if (slide.dynamic?.independentColumns) {
+    const column =
+      map.records.find(
+        (r) =>
+          r.target.scope === "block" &&
+          r.target.page === target.page &&
+          r.name === "RightColumn",
+      ) ||
+      map.records.find(
+        (r) =>
+          r.target.scope === "block" &&
+          r.target.page === target.page &&
+          r.name === "LeftColumn",
+      );
+    if (column) return { record: column, inside: true };
+    const side = slide.blocks[1]?.children?.length ? 1 : 0;
+    if (slide.blocks[side]?.children?.length)
+      return insertionPoint(
+        deck,
+        map,
+        { scope: "block", page: target.page, path: [side, 0] },
+        after,
+      );
+  }
   const owner =
     slide.blocks.length === 1 && slide.blocks[0].type === "layout"
       ? map.get({ scope: "block", page: target.page, path: [0] })

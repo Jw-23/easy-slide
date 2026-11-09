@@ -305,3 +305,23 @@ describe("semantic completions and signatures", () => {
     expect(calculationNames.every((n) => signatures.has(n))).toBe(true);
   });
 });
+
+it("completes math environments, dynamic slides, parameters, motion and LaTeX from the AST", () => {
+  expect(at('Deck("D")\nDyn¦').labels).toContain("DynamicSlide");
+  expect(at('Deck("D") Slide(title:"S"){Pro¦}').labels).toContain("ProofStep");
+  expect(
+    at('Deck("D") Slide(title:"S"){ProofStep("A", rea¦)}').labels,
+  ).toContain("reason:");
+  expect(at('Deck("D") DynamicSlide(title:"S", col¦)').labels).toContain(
+    "columns:",
+  );
+  expect(
+    at('Deck("D") DynamicSlide(title:"S"){LeftColumn(rep¦)}').labels,
+  ).toContain("repeat:");
+  expect(
+    at('Deck("D") Slide(title:"S"){Theorem{Text("a")}.app¦}').labels,
+  ).toContain("appear");
+  expect(
+    at('Deck("D") Slide(title:"S"){ProofStep(reason:`由 $\\fr¦`)}').labels,
+  ).toContain("\\frac");
+});

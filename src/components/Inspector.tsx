@@ -87,7 +87,7 @@ export function Inspector({
                 <textarea
                   rows={2}
                   aria-label="页标题"
-                  value={slide.title}
+                  value={slide.dynamic?.title ?? slide.title}
                   disabled={locked}
                   onChange={(e) => s.field({ title: e.target.value })}
                 />
@@ -102,14 +102,42 @@ export function Inspector({
               </label>
             </section>
             <section className="settings-section">
-              <h3>布局</h3>
+              <h3>
+                {slide.dynamic
+                  ? `动态续页 ${slide.dynamic.part + 1} / ${slide.dynamic.total}`
+                  : "布局"}
+              </h3>
+              {slide.dynamic && (
+                <p className="muted">
+                  标题与页面操作作用于整组，内容按高度自动续页。
+                </p>
+              )}
               <div className="layout-grid">
-                {layouts.map((layout) => (
+                {(slide.dynamic
+                  ? (["content", "split"] as const)
+                  : layouts
+                ).map((layout) => (
                   <button
                     key={layout}
-                    disabled={locked}
-                    aria-pressed={layout === pageLayout(slide)}
-                    className={`layout-option ${layout === pageLayout(slide) ? "chosen" : ""}`}
+                    disabled={
+                      locked ||
+                      (slide.dynamic?.independentColumns &&
+                        layout === "content")
+                    }
+                    title={
+                      slide.dynamic?.independentColumns && layout === "content"
+                        ? "独立左右栏需在 DSL 中调整结构"
+                        : undefined
+                    }
+                    aria-pressed={
+                      layout ===
+                      (slide.dynamic
+                        ? slide.dynamic.columns === 2
+                          ? "split"
+                          : "content"
+                        : pageLayout(slide))
+                    }
+                    className={`layout-option ${layout === (slide.dynamic ? (slide.dynamic.columns === 2 ? "split" : "content") : pageLayout(slide)) ? "chosen" : ""}`}
                     onClick={() => s.layout(layout)}
                   >
                     <div aria-hidden="true" className={`layout-mini ${layout}`}>
@@ -117,7 +145,13 @@ export function Inspector({
                       <i />
                       <i />
                     </div>
-                    <span>{layoutLabels[layout]}</span>
+                    <span>
+                      {slide.dynamic
+                        ? layout === "split"
+                          ? "双栏"
+                          : "单栏"
+                        : layoutLabels[layout]}
+                    </span>
                   </button>
                 ))}
               </div>

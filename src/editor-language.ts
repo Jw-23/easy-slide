@@ -386,7 +386,8 @@ export function completeDsl(
     fragment
       ? ["root", "view", "container"].includes(s.category)
       : root
-        ? s.category === "root" && (s.name === "Slide" || !existing.has(s.name))
+        ? s.category === "root" &&
+          (["Slide", "DynamicSlide"].includes(s.name) || !existing.has(s.name))
         : ["view", "container"].includes(s.category),
   );
   const inFunction = path.some((n) => n.kind === "declaration");

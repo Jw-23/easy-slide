@@ -6,6 +6,7 @@ import {
   useState,
   type MouseEvent,
 } from "react";
+import { pageGroup, groupMoveTarget } from "./page-groups";
 import { SourceMap, type SceneTarget, type SourceRecord } from "./source-map";
 import {
   copyComponent,
@@ -57,11 +58,11 @@ export function useContextActions(
   const map = useMemo(() => {
     if (s.error) return null;
     try {
-      return new SourceMap(s.project.source);
+      return new SourceMap(s.project.source, s.deck);
     } catch {
       return null;
     }
-  }, [s.project.source, s.error]);
+  }, [s.project.source, s.error, s.deck]);
   const [menu, setMenu] = useState<MenuState | null>(null),
     [reveal, setReveal] = useState<RevealRequest | null>(null),
     [focus, setFocus] = useState<FocusRequest | null>(null);
@@ -335,51 +336,71 @@ export function useContextActions(
           separator: true,
           disabled: !s.editable || s.deck.slides.length >= 200,
           action: safe(() =>
-            pageChange(pageTarget, addSlideSource, target.page + 1),
+            pageChange(
+              pageTarget,
+              addSlideSource,
+              pageGroup(s.deck, target.page).last + 1,
+            ),
           ),
         },
         {
-          label: "复制此页",
+          label: s.deck.slides[target.page]?.dynamic
+            ? "复制动态页组"
+            : "复制此页",
           disabled: !s.editable || s.deck.slides.length >= 200,
           action: safe(() =>
-            pageChange(pageTarget, duplicateSlideSource, target.page + 1),
+            pageChange(
+              pageTarget,
+              duplicateSlideSource,
+              pageGroup(s.deck, target.page).last + 1,
+            ),
           ),
         },
       );
       if (thumbnail)
         items.push(
           {
-            label: "上移此页",
-            disabled: !s.editable || target.page === 0,
+            label: s.deck.slides[target.page]?.dynamic
+              ? "上移动态页组"
+              : "上移此页",
+            disabled: !s.editable || pageGroup(s.deck, target.page).first === 0,
             action: safe(() =>
               pageChange(
                 pageTarget,
                 (source, page) => moveSlideSource(source, page, -1),
-                target.page - 1,
+                groupMoveTarget(s.deck, target.page, -1),
               ),
             ),
           },
           {
-            label: "下移此页",
-            disabled: !s.editable || target.page === s.deck.slides.length - 1,
+            label: s.deck.slides[target.page]?.dynamic
+              ? "下移动态页组"
+              : "下移此页",
+            disabled:
+              !s.editable ||
+              pageGroup(s.deck, target.page).last === s.deck.slides.length - 1,
             action: safe(() =>
               pageChange(
                 pageTarget,
                 (source, page) => moveSlideSource(source, page, 1),
-                target.page + 1,
+                groupMoveTarget(s.deck, target.page, 1),
               ),
             ),
           },
         );
       items.push({
-        label: "删除此页",
+        label: s.deck.slides[target.page]?.dynamic
+          ? "删除动态页组"
+          : "删除此页",
         danger: true,
-        disabled: !s.editable || s.deck.slides.length <= 1,
+        disabled:
+          !s.editable ||
+          pageGroup(s.deck, target.page).count === s.deck.slides.length,
         action: safe(() =>
           pageChange(
             pageTarget,
             deleteSlideSource,
-            Math.max(0, target.page - 1),
+            Math.max(0, pageGroup(s.deck, target.page).first - 1),
           ),
         ),
       });
