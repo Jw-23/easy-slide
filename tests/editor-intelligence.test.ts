@@ -315,9 +315,9 @@ it("completes math environments, dynamic slides, parameters, motion and LaTeX fr
   expect(at('Deck("D") DynamicSlide(title:"S", col¦)').labels).toContain(
     "columns:",
   );
-  expect(
-    at('Deck("D") DynamicSlide(title:"S"){LeftColumn(rep¦)}').labels,
-  ).toContain("repeat:");
+  expect(at('Deck("D") DynamicSlide(title:"S", mar¦)').labels).toContain(
+    "margin:",
+  );
   expect(
     at('Deck("D") Slide(title:"S"){Theorem{Text("a")}.app¦}').labels,
   ).toContain("appear");

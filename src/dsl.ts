@@ -1,3 +1,4 @@
+import { pageStyleKeys, pageGeometry } from "./page-layout";
 import {
   mathEnvironments,
   isMathEnvironment,
@@ -186,6 +187,13 @@ export type Block = {
   showValue?: boolean;
 };
 export type Slide = {
+  titleSize?: number;
+  fontSize?: number;
+  margin?: number;
+  padding?: number;
+  titleGap?: number;
+  columnGap?: number;
+  showFooter?: boolean;
   dynamic?: DynamicInfo;
   autoPages?: boolean;
   bindings?: string[];
@@ -251,6 +259,23 @@ export function validateDeck(input: unknown, allowLongContent = false): Deck {
       fail(`${p}：未知 layout`);
     if (s.autoPages !== undefined && typeof s.autoPages !== "boolean")
       fail(`${p}：autoPages 使用 true / false`);
+    for (const [key, min, max] of [
+      ["titleSize", 8, 96],
+      ["fontSize", 8, 64],
+      ["margin", 0, 160],
+      ["padding", 0, 120],
+      ["titleGap", 0, 80],
+      ["columnGap", 0, 120],
+    ] as const) {
+      if (
+        s[key] !== undefined &&
+        (!Number.isFinite(s[key]) || s[key] < min || s[key] > max)
+      )
+        fail(`${p}：${key} 范围为 ${min}–${max}`);
+    }
+    if (s.showFooter !== undefined && typeof s.showFooter !== "boolean")
+      fail(`${p}：showFooter 使用 true / false`);
+    pageGeometry(s);
     if (typeof s.title !== "string") fail(`${p}：title 必须是文本`);
     for (const key of ["title", "subtitle", "eyebrow"])
       validateRich(s[key], `${p}：${key}`);
@@ -939,6 +964,7 @@ export function parseDeck(source: string): Deck {
             "spacing",
             "fontSize",
             "maxPages",
+            ...pageStyleKeys,
           ]);
           if (c.args.length > 1)
             fail("Slide 只接受命名参数，布局请使用 Split / Cards 等组件");
@@ -960,8 +986,7 @@ export function parseDeck(source: string): Deck {
             (c.named.autoPages !== false &&
               (needsPagination(s.blocks as Block[]) ||
                 c.named.columns !== undefined));
-          for (const key of ["columns", "spacing", "fontSize", "maxPages"])
-            delete s[key];
+          for (const key of ["columns", "spacing", "maxPages"]) delete s[key];
           if (automatic) {
             if (c.args.length) {
               const root = (s.blocks as Block[])[0];
@@ -1183,6 +1208,8 @@ export function serialize(d: Deck): string {
     const args = [`title: ${str(s.title)}`];
     for (const k of ["eyebrow", "subtitle", "id"] as const)
       if (s[k] !== undefined) args.push(`${k}: ${str(s[k])}`);
+    for (const key of pageStyleKeys)
+      if (s[key] !== undefined) args.push(`${key}: ${str(s[key])}`);
     if (s.autoPages !== undefined) args.push(`autoPages: ${s.autoPages}`);
     let t =
       "Slide(" +

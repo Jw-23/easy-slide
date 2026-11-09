@@ -104,11 +104,10 @@ export function mathMetrics(b: Block, w: number, font: string, inherited = 22) {
   const pad = b.padding ?? (b.environment === "ProofStep" ? 10 : 18),
     size = b.size ?? inherited,
     inner = Math.max(1, w - pad * 2 - 4),
-    heading = textHeight(mathHeading(b), inner, Math.max(18, size), font),
+    heading = textHeight(mathHeading(b), inner, size, font),
     body = b.text ? textHeight(b.text, inner, size, font) + 12 : 0,
     reason = b.reason
-      ? textHeight("依据：" + b.reason, inner, Math.max(15, size - 4), font) +
-        10
+      ? textHeight("依据：" + b.reason, inner, Math.max(8, size - 2), font) + 10
       : 0,
     footer = proofEnds(b) ? 30 : 0;
   return {
@@ -180,7 +179,9 @@ export function contentHeight(
       (b.type === "code" ? 48 : 6);
   } else if (b.type === "equation") {
     const asset = mathAsset(b.text || "", "#192c2a", true);
-    height = Math.max(60, (asset?.heightEm || 2) * size + 20) + pad * 2;
+    height =
+      Math.max(size * 2.2, (asset?.heightEm || 2) * size + size * 0.8) +
+      pad * 2;
   } else if (b.type === "bullets" || b.type === "numbered")
     height =
       (b.items || []).reduce(

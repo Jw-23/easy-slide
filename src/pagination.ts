@@ -1,3 +1,4 @@
+import { pageGeometry } from "./page-layout";
 import type { Block, Slide } from "./dsl";
 import {
   contentHeight,
@@ -19,7 +20,6 @@ export type DynamicInfo = {
   total: number;
   title: string;
   columns: number;
-  independentColumns: boolean;
 };
 export function needsPagination(blocks: Block[]): boolean {
   return blocks.some(
@@ -240,10 +240,7 @@ function paged(
 export function paginateSlide(
   slide: Slide,
   options: PaginationOptions,
-  source: Omit<
-    DynamicInfo,
-    "part" | "total" | "title" | "columns" | "independentColumns"
-  >,
+  source: Omit<DynamicInfo, "part" | "total" | "title" | "columns">,
   font: string,
 ): Slide[] {
   const columns = options.columns ?? 1,
@@ -254,83 +251,35 @@ export function paginateSlide(
     throw Error("DynamicSlide columns 支持 1 或 2");
   if (!Number.isFinite(gap) || gap < 0 || gap > 80)
     throw Error("DynamicSlide spacing 范围为 0–80");
-  if (!Number.isFinite(size) || size < 16 || size > 40)
-    throw Error("DynamicSlide fontSize 范围为 16–40");
+  if (!Number.isFinite(size) || size < 8 || size > 64)
+    throw Error("DynamicSlide fontSize 范围为 8–64");
   if (!Number.isInteger(limit) || limit < 1 || limit > 200)
     throw Error("DynamicSlide maxPages 范围为 1–200");
-  const top = slide.subtitle ? 250 : 210,
-    height = 620 - top,
-    width = (1132 - gap * (columns - 1)) / columns;
+  const geometry = pageGeometry(slide, true),
+    { x, y: top, w, h: height } = geometry.body;
+  const columnGap = slide.columnGap ?? gap;
+  const width = (w - columnGap * (columns - 1)) / columns;
   let blocks = markSource(slide.blocks),
-    streams: Block[][][],
-    columnSources: (Block | undefined)[] = [];
+    streams: Block[][][];
   assertFlow(blocks);
+  // Legacy side wrappers are ordinary sequential containers; repeat no longer pins a column.
+  const sequential = (nodes: Block[]): Block[] =>
+    nodes.map((b) => ({
+      ...b,
+      ...(b.type === "columnFlow"
+        ? { type: "vstack" as const, repeat: undefined, side: undefined }
+        : {}),
+      ...(b.children ? { children: sequential(b.children) } : {}),
+    }));
+  blocks = sequential(blocks);
   if (
     blocks.length === 1 &&
     ((blocks[0].type === "layout" &&
-      ["content", "split", "compare", "image"].includes(
-        blocks[0].preset || "",
-      )) ||
+      ["split", "compare", "image"].includes(blocks[0].preset || "")) ||
       blocks[0].type === "columns")
-  ) {
-    const root = blocks[0];
-    if (
-      !(root.type === "layout" && root.preset === "content") &&
-      columns === 2 &&
-      (root.children?.length || 0) === 2
-    )
-      blocks = root.children!.map((b, i) => ({
-        ...root,
-        type: "columnFlow",
-        side: i === 0 ? "left" : "right",
-        children: [b],
-      }));
-  }
-  const explicit = blocks.some((b) => b.type === "columnFlow");
-  if (explicit) {
-    if (
-      columns !== 2 ||
-      blocks.some((b) => b.type !== "columnFlow") ||
-      blocks.length > 2
-    )
-      throw Error("LeftColumn / RightColumn 需要双栏，且不能与其他根内容混用");
-    const left = blocks.find((b) => b.side === "left"),
-      right = blocks.find((b) => b.side === "right");
-    if (
-      blocks.filter((b) => b.side === "left").length > 1 ||
-      blocks.filter((b) => b.side === "right").length > 1
-    )
-      throw Error("左右栏只能各定义一次");
-    columnSources = [left, right];
-    const inputs = columnSources,
-      chunks = inputs.map((b) => {
-        if (b?.children?.some((c) => c.type === "columnBreak"))
-          throw Error("显式左右栏请用 PageBreak 分页");
-        if (b?.w !== undefined || b?.h !== undefined)
-          throw Error(
-            "左右栏尺寸由动态页管理，请用 spacing 或子元素 frame 调整",
-          );
-        const pad = b?.padding ?? 0;
-        if (height - 2 * pad - (b?.title ? 54 : 0) < 40)
-          throw Error("栏标题或 padding 过大，正文空间不足");
-        const pages = paged(
-          b?.children || [],
-          Math.max(1, width - 2 * pad),
-          height - 2 * pad - (b?.title ? 54 : 0),
-          font,
-          b?.size ?? size,
-          b?.gap ?? gap,
-          1,
-        ).map((p) => p[0]);
-        if (b?.repeat && pages.length > 1)
-          throw Error("重复显示的栏超出一页，请缩短内容或取消 repeat");
-        return pages;
-      }),
-      total = Math.max(1, ...chunks.map((c) => c.length));
-    streams = Array.from({ length: total }, (_, i) =>
-      chunks.map((c, j) => c[i] || (inputs[j]?.repeat ? c[0] : [])),
-    );
-  } else streams = paged(blocks, width, height, font, size, gap, columns);
+  )
+    blocks = [{ ...blocks[0], type: "vstack", preset: undefined }];
+  streams = paged(blocks, width, height, font, size, gap, columns);
   if (streams.length > limit)
     throw Error(`动态续页需要 ${streams.length} 页，超过 maxPages: ${limit}`);
   return streams.map((cols, part) => ({
@@ -338,20 +287,16 @@ export function paginateSlide(
     title: part ? `${slide.title}（续 ${part + 1}）` : slide.title,
     ...(slide.id ? { id: part ? `${slide.id}--${part + 1}` : slide.id } : {}),
     blocks: cols.map((children, i) => ({
-      ...columnSources[i],
       type: "vstack",
       flowGenerated: true,
       measured: true,
-      ...(columnSources[i]?.sourcePath
-        ? { sourcePath: columnSources[i]!.sourcePath }
-        : {}),
       children,
-      gap: columnSources[i]?.gap ?? gap,
-      size: columnSources[i]?.size ?? size,
+      gap,
+      size,
       w: width,
       h: height,
       position: {
-        x: 74 + i * (width + gap),
+        x: x + i * (width + columnGap),
         y: -top,
         reference: "topLeft",
         anchor: "topLeft",
@@ -366,7 +311,6 @@ export function paginateSlide(
       total: streams.length,
       title: slide.title,
       columns,
-      independentColumns: explicit,
     },
   }));
 }

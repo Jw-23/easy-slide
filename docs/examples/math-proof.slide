@@ -17,33 +17,29 @@ Slide(title: "定义、假设与引理") {
     }
 }
 
-// 左栏在续页保持命题，右栏的证明按内容自然拆分。
-DynamicSlide(title: "梯度下降的收敛率", columns: 2, spacing: 24) {
-    LeftColumn(repeat: true) {
-        Theorem("凸光滑函数") {
-            Text(`令 $x_{k+1}=x_k-\eta\nabla f(x_k)$，其中 $0<\eta\le1/L$。则`)
-            Equation(`f(x_k)-f(x^*)\le\frac{\|x_0-x^*\|^2}{2\eta k}`)
-        }.glass(opacity: 0.7, radius: 18)
+// 定理和证明按第一栏、第二栏、下一页自然顺延。
+DynamicSlide(title: "梯度下降的收敛率", columns: 2, spacing: 16, columnGap: 24, fontSize: 18, titleSize: 28, margin: 24, padding: 8, showFooter: false) {
+    Theorem("凸光滑函数") {
+        Text(`令 $x_{k+1}=x_k-\eta\nabla f(x_k)$，其中 $0<\eta\le1/L$。则`)
+        Equation(`f(x_k)-f(x^*)\le\frac{\|x_0-x^*\|^2}{2\eta k}`)
+    }.glass(opacity: 0.7, radius: 18)
+    Proof {
+        ProofStep("使用凸性", reason: `一阶凸性不等式`) {
+            Equation(`f(x_k)-f(x^*)\le\langle g_k,x_k-x^*\rangle`)
+            Text(`其中 $g_k=\nabla f(x_k)$。`)
+        }.appear(.rise, step: 1, duration: 450)
+        ProofStep("结合下降引理", reason: `步长 $\eta\le1/L$`) {
+            Equation(`f(x_{k+1})\le f(x_k)-\frac\eta2\|g_k\|^2`)
+        }.appear(.fade, step: 1, duration: 450)
+        ProofStep("展开距离平方", reason: `代入迭代式并合并前两步`) {
+            Equation(`2\eta(f(x_{k+1})-f(x^*))\le\|x_k-x^*\|^2-\|x_{k+1}-x^*\|^2`)
+        }.appear(.rise, step: 1, duration: 450)
+        ProofStep("求和与单调性", reason: `望远镜求和；函数值单调下降`) {
+            Equation(`2\eta k(f(x_k)-f(x^*))\le\|x_0-x^*\|^2`)
+            Text(`两侧除以 $2\eta k$，即得结论。`)
+        }.appear(.zoom, step: 1, duration: 450)
     }
-    RightColumn {
-        Proof {
-            ProofStep("使用凸性", reason: `一阶凸性不等式`) {
-                Equation(`f(x_k)-f(x^*)\le\langle g_k,x_k-x^*\rangle`)
-                Text(`其中 $g_k=\nabla f(x_k)$。`)
-            }.appear(.rise, step: 1, duration: 450)
-            ProofStep("结合下降引理", reason: `步长 $\eta\le1/L$`) {
-                Equation(`f(x_{k+1})\le f(x_k)-\frac\eta2\|g_k\|^2`)
-            }.appear(.fade, step: 1, duration: 450)
-            ProofStep("展开距离平方", reason: `代入迭代式并合并前两步`) {
-                Equation(`2\eta(f(x_{k+1})-f(x^*))\le\|x_k-x^*\|^2-\|x_{k+1}-x^*\|^2`)
-            }.appear(.rise, step: 1, duration: 450)
-            ProofStep("求和与单调性", reason: `望远镜求和；函数值单调下降`) {
-                Equation(`2\eta k(f(x_k)-f(x^*))\le\|x_0-x^*\|^2`)
-                Text(`两侧除以 $2\eta k$，即得结论。`)
-            }.appear(.zoom, step: 1, duration: 450)
-        }
-    }
-}.notes("每页先回顾左侧命题，再点击展示右侧推理。")
+}.notes("按列阅读，逐步展示推理；内容超出时自动续页。")
 
 Slide(title: "命题、推论与推理") {
     Proposition("下降方向") {
