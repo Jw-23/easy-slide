@@ -94,3 +94,16 @@ it("exports expanded custom layouts, basic shapes and their grouped animations",
   expect(xml).toContain('dur="720"');
   expect(xml).not.toContain("undefined");
 });
+
+it("exports bottom-left positions and independent scale as native geometry with animation", async () => {
+  const d = parseDeck(
+      'Deck("D") Theme(preset:.paper) Slide(title:"S"){Rectangle(fill:"#ff0000").frame(width:100,height:50).position(x:20,y:20,relativeTo:.slide).scale(2).appear(.rise,step:1,duration:650)}',
+    ),
+    blob = await buildPptx(d, {}, { textMode: "editable" }),
+    zip = await JSZip.loadAsync(await blob.arrayBuffer()),
+    xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+  expect(xml).toContain('<a:off x="190500" y="5715000"/>');
+  expect(xml).toContain('<a:ext cx="1905000" cy="952500"/>');
+  expect(xml).toContain('nodeType="clickEffect"');
+  expect(xml).toContain('dur="650"');
+});

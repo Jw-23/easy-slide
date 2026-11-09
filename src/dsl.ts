@@ -21,6 +21,18 @@ export const layouts = [
   "focus",
 ] as const;
 export type Layout = (typeof layouts)[number];
+export const positionAnchors = [
+  "topLeft",
+  "top",
+  "topRight",
+  "left",
+  "center",
+  "right",
+  "bottomLeft",
+  "bottom",
+  "bottomRight",
+] as const;
+export const positionReferences = ["parent", "slide"] as const;
 export const layoutLabels: Record<Layout, string> = {
   cover: "封面",
   section: "章节",
@@ -112,10 +124,16 @@ export type Block = {
   value?: string;
   label?: string;
   rows?: Cell[][];
-  x?: number;
-  y?: number;
   w?: number;
   h?: number;
+  position?: {
+    x?: number;
+    y?: number;
+    reference?: (typeof positionAnchors)[number];
+    anchor?: (typeof positionAnchors)[number];
+    relativeTo?: (typeof positionReferences)[number];
+  };
+  scale?: number;
   size?: number;
   color?: string;
   step?: number;
@@ -328,17 +346,35 @@ export function validateDeck(input: unknown): Deck {
         )
           fail(`${p}：${key} 范围 0–100`);
       if (b.type === "table") validateTable(b.rows || [], b.table);
-      for (const k of [
-        "x",
-        "y",
-        "w",
-        "h",
-        "size",
-        "step",
-        "gap",
-        "padding",
-        "columns",
-      ])
+      if (b.position !== undefined) {
+        const pos = b.position;
+        if (!pos || typeof pos !== "object" || Array.isArray(pos))
+          fail(`${p}：position 需要命名参数`);
+        for (const key of Object.keys(pos))
+          if (!["x", "y", "reference", "anchor", "relativeTo"].includes(key))
+            fail(`${p}：未知 position 参数 ${key}`);
+        for (const key of ["x", "y"] as const)
+          if (pos[key] !== undefined && !Number.isFinite(pos[key]))
+            fail(`${p}：position ${key} 必须是有限数字`);
+        for (const key of ["reference", "anchor"] as const)
+          if (pos[key] !== undefined && !positionAnchors.includes(pos[key]!))
+            fail(`${p}：position ${key} 支持 ${positionAnchors.join(" / ")}`);
+        if (
+          pos.relativeTo !== undefined &&
+          !positionReferences.includes(pos.relativeTo)
+        )
+          fail(`${p}：position relativeTo 支持 .parent / .slide`);
+      }
+      if (
+        b.scale !== undefined &&
+        (!Number.isFinite(b.scale) || b.scale <= 0 || b.scale > 10)
+      )
+        fail(`${p}：scale 必须大于 0 且不超过 10`);
+      if ("x" in b || "y" in b || "origin" in b || "relativeTo" in b)
+        fail(
+          `${p}：位置请改用 .position(x:, y:, reference:, anchor:, relativeTo:)，frame 只设置尺寸`,
+        );
+      for (const k of ["w", "h", "size", "step", "gap", "padding", "columns"])
         if (
           (b as any)[k] !== undefined &&
           (!Number.isFinite((b as any)[k]) || (b as any)[k] < 0)
@@ -613,19 +649,36 @@ const apply = (
           ...m.named,
         };
       } else if (kind === "block" && m.name === "frame") {
-        plain(m, ["x", "y", "width", "height"]);
+        if (
+          Object.keys(m.named).some((k) =>
+            ["x", "y", "origin", "relativeTo"].includes(k),
+          )
+        )
+          fail(
+            "frame 只设置 width / height；位置请改用 .position(x:, y:, reference:, anchor:, relativeTo:)，x 向右、y 向上",
+          );
+        plain(m, ["width", "height"]);
         for (const [k, v] of Object.entries(m.named))
           target[k === "width" ? "w" : k === "height" ? "h" : k] = v;
+      } else if (kind === "block" && m.name === "position") {
+        plain(m, ["x", "y", "reference", "anchor", "relativeTo"]);
+        target.position = {
+          ...((target.position as Block["position"]) || {}),
+          ...m.named,
+        };
+      } else if (kind === "block" && m.name === "scale") {
+        plain(m, []);
+        target.scale = m.args[0];
       } else
         fail(
-          `${kind} 不支持修饰符 .${m.name}${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"]) ? `，是否想写 .${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "padding", "step", "title", "notes"])}？` : ""}`,
+          `${kind} 不支持修饰符 .${m.name}${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "position", "scale", "padding", "step", "title", "notes"]) ? `，是否想写 .${closest(m.name, ["transition", "appear", "background", "foreground", "font", "frame", "position", "scale", "padding", "step", "title", "notes"])}？` : ""}`,
         );
       if (
         m.args.length !==
-        (["frame", "glass", "tableStyle"].includes(m.name) ? 0 : 1)
+        (["frame", "position", "glass", "tableStyle"].includes(m.name) ? 0 : 1)
       )
         fail(
-          `.${m.name} ${["frame", "glass", "tableStyle"].includes(m.name) ? "仅接受命名参数" : "需要一个未命名参数"}`,
+          `.${m.name} ${["frame", "position", "glass", "tableStyle"].includes(m.name) ? "仅接受命名参数" : "需要一个未命名参数"}`,
         );
       if (kind === "block")
         validateDeck({
@@ -833,13 +886,16 @@ function modifiers(b: Block): string {
       .join("")})`;
   else if (b.step !== undefined) out += `.step(${b.step})`;
   const frame = [
-    ["x", b.x],
-    ["y", b.y],
     ["width", b.w],
     ["height", b.h],
   ].filter(([, v]) => v !== undefined);
   if (frame.length)
     out += `.frame(${frame.map(([k, v]) => `${k}: ${v}`).join(", ")})`;
+  if (b.position)
+    out += `.position(${Object.entries(b.position)
+      .map(([k, v]) => `${k}: ${typeof v === "string" ? "." : ""}${v}`)
+      .join(", ")})`;
+  if (b.scale !== undefined) out += `.scale(${b.scale})`;
   if (b.background) out += `.background(${str(b.background)})`;
   if (b.padding !== undefined) out += `.padding(${b.padding})`;
   return out;

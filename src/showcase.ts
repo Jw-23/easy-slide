@@ -30,7 +30,7 @@ let demoCosts = [120, 180, 95, 240]
 
 Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、主题与动画") {
     Cover {
-        Text("26 页示例 · 在 DSL 面板中查看和修改源码").font(18)
+        Text("27 页示例 · 在 DSL 面板中查看和修改源码").font(18)
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
@@ -122,17 +122,17 @@ Slide(title: "自由组合布局容器", eyebrow: "09 / STACKS + GRID", subtitle
 }.transition(.slide, direction: .down, duration: 650)
 .notes("HStack 左侧固定 width 410，右侧分配剩余宽度。左侧 VStack 使用两个固定高度块和一个 Spacer。Grid 提供二维网格；这些容器与八种预设布局组件可以互相组合。")
 
-Slide(title: "叠层布局与材质边界", eyebrow: "10 / ZSTACK", subtitle: "后声明的内容位于上层，frame 可使用画布绝对坐标") {
+Slide(title: "叠层布局与材质边界", eyebrow: "10 / ZSTACK", subtitle: "后声明的内容位于上层；position 可参考整个画布") {
     ZStack {
-        Image("assets/convergence.png").frame(x: 74, y: 250, width: 750, height: 370)
+        Image("assets/convergence.png").frame(width: 750, height: 370).position(x: 74, y: 100, relativeTo: .slide)
         Glass {
             Text("叠放的说明面板", title: "ZStack").font(25).frame(height: 95)
             Text("网页实时模糊下层图表；PPTX 按入场时序采样下层内容。").font(21)
-        }.frame(x: 640, y: 290, width: 520, height: 270)
+        }.frame(width: 520, height: 270).position(x: 640, y: 160, relativeTo: .slide)
          .glass(blur: 24, opacity: 0.72, radius: 28)
          .appear(.slideRight, step: 1, duration: 650)
     }
-}.notes("ZStack 按声明顺序叠放内容。frame.x/y 是画布绝对坐标。网页 backdrop-filter 能实时模糊下层图表；PPTX 将入场时下层内容采样为静态材质，后续点击的内容不会提前出现在材质中。文字与公式仍独立保留动画，文字可选择保留版式或可编辑模式。")
+}.notes("ZStack 按声明顺序叠放内容。frame 设置尺寸；position(relativeTo: .slide) 从画布左下角计算位置，x 向右、y 向上。网页 backdrop-filter 能实时模糊下层图表；PPTX 将入场时下层内容采样为静态材质，后续点击的内容不会提前出现在材质中。文字与公式仍独立保留动画，文字可选择保留版式或可编辑模式。")
 
 Slide(title: "LaTeX 公式与命令补全", eyebrow: "11 / EQUATIONS", subtitle: "在 Equation 字符串中输入反斜杠，或按 Ctrl / ⌘ + Space") {
     Grid(columns: 2, spacing: 20) {
@@ -210,13 +210,13 @@ Slide(title: "四种缓动与点击阶段", eyebrow: "16 / EASING + STEPS", subt
 Slide(title: "位置、字体与面板样式", eyebrow: "17 / STYLE + FRAME", subtitle: "所有坐标基于 1280 × 720 画布") {
     ZStack {
         Text("固定位置的正文", title: "frame + font")
-            .frame(x: 90, y: 270, width: 500, height: 290)
+            .frame(width: 500, height: 290).position(x: 90, y: 160, relativeTo: .slide)
             .font(31).foreground("#245e55").background("#e2eee8").padding(28)
         Text("独立毛玻璃材质", title: "glass + padding")
-            .frame(x: 650, y: 310, width: 500, height: 260)
+            .frame(width: 500, height: 260).position(x: 650, y: 150, relativeTo: .slide)
             .font(29).glass(blur: 36, opacity: 0.58, radius: 34).padding(30)
     }
-}.notes("对比纯色 background 与毛玻璃 glass。frame 支持 x/y/width/height，font、foreground、padding、title 控制层次。右侧默认卡片材质影响 Cards 等自动卡片；显式 Glass 与 .glass() 会保留自己的材质。")
+}.notes("对比纯色 background 与毛玻璃 glass。frame 设置 width/height，position 设置参考点与位置，scale 独立缩放，font、foreground、padding、title 控制层次。右侧默认卡片材质影响 Cards 等自动卡片；显式 Glass 与 .glass() 会保留自己的材质。")
 
 Slide(title: "页面样式覆盖与无过渡", eyebrow: "18 / PAGE OVERRIDES", subtitle: "页面可覆盖背景、文字色、过渡方式和演讲备注") {
     Flow(spacing: 24) {
@@ -338,6 +338,26 @@ Slide(title: "正文中的公式与强调", eyebrow: "26 / RICH TEXT", subtitle:
         Text(#"行内代码 ${"`"}**原样保留** $x$${"`"}；文字中的 \*星号\* 与价格 \$20 使用反斜杠转义。"#).font(21)
     }
 }.notes("Text、Heading、Caption、列表、表格单元格与页标题支持行内富文本。粗体使用双星号，斜体使用单星号，删除线使用双波浪线，行内代码使用反引号。公式使用美元符或反斜杠括号；复杂公式宜继续使用独立 Equation。纯格式段落在可编辑 PPTX 模式中保留文字，含公式段落以独立 SVG 与高清 PNG 保存，并保留动画。")
+
+Slide(title: "位置、尺寸与缩放", eyebrow: "27 / POSITION + FRAME + SCALE", subtitle: "参考点、元素锚点、布局尺寸与缩放系数分别控制") {
+    ZStack {
+        Rectangle(fill: "#23796e", radius: 14)
+            .frame(width: 280, height: 140)
+            .position(x: 48, y: 48, reference: .bottomLeft, anchor: .bottomLeft)
+            .scale(1.4).appear(.rise, step: 1, duration: 600)
+        Text("scale 1.4").font(28).foreground("#ffffff")
+            .frame(width: 240, height: 50).position(x: 72, y: 100)
+            .appear(.fade, step: 1, duration: 600)
+        Circle(fill: "#d25649").frame(width: 10, height: 10)
+            .position(x: 48, y: 48, anchor: .center)
+        Caption("锚点 (48, 48)").frame(width: 300, height: 30).position(x: 48, y: 12)
+        VStack(spacing: 16) {
+            Heading("四个独立设置", level: 3)
+            Caption("参考点位于父容器内容区；正 x 向右，正 y 向上。").frame(height: 54)
+            Numbered(["frame：布局占位 280 × 140", "position：左下角向右 48、向上 48", "scale：呈现为 392 × 196"]).font(20)
+        }.frame(width: 460, height: 260).position(x: 620, y: 40)
+    }
+}.notes("frame 仅设置 width/height；position 默认以父内容区左下角为参考，x 向右、y 向上。reference 是参考区域上的点，anchor 是元素自身的点，默认与 reference 相同。scale 只改变最终呈现尺寸并保持锚点，不改变布局占位；嵌套缩放会合成。relativeTo: .slide 使用整个 1280×720 画布，即使上级缩放也保持画布参考点稳定。")
 
 `,
 );

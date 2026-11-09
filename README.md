@@ -58,7 +58,7 @@ npm test
 
 ## DSL
 
-详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；由本地专用解释器处理声明与受限计算，不执行 JavaScript。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。布局通过独立 Cover / Split / Cards / Flow 等组件组合，也可嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置；Columns / Rows 可按权重分配空间，Panel 和 Heading / Caption / Numbered / 图元等基础元素用于组合内容；`func` 可定义带默认参数、局部计算及 Content / Slot 插槽的自定义布局。文字使用有源码范围的行内 AST 识别粗体、斜体、删除线、代码及 LaTeX 公式；Code 块保持原样。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。标题、备注、布局、过渡和素材插入只改写对应源码片段；规范化格式是单独的显式操作。公式可用反引号原始字符串直接书写，如 ``Equation(`\frac{1}{n}`)``，无需双写反斜杠；三个反引号支持多行，旧的 `#"..."#` 语法继续兼容。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
+详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；由本地专用解释器处理声明与受限计算，不执行 JavaScript。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。布局通过独立 Cover / Split / Cards / Flow 等组件组合，也可嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置；位置使用 `.position()`，尺寸使用 `.frame()`，呈现缩放使用 `.scale()`，默认以父内容区左下角为参考；Columns / Rows 可按权重分配空间，Panel 和 Heading / Caption / Numbered / 图元等基础元素用于组合内容；`func` 可定义带默认参数、局部计算及 Content / Slot 插槽的自定义布局。文字使用有源码范围的行内 AST 识别粗体、斜体、删除线、代码及 LaTeX 公式；Code 块保持原样。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。标题、备注、布局、过渡和素材插入只改写对应源码片段；规范化格式是单独的显式操作。公式可用反引号原始字符串直接书写，如 ``Equation(`\frac{1}{n}`)``，无需双写反斜杠；三个反引号支持多行，旧的 `#"..."#` 语法继续兼容。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
 
 ```swift
 Deck("一个清晰的结论", author: "研究组")
@@ -88,6 +88,8 @@ Slide(title: "从直觉到证明") {
 - [File System Access API](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)：经用户选择后读写本地目录。
 - [PWA 安装条件](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)与 [Vite PWA 更新提示](https://vite-pwa-org.netlify.app/guide/prompt-for-update)：安装清单、离线缓存和用户确认后的版本更新。
 
+内测中的 `.frame(x:, y:)` 已拆为尺寸 `.frame()`、位置 `.position()` 和缩放 `.scale()`；旧写法会给出迁移提示，详见 [位置与迁移](docs/DSL.md#位置尺寸和缩放)。
+
 ## 开发与验证
 
 React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢量公式；PptxGenJS + JSZip 导出；IndexedDB 自动保存。无应用后端。
@@ -100,7 +102,7 @@ React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢�
 
 ## 初始功能示例
 
-首次启动打开 26 页「功能示例」。已有本地草稿优先恢复；通过「切换示例 → 功能示例」可打开新版示例，替换前仍可导出当前工程。
+首次启动打开 27 页「功能示例」。已有本地草稿优先恢复；通过「切换示例 → 功能示例」可打开新版示例，替换前仍可导出当前工程。
 
 - 1–8 页：八种独立布局、正文与引用、玻璃面板、指标、对比、里程碑和内嵌图片。
 - 9–12 页：组合容器、叠层与精确定位、LaTeX 分式/积分/矩阵/分段函数、代码和表格。
@@ -109,9 +111,10 @@ React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢�
 - 19–20 页：编辑、素材、工程保存与导出操作参考。
 - 21–25 页：基础元素、加权分栏和分区布局、参数化布局函数、Content 与 Slot 内容插槽。
 - 26 页：正文内公式、粗体、斜体、删除线、行内代码与转义。
+- 27 页：独立的布局尺寸、相对位置、参考点、自身锚点与缩放。
 
 每页备注解释对应源码与操作方式。PNG 图表随工程导出，不依赖远程地址；可选开发脚本 `python scripts/generate-example-chart.py` 重建图表源码（仅运行该脚本时需要 matplotlib 与 numpy，网站运行不需要 Python）。
 
 线上功能示例可直接通过 `/?example=features` 打开。此入口使用独立、按示例版本隔离的浏览器草稿，不会覆盖普通入口恢复的工作工程；在示例中进行的修改也会单独保存。普通首页默认恢复最近的工作工程，因此已保存的旧内容不会因网站发布而自动改变。
 
-新版功能示例的草稿独立保存于修订版 5；`/?example=features` 打开最新版，`/?example=features&revision=1`、`revision=2`、`revision=3` 或 `revision=4` 可恢复此前独立入口保存的对应草稿。普通首页的工作工程不受影响。
+新版功能示例的草稿独立保存于修订版 6；`/?example=features` 打开最新版，`/?example=features&revision=1`、`revision=2`、`revision=3` 、`revision=4` 或 `revision=5` 可恢复此前独立入口保存的对应草稿。普通首页的工作工程不受影响。

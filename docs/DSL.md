@@ -286,17 +286,57 @@ Heading 的 level 为 1–4，默认 2；Caption 默认使用主题次要文字�
 
 文字、列表等组件接受一个未命名内容参数；也可用命名参数 text，图片为 src，指标为 value，列表为 items，表格为 rows。可选 title 为块标题。
 
-| 通用修饰符                                       | 含义                          |
-| ------------------------------------------------ | ----------------------------- |
-| `.font(24)`                                      | 正文/指标字号；容器可传给后代 |
-| `.foreground("#16766d")`                         | 文字颜色，可继承              |
-| `.background("#eef2ef")`                         | 内容背景                      |
-| `.frame(width: 480, height: 320)`                | 固定尺寸，可单独设某一维      |
-| `.frame(x: 80, y: 250, width: 500, height: 300)` | 画布绝对定位                  |
-| `.padding(24)`                                   | 内容边界内缩                  |
-| `.title("标题")`                                 | 内容块标题                    |
+| 通用修饰符                                       | 含义                                   |
+| ------------------------------------------------ | -------------------------------------- |
+| `.font(24)`                                      | 正文/指标字号；容器可传给后代          |
+| `.foreground("#16766d")`                         | 文字颜色，可继承                       |
+| `.background("#eef2ef")`                         | 内容背景                               |
+| `.frame(width: 480, height: 320)`                | 固定尺寸，可单独设某一维               |
+| `.position(x: 24, y: 24)`                        | 相对父内容区左下角定位，x 向右、y 向上 |
+| `.position(reference: .center, anchor: .center)` | 对齐参考点与元素自身锚点               |
+| `.scale(1.5)`                                    | 缩放最终内容，布局占位保持不变         |
+| `.padding(24)`                                   | 内容边界内缩                           |
+| `.title("标题")`                                 | 内容块标题                             |
 
-画布固定 1280 × 720（16:9）；正文一般分配在 x≈72–1208、y≈250–620。坐标和尺寸均为非负像素。公式和图片等比包含在区域内，其大小由区域控制，font 不影响公式与图片。长文建议拆页；网页与 PPTX 按内容框裁切超长文字，不自动缩小字号。
+画布固定 1280 × 720（16:9）；正文一般分配在 x≈72–1208、y≈250–620。尺寸使用非负像素，position 的偏移可为负数。公式和图片等比包含在区域内，其大小由区域控制，font 不影响公式与图片。长文建议拆页；网页与 PPTX 按内容框裁切超长文字，不自动缩小字号。
+
+## 位置、尺寸和缩放
+
+三个修饰符各自控制独立属性；书写顺序不改变它们的组合结果，多次设置同一字段时以后一次为准。
+
+```swift
+ZStack {
+    Image("assets/plot.png")
+        .frame(width: 400, height: 200)
+        .position(x: 24, y: 24,
+                  reference: .bottomLeft, anchor: .bottomLeft)
+        .scale(1.5)
+}
+```
+
+上例布局占位为 400×200，呈现尺寸为 600×300，左下角保持在父内容区左下角向右 24、向上 24 的位置。图片继续在自己的内容框内等比完整显示。
+
+- `.frame(width:, height:)` 仅设置布局尺寸，未指定的维度由布局分配。
+- `.position(x:, y:, reference:, anchor:, relativeTo:)` 设置位置。偏移始终为 x 向右、y 向上，允许负数，与参考点的选择无关。x/y 默认 0，reference 默认 `.bottomLeft`，anchor 默认与 reference 一致。
+- reference 是参考区域上的点，anchor 是元素自身上的点，两者可分别设置。均支持 `.topLeft / .top / .topRight / .left / .center / .right / .bottomLeft / .bottom / .bottomRight`。
+- relativeTo 默认 `.parent`，参考直接父容器扣除卡片留白、padding 和块标题后的内容区；Slide 顶层参考正文区域。`.slide` 参考完整 1280×720 画布，即使父容器缩放也保持该画布参考点的位置。
+- `.scale(factor)` 为统一缩放，系数大于 0 且不超过 10。它缩放文字、图片、公式和容器后代的最终几何，不改变布局占位。存在 position 时围绕自身 anchor 缩放；没有 position 时围绕自身中心缩放。嵌套缩放相乘，父相对偏移也随父缩放。
+
+手动组合位置时推荐 ZStack。HStack / VStack 等布局仍按原始 frame 尺寸分配位置，放大后的内容可能与邻项重叠，需要调整占位或间距。网页与 PPTX 使用同一份最终几何，动画阶段、时长和源码定位继续保留。
+
+### 内测语法迁移
+
+旧 `.frame(x:, y:, ...)` 已移除，会提示改用 position。保持旧画布左上角坐标的通用迁移为：
+
+```swift
+// 原 .frame(x: 80, y: 250, width: 500, height: 300)
+Text("内容")
+    .frame(width: 500, height: 300)
+    .position(x: 80, y: -250,
+              reference: .topLeft, anchor: .topLeft, relativeTo: .slide)
+```
+
+若使用新的左下角默认参考点，上例也可写为 `.position(x: 80, y: 170, relativeTo: .slide)`，其中 `170 = 720 - 250 - 300`。工程源码不会被自动重写；旧草稿可以在 DSL 面板中迁移，或从新版功能示例开始。
 
 ## 导出与兼容性
 
