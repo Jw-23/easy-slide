@@ -2,7 +2,9 @@ import type { Deck } from "./dsl";
 import { showcaseDeck } from "./showcase";
 import { exampleAssets } from "./example-assets";
 export { showcaseDeck };
-import { serialize, withLayout } from "./dsl";
+import mathProofSource from "../docs/examples/math-proof.slide?raw";
+export { mathProofSource };
+import { serialize, withLayout, parseDeck } from "./dsl";
 export const mathDeck: Deck = {
   version: 1,
   title: "从局部，到无限",
@@ -332,5 +334,6 @@ export function exampleAssetsFor(deck: Deck): Record<string, string> {
   deck.slides.forEach((s) => collect(s.blocks));
   return result;
 }
+export const mathProofDeck = parseDeck(mathProofSource);
 export const initialSource = serialize(showcaseDeck);
 export const initialAssets = exampleAssetsFor(showcaseDeck);

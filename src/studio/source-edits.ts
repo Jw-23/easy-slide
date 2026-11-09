@@ -1,4 +1,5 @@
 import { layoutComponents, parseDeck, type Layout, type Slide } from "../dsl";
+import { sourcePages } from "./page-groups";
 import { readSyntax, type Call } from "../syntax";
 import { tokenize, type Token } from "../tokens";
 export type SlideEdit = Partial<
@@ -17,7 +18,7 @@ function splice(source: string, from: number, to: number, value: string) {
   return source.slice(0, from) + value + source.slice(to);
 }
 function slides(source: string) {
-  return readSyntax(source).children.filter((c) => c.name === "Slide");
+  return sourcePages(source).pages;
 }
 function selected(source: string, index: number) {
   const call = slides(source)[index];
@@ -113,6 +114,14 @@ function body(source: string, call: Call) {
 }
 export function setSlideLayout(source: string, index: number, layout: Layout) {
   const slide = selected(source, index);
+  const dynamic = parseDeck(source).slides[index].dynamic;
+  if (dynamic) {
+    if (!["content", "split"].includes(layout))
+      throw Error("自动续页支持单栏或双栏；其他布局请在 DSL 中编辑");
+    if (layout === "content" && dynamic.independentColumns)
+      throw Error("独立左右栏需在 DSL 中调整结构");
+    return named(source, slide, "columns", layout === "split" ? "2" : "1");
+  }
   if (slide.args.length) {
     const first = header(source, slide).args.find((a) => a[1]?.value !== ":")!;
     return splice(source, first[0].from, first.at(-1)!.to, `.${layout}`);
@@ -149,10 +158,12 @@ export function appendSlideBlocks(
 ) {
   const slide = selected(source, index);
   const container =
-    slide.children.length === 1 &&
+    slide.children.find((c) => c.name === "RightColumn") ||
+    slide.children.find((c) => c.name === "LeftColumn") ||
+    (slide.children.length === 1 &&
     Object.values(layoutComponents).includes(slide.children[0].name)
       ? slide.children[0]
-      : slide;
+      : slide);
   const bounds = body(source, container),
     inserted = declarations.map((s) => "    " + s).join("\n");
   if (!bounds) {
@@ -207,7 +218,8 @@ export function duplicateSlideSource(
 }
 export function deleteSlideSource(source: string, index: number) {
   const pages = slides(source);
-  if (pages.length <= 1) throw Error("工程至少保留一页");
+  if (new Set(pages.map((c) => c.from)).size <= 1)
+    throw Error("工程至少保留一页或一组动态页");
   return splice(source, pages[index].from, endOf(source, pages[index]), "");
 }
 export function moveSlideSource(
@@ -216,7 +228,14 @@ export function moveSlideSource(
   direction: -1 | 1,
 ) {
   const pages = slides(source),
-    target = index + direction;
+    start = pages[index];
+  let target = index + direction;
+  while (
+    target >= 0 &&
+    target < pages.length &&
+    pages[target].from === start.from
+  )
+    target += direction;
   if (target < 0 || target >= pages.length) return source;
   const a = pages[Math.min(index, target)],
     b = pages[Math.max(index, target)],

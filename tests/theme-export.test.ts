@@ -107,3 +107,39 @@ it("exports bottom-left positions and independent scale as native geometry with 
   expect(xml).toContain('nodeType="clickEffect"');
   expect(xml).toContain('dur="650"');
 });
+
+it("exports mathematical continuation pages, headings, step numbering, endings, notes and animations", async () => {
+  const d = parseDeck(`Deck("证明").transition(.slide,duration:550)
+    Theme(preset:.paper)
+    Slide(title:"证明") {
+      Proof {
+        ProofStep("前半",reason:"初始条件"){Text("第一段").appear(.rise,step:1,duration:430)}
+        PageBreak()
+        ProofStep("后半",reason:"归纳假设"){Equation(\`a=b\`).appear(.fade,step:1,duration:610)}
+      }
+    }.notes("证明的演讲备注")`);
+  const zip = await JSZip.loadAsync(
+    await (await buildPptx(d, {}, { textMode: "editable" })).arrayBuffer(),
+  );
+  const slideFiles = Object.keys(zip.files).filter((name) =>
+    /^ppt\/slides\/slide\d+\.xml$/.test(name),
+  );
+  expect(slideFiles).toHaveLength(2);
+  const first = await zip.file(slideFiles[0])!.async("string"),
+    last = await zip.file(slideFiles[1])!.async("string");
+  expect(first).toContain("步骤 1 · 前半");
+  expect(first).toContain("依据：初始条件");
+  expect(first).not.toContain("∎");
+  expect(last).toContain("步骤 2 · 后半");
+  expect(last).toContain("证明（续）");
+  expect(last).toContain("∎");
+  expect(first).toContain('dur="430"');
+  expect(last).toContain('dur="610"');
+  for (const [i, xml] of [first, last].entries()) {
+    expect(xml).toContain('nodeType="clickEffect"');
+    expect(xml).toContain("p:transition");
+    expect(
+      await zip.file(`ppt/notesSlides/notesSlide${i + 1}.xml`)!.async("string"),
+    ).toContain("证明的演讲备注");
+  }
+});

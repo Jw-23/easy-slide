@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { SlideView } from "../SlideView";
+import { pageGroup } from "../studio/page-groups";
 import { layoutLabels, pageLayout } from "../dsl";
 import type { Studio } from "../studio/use-studio";
 export function SlideNavigator({
@@ -19,7 +20,9 @@ export function SlideNavigator({
   onContextMenu?: (event: React.MouseEvent, page: number) => void;
 }) {
   const [query, setQuery] = useState("");
-  const list = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null),
+    group = pageGroup(s.deck, s.active),
+    dynamic = !!s.slide.dynamic;
   const pages = s.deck.slides
     .map((slide, index) => ({ slide, index }))
     .filter(({ slide, index }) =>
@@ -120,7 +123,11 @@ export function SlideNavigator({
             </div>
             <div className="slide-label">
               {slide.title.replaceAll("\n", " ")}
-              <small>{layoutLabels[pageLayout(slide)]}</small>
+              <small>
+                {slide.dynamic
+                  ? `自动续页 ${slide.dynamic.part + 1}/${slide.dynamic.total} · ${slide.dynamic.columns}栏`
+                  : layoutLabels[pageLayout(slide)]}
+              </small>
             </div>
           </button>
         ))}
@@ -129,23 +136,23 @@ export function SlideNavigator({
       <div className="slide-actions" aria-label="页面操作">
         <button
           className="icon-button"
-          aria-label="上移此页"
-          disabled={!s.editable || s.active === 0}
+          aria-label={dynamic ? "上移动态页组" : "上移此页"}
+          disabled={!s.editable || group.first === 0}
           onClick={() => s.move(-1)}
         >
           <ArrowUp size={15} />
         </button>
         <button
           className="icon-button"
-          aria-label="下移此页"
-          disabled={!s.editable || s.active === s.deck.slides.length - 1}
+          aria-label={dynamic ? "下移动态页组" : "下移此页"}
+          disabled={!s.editable || group.last === s.deck.slides.length - 1}
           onClick={() => s.move(1)}
         >
           <ArrowDown size={15} />
         </button>
         <button
           className="icon-button"
-          aria-label="复制此页"
+          aria-label={dynamic ? "复制动态页组" : "复制此页"}
           disabled={!s.editable || s.deck.slides.length >= 200}
           onClick={s.duplicate}
         >
@@ -153,8 +160,8 @@ export function SlideNavigator({
         </button>
         <button
           className="icon-button danger"
-          aria-label="删除此页"
-          disabled={!s.editable || s.deck.slides.length <= 1}
+          aria-label={dynamic ? "删除动态页组" : "删除此页"}
+          disabled={!s.editable || group.count === s.deck.slides.length}
           onClick={s.remove}
         >
           <Trash2 size={15} />

@@ -1,3 +1,5 @@
+import { contentHeight, mathMetrics, textHeight } from "./content-measure";
+import { mathHeading, proofEnds } from "./math-environments";
 import { parseRichText, type RichDocument } from "./rich-text";
 import type { SceneTarget } from "./studio/source-map";
 import { resolveTheme, headerText } from "./themes";
@@ -64,20 +66,23 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
   }
   const intrinsic = (b: Block): number | undefined =>
     b.h ??
-    (b.type === "divider"
-      ? Math.max(16, (b.thickness ?? 2) + 12)
-      : b.type === "heading"
-        ? (b.size ?? [44, 32, 26, 21][(b.level ?? 2) - 1]) * TEXT_LINE_HEIGHT +
-          8
-        : b.type === "caption"
-          ? 36
-          : b.type === "badge"
-            ? 42
-            : b.type === "progress"
-              ? b.label || b.showValue !== false
-                ? 76
-                : 36
-              : undefined);
+    (b.type === "math"
+      ? contentHeight(b, 1132, theme.font, 22)
+      : b.type === "divider"
+        ? Math.max(16, (b.thickness ?? 2) + 12)
+        : b.type === "heading"
+          ? (b.size ?? [44, 32, 26, 21][(b.level ?? 2) - 1]) *
+              TEXT_LINE_HEIGHT +
+            8
+          : b.type === "caption"
+            ? 36
+            : b.type === "badge"
+              ? 42
+              : b.type === "progress"
+                ? b.label || b.showValue !== false
+                  ? 76
+                  : 36
+                : undefined);
 
   let activeMotion: Motion | undefined,
     activeKey: string | undefined,
@@ -309,7 +314,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     if (b.type === "panel" && !b.glass)
       rect(x, y, w, h, b.fill || panel, b.radius ?? theme.radius, step);
     const padding =
-      b.padding ??
+      (b.type === "math" ? 0 : b.padding) ??
       (b.type === "panel" ? 24 : b.type === "glass" && !card ? 28 : 0);
     if (padding) {
       x += padding;
@@ -317,11 +322,145 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       w = Math.max(0, w - 2 * padding);
       h = Math.max(0, h - 2 * padding);
     }
-    if (b.title) {
+    if (b.title && b.type !== "math") {
       text(b.title, x, y, w, 44, 23, c, true, step);
       y += 54;
       h -= 54;
     }
+    if (b.type === "math") {
+      const m = mathMetrics(b, w, theme.font, b.size ?? 22),
+        children = b.children || [],
+        gap = b.gap ?? 18,
+        plain = [
+          "Proof",
+          "Solution",
+          "Derivation",
+          "Reasoning",
+          "ProofStep",
+        ].includes(b.environment || "");
+      if (!b.glass && (!plain || b.fill))
+        rect(x, y, w, h, b.fill || panel, b.radius ?? 14, step);
+      rect(x, y, plain ? 2 : 4, h, accent, 1, step);
+      const innerX = x + m.pad + 4,
+        innerY = y + m.pad + m.heading + 12;
+      text(
+        mathHeading(b),
+        innerX,
+        y + m.pad,
+        m.inner,
+        m.heading,
+        m.size,
+        c,
+        true,
+        step,
+      );
+      let cursor = innerY;
+      if (b.text) {
+        text(
+          b.text,
+          innerX,
+          cursor,
+          m.inner,
+          m.body - 12,
+          m.size,
+          c,
+          false,
+          step,
+        );
+        cursor += m.body;
+      }
+      children.forEach((child, i) => {
+        const ch = contentHeight(child, m.inner, theme.font, m.size);
+        block(
+          {
+            ...child,
+            size: child.size ?? m.size,
+            color: child.color || b.color,
+            step: Math.max(step, child.step || 0),
+            ...(b.stagger !== undefined
+              ? {
+                  appear: {
+                    ...(child.appear ||
+                      activeMotion || { effect: "rise" as const }),
+                    delay:
+                      (child.appear?.delay ?? activeMotion?.delay ?? 0) +
+                      i * b.stagger,
+                  },
+                }
+              : {}),
+          },
+          innerX,
+          cursor,
+          m.inner,
+          ch,
+          false,
+          [...(activeSource.scope === "block" ? activeSource.path : []), i],
+          {
+            x: innerX,
+            y: innerY,
+            w: m.inner,
+            h: Math.max(0, h - m.pad - (innerY - y) - m.reason - m.footer),
+          },
+        );
+        cursor += ch + (i < children.length - 1 ? gap : 0);
+      });
+      if (b.reason) {
+        cursor += 10;
+        text(
+          "依据：" + b.reason,
+          innerX,
+          cursor,
+          m.inner,
+          m.reason - 10,
+          Math.max(15, m.size - 4),
+          muted,
+          false,
+          step,
+        );
+        cursor += m.reason - 10;
+      }
+      if (proofEnds(b)) {
+        const lastStep = (nodes: Block[]): number =>
+          Math.max(
+            step,
+            ...nodes.map((n) =>
+              Math.max(n.step || 0, lastStep(n.children || [])),
+            ),
+          );
+        const closingStep = lastStep(children),
+          previousMotion = activeMotion,
+          previousKey = activeKey;
+        activeMotion = {
+          effect: "fade",
+          duration: 180,
+          order:
+            1 +
+            Math.max(
+              -1,
+              ...e
+                .filter((el) => el.step === closingStep && el.motionKey)
+                .map((el) => el.appear?.order ?? 0),
+            ),
+        };
+        activeKey = "motion-qed-" + counter++;
+        text(
+          "∎",
+          innerX,
+          cursor + 6,
+          m.inner,
+          24,
+          20,
+          accent,
+          true,
+          closingStep,
+        );
+        e[e.length - 1].align = "right";
+        activeMotion = previousMotion;
+        activeKey = previousKey;
+      }
+      return;
+    }
+    if (b.type === "pageBreak" || b.type === "columnBreak") return;
     if (b.type === "spacer") return;
     if (b.type === "heading" || b.type === "caption") {
       text(
@@ -449,6 +588,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         "panel",
         "columns",
         "rows",
+        "columnFlow",
       ].includes(b.type)
     ) {
       const children = b.children || [],
@@ -593,7 +733,11 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
                 String(items.length).length * (b.size || 23) * 0.65 + 14,
               )
             : 23;
+      let itemY = y;
       items.forEach((item, i) => {
+        const rowHeight = b.measured
+          ? textHeight(item, Math.max(1, w - 40), b.size || 23, theme.font) + 10
+          : gap;
         const oldMotion = activeMotion,
           oldKey = activeKey;
         if (b.stagger !== undefined) {
@@ -605,28 +749,29 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         }
         if (b.type === "numbered")
           text(
-            `${i + 1}.`,
+            `${i + (b.start ?? 1)}.`,
             x,
-            y + i * gap,
+            itemY,
             markerWidth - 6,
-            Math.max(0, gap - 5),
+            Math.max(0, rowHeight - 5),
             b.size || 23,
             accent,
             true,
             step,
           );
-        else rect(x, y + i * gap + 11, 6, 6, accent, 3, step);
+        else rect(x, itemY + 11, 6, 6, accent, 3, step);
         text(
           item,
           x + markerWidth,
-          y + i * gap,
+          itemY,
           Math.max(0, w - markerWidth),
-          Math.max(0, gap - 5),
+          Math.max(0, rowHeight - 5),
           b.size || 23,
           c,
           false,
           step,
         );
+        itemY += rowHeight;
         activeMotion = oldMotion;
         activeKey = oldKey;
       });

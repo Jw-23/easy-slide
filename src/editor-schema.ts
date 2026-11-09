@@ -1,3 +1,4 @@
+import { mathEnvironments } from "./math-environments";
 import { themeIds } from "./themes";
 import {
   effects,
@@ -47,7 +48,7 @@ export function typeLabel(t: ValueType): string {
       string: "String",
       boolean: "Bool",
       null: "Null",
-      unknown: "未知",
+      unknown: "Unknown",
       column: "Column",
       component: t.name ?? "View",
     } as Record<string, string>
@@ -114,11 +115,11 @@ const named = (
   detail: string,
   extra: Partial<ParameterSpec> = {},
 ) => p(name, type, detail, { named: true, optional: true, ...extra });
-const color = (name: string, detail = "六位十六进制颜色") =>
+const color = (name: string, detail = "Six-digit hexadecimal color") =>
   named(name, string, detail, { stringKind: "color", snippet: '"${#23786b}"' });
 const ms = (name: string, detail: string) =>
-  named(name, number, detail + "，单位毫秒");
-const spacing = named("spacing", number, "子项间距，像素");
+  named(name, number, detail + ", in milliseconds");
+const spacing = named("spacing", number, "Child spacing in pixels");
 const enumParam = (
   name: string,
   values: readonly string[],
@@ -127,15 +128,19 @@ const enumParam = (
 ) =>
   p(name, string, detail, { named: isNamed, optional: isNamed, enums: values });
 const tableParams = [
-  named("header", boolean, "是否显示表头", { snippet: "${true}" }),
-  named("rowHeight", number, "行高，像素"),
-  named("zebra", boolean, "交替行底色", { snippet: "${true}" }),
-  enumParam("borders", ["none", "horizontal", "all"], "无边框、横线或完整网格"),
-  color("headerFill", "表头底色"),
-  color("headerColor", "表头文字色"),
-  color("stripeColor", "交替行底色"),
-  color("borderColor", "边框颜色"),
-  named("cellPadding", number, "单元格内边距，像素"),
+  named("header", boolean, "Show the header row", { snippet: "${true}" }),
+  named("rowHeight", number, "Row height in pixels"),
+  named("zebra", boolean, "Alternating row fill", { snippet: "${true}" }),
+  enumParam(
+    "borders",
+    ["none", "horizontal", "all"],
+    "No borders, horizontal lines, or full grid",
+  ),
+  color("headerFill", "Header fill"),
+  color("headerColor", "Header text color"),
+  color("stripeColor", "Alternating row fill"),
+  color("borderColor", "Border color"),
+  named("cellPadding", number, "Cell padding in pixels"),
 ];
 export const signatures = new Map<string, Signature>();
 function add(
@@ -160,34 +165,34 @@ function add(
 add(
   "Deck",
   "root",
-  "工程配置，与 Slide 并列书写",
+  "Document settings, declared alongside Slide",
   [
-    p("名称", string, "工程名称"),
-    named("author", string, "作者"),
-    named("version", number, "工程格式版本，目前为 1"),
+    p("Name", string, "Document title"),
+    named("author", string, "Author"),
+    named("version", number, "Document format version, currently 1"),
   ],
-  'Deck("${名称}", author: "${作者}")',
+  'Deck("${Name}", author: "${Author}")',
 );
 add(
   "Theme",
   "root",
-  "全局主题，预设可叠加自定义颜色、字体与材质",
+  "Global theme with optional color, font, and material overrides",
   [
-    enumParam("preset", [...themeIds], "内置主题"),
+    enumParam("preset", [...themeIds], "Built-in theme preset"),
     color("accent"),
     color("background"),
     color("color"),
-    named("font", string, "字体名称"),
-    enumParam("material", ["glass", "solid"], "默认面板材质"),
+    named("font", string, "Font family"),
+    enumParam("material", ["glass", "solid"], "Default panel material"),
   ],
   "Theme(preset: .${aurora})",
 );
 add(
   "Slide",
   "root",
-  "页面，布局由子组件定义",
+  "Slide with layout defined by child components",
   [
-    p("布局", string, "兼容旧版布局；推荐省略并添加布局组件", {
+    p("Layout", string, "Legacy layout; prefer dedicated layout components", {
       optional: true,
       enums: layouts,
     }),
@@ -197,27 +202,29 @@ add(
         string,
         (
           {
-            title: "页标题",
-            subtitle: "副标题",
-            eyebrow: "引题",
-            notes: "演讲备注",
-            id: "页面标识",
+            title: "Slide title",
+            subtitle: "Subtitle",
+            eyebrow: "Eyebrow",
+            notes: "Speaker notes",
+            id: "Slide identifier",
           } as Record<string, string>
         )[name],
         { optional: name !== "title" },
       ),
     ),
   ],
-  'Slide(title: "${标题}") {\n    ${}\n}',
+  'Slide(title: "${Title}") {\n    ${}\n}',
 );
 for (const [preset, name] of Object.entries(layoutComponents))
   add(
     name,
     "container",
-    "独立布局 · " + preset,
+    "Layout component: " + preset,
     [
       spacing,
-      ...(name === "Cards" ? [named("columns", number, "列数，1–12")] : []),
+      ...(name === "Cards"
+        ? [named("columns", number, "Column count, 1–12")]
+        : []),
     ],
     name + " {\n    ${}\n}",
   );
@@ -227,34 +234,36 @@ for (const name of ["HStack", "VStack", "ZStack", "Grid", "Glass"])
     "container",
     (
       {
-        HStack: "水平布局",
-        VStack: "垂直布局",
-        ZStack: "叠层布局",
-        Grid: "网格布局",
-        Glass: "毛玻璃内容面板",
+        HStack: "Horizontal stack",
+        VStack: "Vertical stack",
+        ZStack: "Layered stack",
+        Grid: "Grid layout",
+        Glass: "Frosted glass panel",
       } as Record<string, string>
     )[name],
     [
-      ...(name === "Grid" ? [named("columns", number, "列数，1–12")] : []),
+      ...(name === "Grid"
+        ? [named("columns", number, "Column count, 1–12")]
+        : []),
       spacing,
     ],
     name + " {\n    ${}\n}",
   );
 for (const [name, description, field, type, template, kind] of [
-  ["Text", "正文文字", "text", string, '"${正文}"', undefined],
+  ["Text", "Body text", "text", string, '"${Body}"', undefined],
   [
     "Bullets",
-    "项目列表",
+    "Bulleted list",
     "items",
     array(string),
-    '["${要点一}", "${要点二}"]',
+    '["${First point}", "${Second point}"]',
     undefined,
   ],
-  ["Equation", "LaTeX 公式", "text", string, "`${E = mc^2}`", "latex"],
-  ["Image", "工程内图片", "src", string, '"${assets/image.png}"', "asset"],
-  ["Metric", "醒目指标", "value", string, '"${99.95%}"', undefined],
-  ["Quote", "引用文字", "text", string, '"${引用}"', undefined],
-  ["Code", "等宽代码块", "text", string, '"${代码}"', undefined],
+  ["Equation", "LaTeX equation", "text", string, "`${E = mc^2}`", "latex"],
+  ["Image", "Project image", "src", string, '"${assets/image.png}"', "asset"],
+  ["Metric", "Key metric", "value", string, '"${99.95%}"', undefined],
+  ["Quote", "Quotation", "text", string, '"${Quote}"', undefined],
+  ["Code", "Monospaced code block", "text", string, '"${Code}"', undefined],
 ] as const)
   add(
     name,
@@ -263,42 +272,54 @@ for (const [name, description, field, type, template, kind] of [
     [
       p(field, type, description, { stringKind: kind }),
       named(field, type, description, { stringKind: kind }),
-      named("title", string, "块标题"),
+      named("title", string, "Block title"),
       ...(name === "Metric"
         ? [
-            named("label", string, "指标说明"),
-            named("text", string, "补充说明"),
+            named("label", string, "Metric label"),
+            named("text", string, "Additional description"),
           ]
         : []),
     ],
-    `${name}(${template}${name === "Metric" ? ', label: "${可用性}"' : ""})`,
+    `${name}(${template}${name === "Metric" ? ', label: "${Availability}"' : ""})`,
   );
-add("Spacer", "view", "留白", [], "Spacer");
+add("Spacer", "view", "Flexible space", [], "Spacer");
 const cell: ValueType = union([number, string, boolean, { kind: "null" }]);
 add(
   "Table",
   "view",
-  "数据表格，支持 DSL 计算结果",
+  "Data table supporting computed DSL values",
   [
-    p("rows", array(array(cell)), "二维单元格数据", { optional: true }),
-    named("rows", array(array(cell)), "二维数据，可使用计算结果"),
-    named("columns", array(column), "Column 列定义数组"),
-    named("headers", array(string), "表头文字数组"),
+    p("rows", array(array(cell)), "Two-dimensional cell data", {
+      optional: true,
+    }),
+    named(
+      "rows",
+      array(array(cell)),
+      "Two-dimensional data, including computed values",
+    ),
+    named("columns", array(column), "Array of Column definitions"),
+    named("headers", array(string), "Header labels"),
     ...tableParams,
   ],
-  'Table(columns: [Column("${列一}")], rows: [[${1}]])',
+  'Table(columns: [Column("${Column 1}")], rows: [[${1}]])',
 );
 add(
   "Column",
   "calculation",
-  "列标题、宽度权重、对齐和数字格式",
+  "Column label, width weight, alignment, and number format",
   [
-    p("标题", string, "列标题"),
-    named("width", number, "正数宽度权重"),
-    enumParam("align", ["left", "center", "right"], "单元格水平对齐"),
-    named("format", string, "如 0.000 或 0.0%", { stringKind: "format" }),
+    p("Title", string, "Column label"),
+    named("width", number, "Positive width weight"),
+    enumParam(
+      "align",
+      ["left", "center", "right"],
+      "Horizontal cell alignment",
+    ),
+    named("format", string, "For example, 0.000 or 0.0%", {
+      stringKind: "format",
+    }),
   ],
-  'Column("${标题}", width: ${1}, align: .${right}, format: "${0.00}")',
+  'Column("${Title}", width: ${1}, align: .${right}, format: "${0.00}")',
   column,
 );
 for (const name of ["Heading", "Caption", "Badge"]) {
@@ -306,77 +327,81 @@ for (const name of ["Heading", "Caption", "Badge"]) {
     name,
     "view",
     (
-      { Heading: "分级标题", Caption: "说明文字", Badge: "徽标" } as Record<
+      { Heading: "Heading", Caption: "Caption", Badge: "Badge" } as Record<
         string,
         string
       >
     )[name],
     [
-      p("text", string, "文字"),
-      named("text", string, "文字"),
-      ...(name === "Heading" ? [named("level", number, "标题层级 1–4")] : []),
+      p("text", string, "Text"),
+      named("text", string, "Text"),
+      ...(name === "Heading"
+        ? [named("level", number, "Heading level, 1–4")]
+        : []),
       ...(name === "Badge"
-        ? [color("fill"), named("radius", number, "圆角")]
+        ? [color("fill"), named("radius", number, "Corner radius")]
         : []),
     ],
-    `${name}("\${内容}"${name === "Heading" ? ", level: 2" : ""})`,
+    `${name}("\${Content}"${name === "Heading" ? ", level: 2" : ""})`,
   );
 }
 add(
   "Numbered",
   "view",
-  "编号列表",
-  [p("items", array(string), "条目"), named("items", array(string), "条目")],
-  'Numbered(["\${第一步}", "\${第二步}"])',
+  "Numbered list",
+  [p("items", array(string), "Items"), named("items", array(string), "Items")],
+  'Numbered(["\${First step}", "\${Second step}"])',
 );
 for (const name of ["Rectangle", "Circle"])
   add(
     name,
     "view",
-    name === "Circle" ? "圆形" : "矩形",
+    name === "Circle" ? "Circle" : "Rectangle",
     [
       color("fill"),
-      ...(name === "Rectangle" ? [named("radius", number, "圆角")] : []),
+      ...(name === "Rectangle"
+        ? [named("radius", number, "Corner radius")]
+        : []),
     ],
     `${name}(fill: "\${#23796e}").frame(width: 100, height: 100)`,
   );
 add(
   "Divider",
   "view",
-  "分隔线",
+  "Divider",
   [
-    enumParam("direction", ["horizontal", "vertical"], "方向"),
-    named("thickness", number, "线宽 0–100"),
+    enumParam("direction", ["horizontal", "vertical"], "Direction"),
+    named("thickness", number, "Line thickness, 0–100"),
   ],
   "Divider(thickness: \${2})",
 );
 add(
   "Progress",
   "view",
-  "进度条",
+  "Progress bar",
   [
-    p("value", number, "进度 0–1"),
-    named("value", number, "进度 0–1"),
-    named("label", string, "说明"),
-    named("showValue", boolean, "显示百分比"),
+    p("value", number, "Progress, 0–1"),
+    named("value", number, "Progress, 0–1"),
+    named("label", string, "Description"),
+    named("showValue", boolean, "Show percentage"),
     color("fill"),
   ],
-  'Progress(\${0.75}, label: "\${完成度}")',
+  'Progress(\${0.75}, label: "\${Completion}")',
 );
 for (const name of ["Columns", "Rows"])
   add(
     name,
     "container",
-    "按权重分配空间",
+    "Distribute space by weight",
     [
       spacing,
-      named("weights", array(number), "每个内容的正数权重"),
+      named("weights", array(number), "Positive weight for each child"),
       enumParam(
         "alignment",
         name === "Columns"
           ? ["top", "center", "bottom"]
           : ["leading", "center", "trailing"],
-        "交叉轴对齐",
+        "Cross-axis alignment",
       ),
     ],
     `${name}(weights: [1, 2], spacing: 24) {\n    \${}\n}`,
@@ -384,17 +409,92 @@ for (const name of ["Columns", "Rows"])
 add(
   "Panel",
   "container",
-  "实色面板",
-  [color("fill"), named("radius", number, "圆角")],
+  "Solid panel",
+  [color("fill"), named("radius", number, "Corner radius")],
   "Panel {\n    \${}\n}",
 );
-add("Content", "container", "函数中放置所有剩余传入内容", [], "Content()");
+add(
+  "Content",
+  "container",
+  "Insert all remaining supplied content",
+  [],
+  "Content()",
+);
 add(
   "Slot",
   "container",
-  "函数中放置指定序号内容",
-  [p("index", number, "从 0 开始的内容序号")],
+  "Insert supplied content at the given index",
+  [p("index", number, "Zero-based content index")],
   "Slot(\${0})",
+);
+
+for (const name of Object.keys(mathEnvironments))
+  add(
+    name,
+    "container",
+    name + " environment; automatically continues within a regular Slide",
+    [
+      p("title", string, "Environment title", { optional: true }),
+      named("title", string, "Environment title"),
+      named("text", string, "Body text with inline math support"),
+      named("number", union([string, number]), "Custom number"),
+      named("numbered", boolean, "Enable numbering"),
+      named("reason", string, "Reasoning justification"),
+      named("qed", boolean, "Show the QED symbol at the end of Proof"),
+      named(
+        "keepTogether",
+        boolean,
+        "Keep the entire environment in one column",
+      ),
+      spacing,
+    ],
+    name + '("${Title}") {\n    Text(`${Body}`)\n}',
+  );
+for (const name of ["LeftColumn", "RightColumn"])
+  add(
+    name,
+    "container",
+    "Independent content flow in a two-column slide",
+    [named("repeat", boolean, "Repeat this column on continuation slides")],
+    name + " {\n    ${}\n}",
+  );
+for (const name of ["PageBreak", "ColumnBreak"])
+  add(
+    name,
+    "view",
+    name === "PageBreak" ? "Start a new page" : "Start a new column",
+    [],
+    name + "()",
+  );
+add(
+  "DynamicSlide",
+  "root",
+  "Automatically paginate content into one or two columns",
+  [
+    ...["title", "subtitle", "eyebrow", "notes", "id"].map((n) =>
+      named(n, string, "Slide " + n),
+    ),
+    named("columns", number, "One or two columns"),
+    spacing,
+    named("fontSize", number, "Default body font size, 16–40"),
+    named("maxPages", number, "Maximum generated pages, 1–200"),
+  ],
+  'DynamicSlide(title: "${Proof}", columns: 2) {\n    LeftColumn(repeat: true) { Theorem("${Conclusion}") { Text(`${Statement}`) } }\n    RightColumn { Proof { ProofStep("${First step}") { Text(`${Reasoning}`) } } }\n}',
+);
+signatures
+  .get("Numbered")!
+  .params.push(named("start", number, "Starting number, defaults to 1"));
+const slideSpec = signatures.get("Slide")!;
+slideSpec.params.push(
+  spacing,
+  named(
+    "autoPages",
+    boolean,
+    "Math environments paginate automatically; false enables manual layout",
+  ),
+  named("columns", number, "Automatic flow column count, 1 or 2"),
+  named("fontSize", number, "Default font size for automatic flow"),
+  named("maxPages", number, "Maximum page count"),
 );
 const views = [...signatures.values()]
   .filter(
@@ -406,42 +506,60 @@ const views = [...signatures.values()]
 add(
   "transition",
   "modifier",
-  "页面过渡",
+  "Slide transition",
   [
-    enumParam("effect", ["fade", "slide", "zoom", "none"], "过渡效果", false),
-    ms("duration", "持续时间"),
-    enumParam("direction", ["left", "right", "up", "down"], "移动方向"),
-    enumParam("easing", easings, "缓动曲线"),
+    enumParam(
+      "effect",
+      ["fade", "slide", "zoom", "none"],
+      "Transition effect",
+      false,
+    ),
+    ms("duration", "Duration"),
+    enumParam(
+      "direction",
+      ["left", "right", "up", "down"],
+      "Movement direction",
+    ),
+    enumParam("easing", easings, "Easing curve"),
   ],
   "transition(.${slide}, duration: ${650}, direction: .${left}, easing: .${easeOut})",
   unknown,
-  ["Deck", "Slide"],
+  ["Deck", "Slide", "DynamicSlide"],
 );
 add(
   "appear",
   "modifier",
-  "入场编排",
+  "Entrance animation",
   [
-    enumParam("effect", effects, "入场效果", false),
-    named("step", number, "点击阶段，0 为进入页面时，1–30 为点击阶段"),
-    named("order", number, "同一点击阶段内的顺序，相同值并行"),
-    ms("delay", "启动延迟"),
-    ms("duration", "持续时间"),
-    enumParam("easing", easings, "缓动曲线"),
+    enumParam("effect", effects, "Entrance effect", false),
+    named("step", number, "Animation step: 0 on slide entry, 1–30 on clicks"),
+    named(
+      "order",
+      number,
+      "Order within a click step; equal values run in parallel",
+    ),
+    ms("delay", "Start delay"),
+    ms("duration", "Duration"),
+    enumParam("easing", easings, "Easing curve"),
   ],
   "appear(.${rise}, step: ${1}, order: ${0}, delay: ${0}, duration: ${600}, easing: .${easeOut})",
   unknown,
   views,
 );
 for (const [name, type, detail, snippet] of [
-  ["font", number, "文字大小，像素", "font(${24})"],
-  ["foreground", string, "文字颜色", 'foreground("${#16766d}")'],
-  ["background", string, "背景颜色", 'background("${#eef2ef}")'],
-  ["padding", number, "内边距，像素", "padding(${24})"],
-  ["title", string, "块标题", 'title("${标题}")'],
-  ["notes", string, "页面演讲备注", 'notes("${演讲思路}")'],
-  ["step", number, "点击阶段，0–30", "step(${1})"],
-  ["stagger", number, "子项交错间隔，毫秒", "stagger(${120})"],
+  ["font", number, "Font size in pixels", "font(${24})"],
+  ["foreground", string, "Text color", 'foreground("${#16766d}")'],
+  ["background", string, "Background color", 'background("${#eef2ef}")'],
+  ["padding", number, "Padding in pixels", "padding(${24})"],
+  ["title", string, "Block title", 'title("${Title}")'],
+  ["notes", string, "Slide speaker notes", 'notes("${Speaker notes}")'],
+  ["step", number, "Click step, 0–30", "step(${1})"],
+  [
+    "stagger",
+    number,
+    "Child stagger interval in milliseconds",
+    "stagger(${120})",
+  ],
 ] as const)
   add(
     name,
@@ -457,7 +575,7 @@ for (const [name, type, detail, snippet] of [
     snippet,
     unknown,
     name === "notes"
-      ? ["Slide"]
+      ? ["Slide", "DynamicSlide"]
       : name === "stagger"
         ? [
             "Bullets",
@@ -465,22 +583,24 @@ for (const [name, type, detail, snippet] of [
             ...views.filter((v) => signatures.get(v)?.category === "container"),
           ]
         : ["foreground", "background"].includes(name)
-          ? ["Slide", ...views]
+          ? ["Slide", "DynamicSlide", ...views]
           : views,
   );
 add(
   "frame",
   "modifier",
-  "布局尺寸，像素；位置使用 position，缩放使用 scale",
+  "Layout size in pixels; use position for placement and scale for visual scaling",
   ["width", "height"].map((n) =>
     named(
       n,
       number,
       (
-        { x: "横坐标", y: "纵坐标", width: "宽度", height: "高度" } as Record<
-          string,
-          string
-        >
+        {
+          x: "X coordinate",
+          y: "Y coordinate",
+          width: "Width",
+          height: "Height",
+        } as Record<string, string>
       )[n],
     ),
   ),
@@ -491,20 +611,24 @@ add(
 add(
   "position",
   "modifier",
-  "参考点与自身锚点分开；x 向右，y 向上，默认父内容区左下角",
+  "Separate reference point and element anchor; x points right, y up; defaults to the parent bottom-left",
   [
-    named("x", number, "向右偏移，可为负数"),
-    named("y", number, "向上偏移，可为负数"),
-    enumParam("reference", positionAnchors, "参考区域上的点，默认 bottomLeft"),
+    named("x", number, "Rightward offset; may be negative"),
+    named("y", number, "Upward offset; may be negative"),
+    enumParam(
+      "reference",
+      positionAnchors,
+      "Point on the reference area; defaults to bottomLeft",
+    ),
     enumParam(
       "anchor",
       positionAnchors,
-      "元素自身的锚点，默认与 reference 一致",
+      "Element anchor; defaults to reference",
     ),
     enumParam(
       "relativeTo",
       positionReferences,
-      "参考父内容区或整个画布，默认 parent",
+      "Reference the parent content area or slide; defaults to parent",
     ),
   ],
   "position(x: ${24}, y: ${24}, reference: .${bottomLeft}, anchor: .${bottomLeft})",
@@ -514,8 +638,8 @@ add(
 add(
   "scale",
   "modifier",
-  "呈现缩放系数，大于 0 且不超过 10；不改变布局占位",
-  [p("factor", number, "统一缩放系数")],
+  "Visual scale factor, greater than 0 and at most 10; does not change layout size",
+  [p("factor", number, "Uniform scale factor")],
   "scale(${1.2})",
   unknown,
   views,
@@ -524,11 +648,11 @@ add(
 add(
   "glass",
   "modifier",
-  "毛玻璃材质",
+  "Frosted glass material",
   [
-    named("blur", number, "模糊半径，0–80"),
-    named("opacity", number, "透明度，0–1"),
-    named("radius", number, "圆角，0–100"),
+    named("blur", number, "Blur radius, 0–80"),
+    named("opacity", number, "Opacity, 0–1"),
+    named("radius", number, "Corner radius, 0–100"),
   ],
   "glass(blur: ${24}, opacity: ${0.68}, radius: ${28})",
   unknown,
@@ -537,7 +661,7 @@ add(
 add(
   "tableStyle",
   "modifier",
-  "表格样式",
+  "Table style",
   tableParams,
   'tableStyle(zebra: ${true}, borders: .${horizontal}, headerFill: "${#23796e}")',
   unknown,
@@ -546,97 +670,117 @@ add(
 const specs: Record<string, [ParameterSpec[], ValueType, string, string?]> = {
   range: [
     [
-      p("start", number, "起点；只给一个参数时它表示终点"),
-      p("end", number, "终点，不包含", { optional: true }),
-      p("step", number, "非零步长，默认 1", { optional: true }),
+      p("start", number, "Start; a single argument specifies the end"),
+      p("end", number, "Exclusive end", { optional: true }),
+      p("step", number, "Nonzero step, defaults to 1", { optional: true }),
     ],
     array(number),
-    "数列，最多 2000 项",
+    "Numeric sequence, up to 2000 items",
     "range(${0}, ${6})",
   ],
   repeat: [
-    [p("value", unknown, "重复的值"), p("count", number, "次数，0–2000")],
+    [
+      p("value", unknown, "Value to repeat"),
+      p("count", number, "Count, 0–2000"),
+    ],
     array(),
-    "重复生成数组",
+    "Create an array of repeated values",
     "repeat(${0}, ${5})",
   ],
   pow: [
-    [p("x", number, "底数"), p("power", number, "指数")],
+    [p("x", number, "Base"), p("power", number, "Exponent")],
     number,
-    "乘方",
+    "Exponentiation",
     "pow(${x}, ${2})",
   ],
   round: [
     [
-      p("x", number, "数值"),
-      p("digits", number, "小数位数，0–10", { optional: true }),
+      p("x", number, "Numeric value"),
+      p("digits", number, "Decimal places, 0–10", { optional: true }),
     ],
     number,
-    "四舍五入",
+    "Round to decimal places",
     "round(${x}, ${2})",
   ],
   fixed: [
     [
-      p("x", number, "数值"),
-      p("digits", number, "小数位数，0–10", { optional: true }),
+      p("x", number, "Numeric value"),
+      p("digits", number, "Decimal places, 0–10", { optional: true }),
     ],
     string,
-    "固定小数位文本",
+    "Fixed-decimal text",
     "fixed(${x}, ${3})",
   ],
   percent: [
     [
-      p("x", number, "数值，1 表示 100%"),
-      p("digits", number, "小数位数，0–10", { optional: true }),
+      p("x", number, "Numeric value; 1 represents 100%"),
+      p("digits", number, "Decimal places, 0–10", { optional: true }),
     ],
     string,
-    "百分比文本",
+    "Percentage text",
     "percent(${x}, ${1})",
   ],
   format: [
     [
-      p("x", number, "数值"),
-      p("pattern", string, "数字显示格式", { stringKind: "format" }),
+      p("x", number, "Numeric value"),
+      p("pattern", string, "Number format pattern", { stringKind: "format" }),
     ],
     string,
-    "格式化数值",
+    "Format a number",
     'format(${x}, "${0.000}")',
   ],
   clamp: [
     [
-      p("x", number, "数值"),
-      p("min", number, "下限"),
-      p("max", number, "上限"),
+      p("x", number, "Numeric value"),
+      p("min", number, "Lower bound"),
+      p("max", number, "Upper bound"),
     ],
     number,
-    "限制数值范围",
+    "Clamp a number to a range",
     "clamp(${x}, ${0}, ${1})",
   ],
-  str: [[p("value", cell, "需要转换的标量")], string, "标量转换为文本"],
-  len: [
-    [p("value", union([array(), string]), "数组或文本")],
-    number,
-    "数组或文本长度",
+  str: [
+    [p("value", cell, "Scalar value to convert")],
+    string,
+    "Convert a scalar to text",
   ],
-  concat: [[p("arrays", array(), "一个或多个数组")], array(), "合并数组"],
+  len: [
+    [p("value", union([array(), string]), "Array or string")],
+    number,
+    "Array or string length",
+  ],
+  concat: [
+    [p("arrays", array(), "One or more arrays")],
+    array(),
+    "Concatenate arrays",
+  ],
   zip: [
-    [p("a", array(), "第一个数组"), p("b", array(), "第二个及后续数组")],
+    [
+      p("a", array(), "First array"),
+      p("b", array(), "Second and subsequent arrays"),
+    ],
     array(array()),
-    "按最短长度组合各数组",
+    "Zip arrays to the shortest length",
   ],
   transpose: [
-    [p("rows", array(array()), "等长的二维数组")],
+    [p("rows", array(array()), "Two-dimensional array with equal-length rows")],
     array(array()),
-    "转置矩阵",
+    "Transpose a matrix",
   ],
-  row: [[p("values", cell, "0–20 个单元格")], array(cell), "创建一行数据"],
+  row: [[p("values", cell, "0–20 cells")], array(cell), "Create a data row"],
 };
 for (const name of ["sum", "mean", "min", "max"])
   specs[name] = [
-    [p("values", union([array(number), number]), "数值数组或多个数值")],
+    [
+      p(
+        "values",
+        union([array(number), number]),
+        "Numeric array or multiple numeric values",
+      ),
+    ],
     number,
     (
-      { sum: "求和", mean: "平均值", min: "最小值", max: "最大值" } as Record<
+      { sum: "Sum", mean: "Mean", min: "Minimum", max: "Maximum" } as Record<
         string,
         string
       >
@@ -655,9 +799,9 @@ for (const name of [
   "ceil",
 ])
   specs[name] = [
-    [p("x", number, "有限数值；三角函数使用弧度")],
+    [p("x", number, "Finite number; trigonometric functions use radians")],
     number,
-    "数学函数",
+    "Math function",
   ];
 for (const [name, [params, result, detail, snippet]] of Object.entries(specs))
   add(
@@ -671,15 +815,15 @@ for (const [name, [params, result, detail, snippet]] of Object.entries(specs))
 add(
   "map",
   "method",
-  "逐项映射，可选第二个回调参数为下标",
-  [p("transform", { kind: "function" }, "(item, index) => 新值")],
+  "Map each item; optional second callback parameter is the index",
+  [p("transform", { kind: "function" }, "(item, index) => newValue")],
   "map(${x} => ${x})",
   array(),
 );
 add(
   "filter",
   "method",
-  "按布尔条件筛选",
+  "Filter by a boolean condition",
   [p("predicate", { kind: "function" }, "(item, index) => Bool")],
   "filter(${x} => ${x} > 0)",
   array(),
@@ -687,10 +831,10 @@ add(
 add(
   "reduce",
   "method",
-  "归约为一个值",
+  "Reduce to a single value",
   [
-    p("combine", { kind: "function" }, "(acc, item, index) => 新累计值"),
-    p("initial", unknown, "初始累计值"),
+    p("combine", { kind: "function" }, "(acc, item, index) => newAccumulator"),
+    p("initial", unknown, "Initial accumulator"),
   ],
   "reduce((${acc}, ${x}) => ${acc} + ${x}, ${0})",
 );

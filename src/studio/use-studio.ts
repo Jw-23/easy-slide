@@ -1,3 +1,4 @@
+import { pageGroup, groupMoveTarget } from "./page-groups";
 import { formatSource } from "./format-source";
 import { SourceMap, type SceneTarget } from "./source-map";
 import { pasteCanvasText } from "./component-clipboard";
@@ -118,28 +119,28 @@ export function useStudio(draftKey: string) {
     mutate(
       () => addSlideSource(doc.project.source, doc.active),
       undefined,
-      doc.active + 1,
+      pageGroup(doc.deck, doc.active).last + 1,
     );
   }
   function duplicate() {
     mutate(
       () => duplicateSlideSource(doc.project.source, doc.active),
       undefined,
-      doc.active + 1,
+      pageGroup(doc.deck, doc.active).last + 1,
     );
   }
   function remove() {
     mutate(
       () => deleteSlideSource(doc.project.source, doc.active),
       undefined,
-      Math.max(0, doc.active - 1),
+      Math.max(0, pageGroup(doc.deck, doc.active).first - 1),
     );
   }
   function move(direction: -1 | 1) {
     mutate(
       () => moveSlideSource(doc.project.source, doc.active, direction),
       undefined,
-      Math.max(0, Math.min(doc.deck.slides.length - 1, doc.active + direction)),
+      groupMoveTarget(doc.deck, doc.active, direction),
     );
   }
   function text(source: string, independent = false) {

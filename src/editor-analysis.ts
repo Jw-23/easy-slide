@@ -199,11 +199,11 @@ export class EditorAnalysis {
       const lambda = symbol.node.initializer;
       return {
         name: symbol.name,
-        detail: "已声明函数",
+        detail: "Declared function",
         params: (type.params ?? []).map((type, i) => ({
           name: lambda?.params?.[i]?.name ?? `arg${i + 1}`,
           type,
-          detail: "函数参数",
+          detail: "Function parameter",
         })),
         snippet: "",
         category: "calculation",
@@ -216,7 +216,7 @@ export class EditorAnalysis {
     const params = (node.params || []).map((p) => ({
       name: p.name || "arg",
       type: p.initializer ? this.infer(p.initializer) : unknown,
-      detail: "布局函数参数",
+      detail: "Layout function parameter",
       optional: !!p.initializer,
     }));
     const required = (node.params || [])
@@ -225,7 +225,7 @@ export class EditorAnalysis {
       .join(", ");
     return {
       name: node.name!,
-      detail: "自定义布局函数",
+      detail: "Custom layout function",
       category: "container",
       params: [...params, ...params.map((p) => ({ ...p, named: true }))],
       snippet: `${node.name}(${required}) {\n    \${}\n}`,
@@ -560,7 +560,7 @@ export class EditorAnalysis {
   symbolDescription(symbol: SymbolInfo) {
     const t = this.symbolType(symbol),
       line = this.source.slice(0, symbol.node.from).split("\n").length;
-    return `${typeLabel(t)} · ${symbol.parameter === undefined ? "常量" : "回调参数"} · 第 ${line} 行`;
+    return `${typeLabel(t)} · ${symbol.parameter === undefined ? "Constant" : "Callback parameter"} · Line ${line}`;
   }
   expectedBoost(actual: ValueType, expected: ValueType) {
     return actual.kind === "unknown"

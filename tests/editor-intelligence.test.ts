@@ -142,7 +142,7 @@ describe("scope-aware static inference", () => {
     expect(typeOf(source, "total")).toBe("Number");
     expect(typeOf(source, "text")).toBe("String");
     expect(typeOf(source, "columns")).toBe("[Column]");
-    expect(typeOf("let f=x=>f(x)\nlet result=f(1)", "result")).toBe("未知");
+    expect(typeOf("let f=x=>f(x)\nlet result=f(1)", "result")).toBe("Unknown");
     expect(typeOf("let huge=range(0,1e12).map(x=>[x,x*x])", "huge")).toBe(
       "[[Number]]",
     );
@@ -304,4 +304,24 @@ describe("semantic completions and signatures", () => {
     expect(state.field(signatureHelp)).toBeNull();
     expect(calculationNames.every((n) => signatures.has(n))).toBe(true);
   });
+});
+
+it("completes math environments, dynamic slides, parameters, motion and LaTeX from the AST", () => {
+  expect(at('Deck("D")\nDyn¦').labels).toContain("DynamicSlide");
+  expect(at('Deck("D") Slide(title:"S"){Pro¦}').labels).toContain("ProofStep");
+  expect(
+    at('Deck("D") Slide(title:"S"){ProofStep("A", rea¦)}').labels,
+  ).toContain("reason:");
+  expect(at('Deck("D") DynamicSlide(title:"S", col¦)').labels).toContain(
+    "columns:",
+  );
+  expect(
+    at('Deck("D") DynamicSlide(title:"S"){LeftColumn(rep¦)}').labels,
+  ).toContain("repeat:");
+  expect(
+    at('Deck("D") Slide(title:"S"){Theorem{Text("a")}.app¦}').labels,
+  ).toContain("appear");
+  expect(
+    at('Deck("D") Slide(title:"S"){ProofStep(reason:`由 $\\fr¦`)}').labels,
+  ).toContain("\\frac");
 });

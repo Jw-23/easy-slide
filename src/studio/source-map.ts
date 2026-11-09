@@ -1,3 +1,5 @@
+import { parseDeck, type Block, type Deck } from "../dsl";
+import { isSlideCall, automaticCall } from "./page-groups";
 import { readSyntax, type Call } from "../syntax";
 import { tokenize, type Token } from "../tokens";
 export type SceneTarget =
@@ -47,7 +49,10 @@ export function targetContains(
 export class SourceMap {
   readonly records: SourceRecord[] = [];
   private byKey = new Map<string, SourceRecord>();
-  constructor(readonly source: string) {
+  constructor(
+    readonly source: string,
+    suppliedDeck?: Deck,
+  ) {
     const root = readSyntax(source),
       tokens = tokenize(source),
       starts = new Map(tokens.map((token, i) => [token.from, i]));
@@ -193,21 +198,81 @@ export class SourceMap {
         walk(child, [...path, i], record.childBindings, page),
       );
     };
+    const authored = root.children.filter((c) => isSlideCall(c.name)),
+      compiled =
+        suppliedDeck ||
+        (authored.some(automaticCall) ? parseDeck(source) : undefined);
+    let sourceIndex = 0;
     for (const call of root.children) {
       if (call.name === "Theme")
         add(call, { scope: "theme", page: 0 }, globals);
-      if (call.name !== "Slide") continue;
-      const record = add(call, { scope: "slide", page }, globals);
-      if (call.args.length) {
-        add(call, { scope: "block", page, path: [0] }, globals, true);
-        call.children.forEach((child, i) =>
-          walk(child, [0, i], record.childBindings, page),
-        );
-      } else
-        call.children.forEach((child, i) =>
-          walk(child, [i], record.childBindings, page),
-        );
-      page++;
+      if (!isSlideCall(call.name)) continue;
+      const pages =
+        compiled?.slides.filter(
+          (s) => s.dynamic?.sourceIndex === sourceIndex,
+        ) || [];
+      if (pages.length) {
+        const originals = new Map<string, Call>(),
+          scopes = new Map<string, string[]>();
+        const indexCalls = (
+          nodes: Call[],
+          path: number[] = [],
+          scope = [...globals, ...(call.bindings || [])],
+        ) =>
+          nodes.forEach((n, i) => {
+            originals.set([...path, i].join("."), n);
+            scopes.set([...path, i].join("."), scope);
+            indexCalls(
+              n.children,
+              [...path, i],
+              [...scope, ...(n.bindings || [])],
+            );
+          });
+        indexCalls(call.children);
+        for (const slide of pages) {
+          const record = add(call, { scope: "slide", page }, globals);
+          const generated = (blocks: Block[], path: number[] = []) =>
+            blocks.forEach((block, i) => {
+              const target = {
+                  scope: "block" as const,
+                  page,
+                  path: [...path, i],
+                },
+                original = block.sourcePath
+                  ? originals.get(block.sourcePath.join("."))
+                  : undefined;
+              const mapped = add(
+                original
+                  ? {
+                      ...original,
+                      ...(block.fragment ? { generated: true } : {}),
+                    }
+                  : call,
+                target,
+                (block.sourcePath && scopes.get(block.sourcePath.join("."))) ||
+                  record.childBindings,
+                !original,
+              );
+              if (block.fragment) mapped.synthetic = true;
+              if (block.children) generated(block.children, [...path, i]);
+            });
+          generated(slide.blocks);
+          page++;
+        }
+      } else {
+        const record = add(call, { scope: "slide", page }, globals);
+        if (call.args.length) {
+          add(call, { scope: "block", page, path: [0] }, globals, true);
+          call.children.forEach((child, i) =>
+            walk(child, [0, i], record.childBindings, page),
+          );
+        } else
+          call.children.forEach((child, i) =>
+            walk(child, [i], record.childBindings, page),
+          );
+        page++;
+      }
+      sourceIndex++;
     }
   }
   get(target: SceneTarget) {
@@ -215,8 +280,17 @@ export class SourceMap {
   }
   at(position: number, page: number): SourceRecord | undefined {
     const found = this.records
-      .filter((r) => !r.synthetic && r.from <= position && position < r.to)
-      .sort((a, b) => a.to - a.from - (b.to - b.from))[0];
+      .filter(
+        (r) =>
+          (!r.synthetic || r.generated) &&
+          r.from <= position &&
+          position < r.to,
+      )
+      .sort(
+        (a, b) =>
+          a.to - a.from - (b.to - b.from) ||
+          Number(a.target.page !== page) - Number(b.target.page !== page),
+      )[0];
     return found
       ? {
           ...found,

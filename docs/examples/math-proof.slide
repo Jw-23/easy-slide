@@ -1,0 +1,85 @@
+Deck("凸优化与证明", author: "数学论坛")
+    .transition(.slide, duration: 500)
+Theme(preset: .paper)
+
+// 普通 Slide 中的数学环境直接自动续页，无需预估高度。
+Slide(title: "定义、假设与引理") {
+    Definition("凸函数") {
+        Text(`对任意 $x,y$ 和 $t\in[0,1]$，有`)
+        Equation(`f(tx+(1-t)y)\le t f(x)+(1-t)f(y)`)
+    }
+    Given("光滑性") {
+        Text(`假设 $f$ 可微，$\nabla f$ 为 $L$-Lipschitz 连续，且最优解 $x^*$ 存在。`)
+    }
+    Lemma("下降引理") {
+        Equation(`f(y)\le f(x)+\langle\nabla f(x),y-x\rangle+\frac L2\|y-x\|^2`)
+        Text(`取 $y=x-\eta\nabla f(x)$，且 $0<\eta\le1/L$，得到函数值单调下降。`)
+    }
+}
+
+// 左栏在续页保持命题，右栏的证明按内容自然拆分。
+DynamicSlide(title: "梯度下降的收敛率", columns: 2, spacing: 24) {
+    LeftColumn(repeat: true) {
+        Theorem("凸光滑函数") {
+            Text(`令 $x_{k+1}=x_k-\eta\nabla f(x_k)$，其中 $0<\eta\le1/L$。则`)
+            Equation(`f(x_k)-f(x^*)\le\frac{\|x_0-x^*\|^2}{2\eta k}`)
+        }.glass(opacity: 0.7, radius: 18)
+    }
+    RightColumn {
+        Proof {
+            ProofStep("使用凸性", reason: `一阶凸性不等式`) {
+                Equation(`f(x_k)-f(x^*)\le\langle g_k,x_k-x^*\rangle`)
+                Text(`其中 $g_k=\nabla f(x_k)$。`)
+            }.appear(.rise, step: 1, duration: 450)
+            ProofStep("结合下降引理", reason: `步长 $\eta\le1/L$`) {
+                Equation(`f(x_{k+1})\le f(x_k)-\frac\eta2\|g_k\|^2`)
+            }.appear(.fade, step: 1, duration: 450)
+            ProofStep("展开距离平方", reason: `代入迭代式并合并前两步`) {
+                Equation(`2\eta(f(x_{k+1})-f(x^*))\le\|x_k-x^*\|^2-\|x_{k+1}-x^*\|^2`)
+            }.appear(.rise, step: 1, duration: 450)
+            ProofStep("求和与单调性", reason: `望远镜求和；函数值单调下降`) {
+                Equation(`2\eta k(f(x_k)-f(x^*))\le\|x_0-x^*\|^2`)
+                Text(`两侧除以 $2\eta k$，即得结论。`)
+            }.appear(.zoom, step: 1, duration: 450)
+        }
+    }
+}.notes("每页先回顾左侧命题，再点击展示右侧推理。")
+
+Slide(title: "命题、推论与推理") {
+    Proposition("下降方向") {
+        Text(`若 $\nabla f(x)\ne0$，负梯度方向是严格下降方向。`)
+    }
+    Reasoning("方向导数", reason: `内积的正定性`) {
+        Equation(`D_{-\nabla f(x)}f(x)=-\|\nabla f(x)\|^2<0`)
+    }
+    Corollary("一阶必要条件") {
+        Text(`可微函数在内部局部极小点满足 $\nabla f(x)=0$。`)
+    }
+}
+
+Slide(title: "解题与推导") {
+    Problem("均值不等式", number: "练习 1") {
+        Text(`对 $a,b\ge0$，证明 $a+b\ge2\sqrt{ab}$。`)
+    }
+    Solution {
+        ProofStep("构造非负平方") {
+            Equation(`(\sqrt a-\sqrt b)^2\ge0`)
+        }
+        Derivation("展开并移项") {
+            Equation(`a+b-2\sqrt{ab}\ge0\quad\Longrightarrow\quad a+b\ge2\sqrt{ab}`)
+        }
+        Text(`**等号条件**：当且仅当 $a=b$。`)
+    }
+}
+
+// 通用双栏内容流：先填左栏，再填右栏；继续书写会自动增加 PPT 页。
+DynamicSlide(title: "讲解顺序", columns: 2) {
+    Heading("回顾")
+    Text(`定义 → 引理 → 定理 → 证明 → 推论。`)
+    ColumnBreak()
+    Heading("讨论")
+    Text(`移除凸性后，哪一步推理不再成立？`)
+    PageBreak()
+    Heading("下一步")
+    Text(`把自己的条件、公式与推理接在这里，超出高度时自动续页。`)
+}

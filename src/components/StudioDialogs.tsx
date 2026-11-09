@@ -8,7 +8,12 @@ import {
   Presentation,
 } from "lucide-react";
 import { Dialog } from "./Dialog";
-import { showcaseDeck, mathDeck, engineeringDeck } from "../examples";
+import {
+  showcaseDeck,
+  mathDeck,
+  engineeringDeck,
+  mathProofDeck,
+} from "../examples";
 import type { Deck } from "../dsl";
 import type { Studio } from "../studio/use-studio";
 export type StudioDialog = "export" | "help" | "templates";
@@ -157,6 +162,12 @@ export default function StudioDialogs({
               icon: Code2,
             },
             {
+              deck: mathProofDeck,
+              title: "数学证明",
+              detail: "自动续页、独立双栏与证明步骤",
+              icon: Code2,
+            },
+            {
               deck: engineeringDeck,
               title: "工程汇报",
               detail: "成果、方案与里程碑",
@@ -221,6 +232,25 @@ Slide(title: "一个清晰的结论") {
             label；Table 接受二维数组。Heading 设置标题层级，Caption
             写说明；Numbered 编号，Divider 分隔；Rectangle / Circle
             绘制图元，Badge 显示徽标，Progress 接收 0–1 的进度值。
+          </p>
+          <h3>数学环境与自动续页</h3>
+          <p>
+            普通 Slide 中的
+            Definition、Theorem、Lemma、Proposition、Corollary、Problem、Given、Solution、Proof、ProofStep、Derivation、Reasoning
+            按内容高度自动续页。环境重复标题，步骤连续编号，Proof
+            仅在最后显示证毕符号。模板「数学证明」展示完整用法。
+          </p>
+          <pre>
+            {
+              'Slide(title: "证明") {\n    Proof {\n        ProofStep("第一步", reason: "已知条件") { Text(`由 $a=b$ 得到结论。`) }\n        ProofStep("第二步") { Equation(`a^2=b^2`) }\n    }\n}'
+            }
+          </pre>
+          <p>
+            DynamicSlide(columns: 2) 先填左栏再填右栏；LeftColumn / RightColumn
+            定义独立内容流，repeat: true 在续页重复该栏。PageBreak()
+            开始下一页，ColumnBreak()
+            开始下一栏。页面列表中的复制、移动、删除作用于整组动态页。需要手动定位或缩放时，用
+            Slide(autoPages: false) 关闭自动续页。
           </p>
           <h3>富文本与行内公式</h3>
           <pre>
