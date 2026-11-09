@@ -1,3 +1,4 @@
+import { ImageEditor } from "./components/ImageEditor";
 import { ContextMenu } from "./components/ContextMenu";
 import { useContextActions } from "./studio/use-context-actions";
 import { useShortcuts } from "./studio/use-shortcuts";
@@ -38,6 +39,7 @@ export default function App() {
   const [tab, setTab] = useState<InspectorTab>("design"),
     [dialog, setDialog] = useState<StudioDialog | null>(null),
     [playing, setPlaying] = useState(false);
+  const [editingImage, setEditingImage] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null),
     imageRef = useRef<HTMLInputElement>(null),
     inspectorRef = useRef<HTMLDivElement>(null);
@@ -58,6 +60,7 @@ export default function App() {
     () => onTab("dsl"),
     () => workspace.setMobile("preview"),
     () => imageRef.current?.click(),
+    setEditingImage,
   );
   const saveLabel = {
     restoring: "正在恢复草稿…",
@@ -260,6 +263,7 @@ export default function App() {
           <div className="inspector-slot" ref={inspectorRef}>
             <Inspector
               studio={s}
+              onEditImage={setEditingImage}
               tab={tab}
               onTab={onTab}
               onHelp={() => setDialog("help")}
@@ -348,6 +352,14 @@ export default function App() {
               <X size={14} />
             </button>
           </div>
+        )}
+        {editingImage && (
+          <ImageEditor
+            key={editingImage}
+            path={editingImage}
+            studio={s}
+            onClose={() => setEditingImage(null)}
+          />
         )}
         {context.menu && (
           <ContextMenu menu={context.menu} onClose={context.close} />

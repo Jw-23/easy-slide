@@ -43,7 +43,11 @@ export function markSource(blocks: Block[], path: number[] = []): Block[] {
 }
 function assertFlow(blocks: Block[]) {
   for (const b of blocks) {
-    if (b.position || b.scale !== undefined)
+    if (
+      (b.position &&
+        !(b.type === "image" && b.position.relativeTo === "slide")) ||
+      b.scale !== undefined
+    )
       throw Error(
         "自动续页环境不能混用 position / scale；请使用布局容器，或在 Slide 中设置 autoPages: false 手动排版",
       );

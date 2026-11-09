@@ -21,7 +21,9 @@ export function Inspector({
   reveal,
   onEditorContext,
   clipboard,
+  onEditImage,
 }: {
+  onEditImage: (path: string) => void;
   studio: Studio;
   tab: InspectorTab;
   onTab: (tab: InspectorTab) => void;
@@ -355,15 +357,21 @@ export function Inspector({
             </button>
             <div className="asset-list">
               {Object.entries(s.project.assets).map(([path, src]) => (
-                <button
-                  key={path}
-                  disabled={locked}
-                  onClick={() => s.insertImage(path)}
-                  title={`插入 ${path}`}
-                >
-                  <img src={src} alt={path.split("/").pop()} loading="lazy" />
-                  <small>{path.split("/").pop()}</small>
-                </button>
+                <div key={path} className="asset-entry">
+                  <button
+                    disabled={locked}
+                    onClick={() => s.insertImage(path)}
+                    title={`插入 ${path}`}
+                  >
+                    <img src={src} alt={path.split("/").pop()} loading="lazy" />
+                    <small>{path.split("/").pop()}</small>
+                  </button>
+                  <div className="asset-actions">
+                    <button disabled={locked} onClick={() => onEditImage(path)}>
+                      编辑 / 重命名
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
             {!Object.keys(s.project.assets).length && (

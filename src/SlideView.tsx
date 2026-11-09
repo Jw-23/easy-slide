@@ -105,6 +105,7 @@ function SceneElement({
         : assets[e.src || ""]);
     content = src ? (
       <img
+        draggable={false}
         src={src}
         alt={e.kind === "equation" ? e.text : e.src || ""}
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
@@ -120,6 +121,7 @@ function SceneElement({
       ref={ref}
       style={style}
       data-scene-element={elementIndex}
+      data-image-asset={!!e.src}
       data-motion={e.motionKey}
       data-step={e.step}
     >
@@ -137,6 +139,7 @@ function SlideViewContent({
   epoch = 0,
   onContextMenu,
   highlight,
+  onImageMove,
 }: {
   deck: Deck;
   slide: Slide;
@@ -151,6 +154,13 @@ function SlideViewContent({
     element?: Element,
   ) => void;
   highlight?: SceneTarget;
+  onImageMove?: (
+    target: SceneTarget,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(1);
@@ -163,6 +173,15 @@ function SlideViewContent({
     ro.observe(ref.current);
     return () => ro.disconnect();
   }, []);
+  const drag = useRef<{
+    id: number;
+    startX: number;
+    startY: number;
+    el: Element;
+    node: HTMLElement;
+
+    zoom: number;
+  } | null>(null);
   const elements = useMemo(
     () => scene(deck, slide, index),
     [deck.theme, deck.title, deck.author, slide, index],
@@ -205,8 +224,68 @@ function SlideViewContent({
     <div
       ref={ref}
       className="slide-frame"
+      data-image-draggable={!!onImageMove}
       tabIndex={onContextMenu ? 0 : undefined}
       aria-label={onContextMenu ? "幻灯片画布" : undefined}
+      onPointerDown={
+        onImageMove
+          ? (event) => {
+              if (event.button !== 0 || event.altKey || event.shiftKey) return;
+              const node = (event.target as HTMLElement).closest<HTMLElement>(
+                "[data-scene-element]",
+              );
+              const el = node
+                ? elements[Number(node.dataset.sceneElement)]
+                : undefined;
+              if (!node || el?.kind !== "image" || !el.src || !el.source)
+                return;
+              event.preventDefault();
+              const zoom = ref.current!.getBoundingClientRect().width / 1280;
+              drag.current = {
+                id: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                el,
+                node,
+                zoom,
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }
+          : undefined
+      }
+      onPointerMove={(event) => {
+        const d = drag.current;
+        if (!d || d.id !== event.pointerId) return;
+        const dx = (event.clientX - d.startX) / d.zoom,
+          dy = (event.clientY - d.startY) / d.zoom;
+        d.node.style.left = `${Math.max(0, Math.min(1280 - d.el.w, d.el.x + dx))}px`;
+        d.node.style.top = `${Math.max(0, Math.min(720 - d.el.h, d.el.y + dy))}px`;
+      }}
+      onPointerUp={(event) => {
+        const d = drag.current;
+        if (!d || d.id !== event.pointerId) return;
+        drag.current = null;
+        d.node.style.left = `${d.el.x}px`;
+        d.node.style.top = `${d.el.y}px`;
+        if (!elements.includes(d.el)) return;
+        if (Math.hypot(event.clientX - d.startX, event.clientY - d.startY) < 4)
+          return;
+        onImageMove?.(
+          d.el.source!,
+          d.el.x + (event.clientX - d.startX) / d.zoom,
+          d.el.y + (event.clientY - d.startY) / d.zoom,
+          d.el.w,
+          d.el.h,
+        );
+      }}
+      onPointerCancel={() => {
+        const d = drag.current;
+        drag.current = null;
+        if (d) {
+          d.node.style.left = `${d.el.x}px`;
+          d.node.style.top = `${d.el.y}px`;
+        }
+      }}
       onContextMenu={
         onContextMenu
           ? (event) => {
@@ -270,6 +349,7 @@ function SlideViewContent({
 export const SlideView = memo(
   SlideViewContent,
   (a, b) =>
+    a.onImageMove === b.onImageMove &&
     a.highlight === b.highlight &&
     a.onContextMenu === b.onContextMenu &&
     a.slide === b.slide &&
