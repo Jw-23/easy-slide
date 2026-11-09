@@ -1,6 +1,7 @@
 import { parseDeck } from "./dsl";
 /** The startup document is authored in the same flat DSL that users edit. */
-export const showcaseDeck = parseDeck(String.raw`
+export const showcaseDeck = parseDeck(
+  String.raw`
 func ForumPanel(title, subtitle, spacing = 16) {
     Panel(radius: 20) {
         VStack(spacing: spacing) {
@@ -29,7 +30,7 @@ let demoCosts = [120, 180, 95, 240]
 
 Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、主题与动画") {
     Cover {
-        Text("25 页示例 · 在 DSL 面板中查看和修改源码").font(18)
+        Text("26 页示例 · 在 DSL 面板中查看和修改源码").font(18)
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
@@ -326,4 +327,17 @@ Slide(title: "主次布局与编号槽位", eyebrow: "25 / FOCUS + SLOT", subtit
     }
 }.notes("布局函数可组合调用，并通过 Slot(index) 指定内容位置，序号从零开始。Content() 插入所有尚未使用的内容；缺少槽位、重复使用槽位、未使用内容、未知参数和递归都会报告具体错误。计算与展开均在本地解释执行。")
 
-`);
+Slide(title: "正文中的公式与强调", eyebrow: "26 / RICH TEXT", subtitle: "同一段文字中组合公式、强调与行内代码") {
+    VStack(spacing: 24) {
+        Panel {
+            VStack(spacing: 20) {
+                Text(#"**主要结论**：当 $0 < \eta < 2/L$ 时，*梯度下降* 的更新为 \(x_{k+1}=x_k-\eta\nabla f(x_k)\)。"#).font(25)
+                Text(#"误差满足 **$\|x_k-x^*\| \le C/k$**；~~旧估计~~ 已替换。"#).font(25)
+            }
+        }.frame(height: 210).appear(.rise, step: 1, duration: 600)
+        Text(#"行内代码 ${"`"}**原样保留** $x$${"`"}；文字中的 \*星号\* 与价格 \$20 使用反斜杠转义。"#).font(21)
+    }
+}.notes("Text、Heading、Caption、列表、表格单元格与页标题支持行内富文本。粗体使用双星号，斜体使用单星号，删除线使用双波浪线，行内代码使用反引号。公式使用美元符或反斜杠括号；复杂公式宜继续使用独立 Equation。纯格式段落在可编辑 PPTX 模式中保留文字，含公式段落以独立 SVG 与高清 PNG 保存，并保留动画。")
+
+`,
+);

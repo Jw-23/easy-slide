@@ -1,3 +1,4 @@
+import { parseRichText, type RichDocument } from "./rich-text";
 import type { SceneTarget } from "./studio/source-map";
 import { resolveTheme, headerText } from "./themes";
 import { tableModel } from "./table";
@@ -16,6 +17,7 @@ export type Element = {
   w: number;
   h: number;
   text?: string;
+  rich?: RichDocument;
   src?: string;
   size?: number;
   color?: string;
@@ -85,7 +87,8 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     bold = false,
     step = 0,
     mono = false,
-  ) =>
+  ) => {
+    const rich = !mono ? parseRichText(t) : undefined;
     push({
       kind: "text",
       text: t,
@@ -98,7 +101,9 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       bold,
       step,
       mono,
+      ...(rich?.formatted ? { rich } : {}),
     });
+  };
   const rect = (
     x: number,
     y: number,

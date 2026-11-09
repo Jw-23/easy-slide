@@ -3,6 +3,7 @@ import { resolveTheme } from "./themes";
 import { memo, useMemo, useLayoutEffect, useRef, useState } from "react";
 import type { Deck, Slide } from "./dsl";
 import { scene, TEXT_LINE_HEIGHT, type Element } from "./scene";
+import { richHtml } from "./rich-text-render";
 import { mathSvg } from "./math";
 import { timeline, easingCss, entranceFrames } from "./motion";
 function SceneElement({
@@ -91,7 +92,11 @@ function SceneElement({
       overflow: "hidden",
       overflowWrap: "anywhere",
     });
-    content = e.text;
+    content = e.rich ? (
+      <span dangerouslySetInnerHTML={{ __html: richHtml(e.rich, e.color) }} />
+    ) : (
+      e.text
+    );
   } else {
     const src =
       e.data ||

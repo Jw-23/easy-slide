@@ -142,8 +142,9 @@ export function useStudio(draftKey: string) {
       Math.max(0, Math.min(doc.deck.slides.length - 1, doc.active + direction)),
     );
   }
-  function text(source: string) {
-    if (doc.ready && !locked.current) doc.source(source, "dsl");
+  function text(source: string, independent = false) {
+    if (doc.ready && !locked.current)
+      doc.source(source, independent ? undefined : "dsl");
   }
   function undo() {
     if (!locked.current) doc.undo();

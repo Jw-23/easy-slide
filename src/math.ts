@@ -17,7 +17,13 @@ const doc = mathjax.document("", {
   }),
   OutputJax: new SVG({ fontCache: "none" }),
 });
-const cache = new Map<string, string>();
+export type MathAsset = {
+  data: string;
+  widthEm: number;
+  heightEm: number;
+  depthEm: number;
+};
+const cache = new Map<string, MathAsset>();
 const errors = new Map<string, string | null>();
 export function mathError(tex: string): string | null {
   if (!errors.has(tex)) mathSvg(tex, "#192c2a");
@@ -38,10 +44,19 @@ function explainMath(message: string): string {
   );
 }
 export function mathSvg(tex: string, color: string): string {
-  const key = tex + color;
+  return mathAsset(tex, color, true)?.data || "";
+}
+export function mathAsset(
+  tex: string,
+  color: string,
+  display = false,
+): MathAsset | null {
+  const key = JSON.stringify([tex, color, display]);
   if (cache.has(key)) return cache.get(key)!;
+  if (cache.size > 512) cache.clear();
+  if (errors.size > 512) errors.clear();
   try {
-    const node = doc.convert(tex, { display: true });
+    const node = doc.convert(tex, { display });
     let svg = adaptor.innerHTML(node);
     if (
       svg.includes('data-mml-node="merror"') ||
@@ -51,7 +66,7 @@ export function mathSvg(tex: string, color: string): string {
         svg.match(/data-mjx-error="([^"]+)"/)?.[1] ||
         "公式包含无效命令或不匹配的括号";
       errors.set(tex, explainMath(msg));
-      return "";
+      return null;
     }
     errors.set(tex, null);
     const match = svg.match(/viewBox="([^"]+)"/);
@@ -64,10 +79,16 @@ export function mathSvg(tex: string, color: string): string {
       .replace("<svg ", '<svg color="' + color + '" ');
     const result =
       "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
-    cache.set(key, result);
-    return result;
+    const asset = {
+      data: result,
+      widthEm: dims[2] / 1000,
+      heightEm: dims[3] / 1000,
+      depthEm: Math.max(0, (dims[1] + dims[3]) / 1000),
+    };
+    cache.set(key, asset);
+    return asset;
   } catch (e) {
     errors.set(tex, explainMath((e as Error).message));
-    return "";
+    return null;
   }
 }

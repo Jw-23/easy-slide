@@ -152,7 +152,7 @@ describe("presentation themes", () => {
       [...themeIds].sort(),
     );
   });
-  it("keeps all 25 feature-tour pages within the canvas under every theme", () => {
+  it("keeps all 26 feature-tour pages within the canvas under every theme", () => {
     for (const preset of themeIds) {
       const deck = { ...showcaseDeck, theme: { preset } };
       deck.slides.forEach((slide, i) =>

@@ -1,6 +1,7 @@
 import { themeIds, type ThemeOptions } from "./themes";
 import { validateTable, tableKeys, type TableOptions } from "./table";
 import type { Cell } from "./number-format";
+import { parseRichText, richRuns } from "./rich-text";
 import { mathError } from "./math";
 import { DslError, closest } from "./diagnostics";
 import { readSyntax, type Call } from "./syntax";
@@ -173,6 +174,15 @@ const color = /^(#[0-9a-f]{6})$/i;
 function fail(message: string): never {
   throw new Error(message);
 }
+function validateRich(value: unknown, label: string) {
+  if (typeof value !== "string") return;
+  const document = parseRichText(value);
+  for (const run of richRuns(document))
+    if (run.kind === "math") {
+      const issue = mathError(run.text);
+      if (issue) fail(`${label}，文本第 ${run.node.from + 1} 个字符：${issue}`);
+    }
+}
 export function validateDeck(input: unknown): Deck {
   const d = input as any;
   if (!d || d.version !== 1) fail("version 必须为 1");
@@ -181,11 +191,14 @@ export function validateDeck(input: unknown): Deck {
   if (typeof d.title !== "string" || !d.title.trim()) fail("请填写工程 title");
   if (!Array.isArray(d.slides) || !d.slides.length || d.slides.length > 200)
     fail("slides 需要包含 1–200 页");
+  for (const key of ["title", "author"]) validateRich(d[key], key);
   for (const [i, s] of d.slides.entries()) {
     const p = `第 ${i + 1} 页`;
     if (!s || (s.layout !== undefined && !layouts.includes(s.layout)))
       fail(`${p}：未知 layout`);
     if (typeof s.title !== "string") fail(`${p}：title 必须是文本`);
+    for (const key of ["title", "subtitle", "eyebrow"])
+      validateRich(s[key], `${p}：${key}`);
     if (s.blocks === undefined) s.blocks = [];
     if (!Array.isArray(s.blocks) || s.blocks.length > 30)
       fail(`${p}：blocks 必须是数组，最多 30 项`);
@@ -242,6 +255,24 @@ export function validateDeck(input: unknown): Deck {
           typeof (b as any)[key] !== "string"
         )
           fail(`${p}：${key} 必须是文本（数字请加引号）`);
+      for (const key of ["text", "title", "label", "value"] as const)
+        if (!(key === "text" && ["code", "equation"].includes(b.type)))
+          validateRich(b[key], `${p}：${key}`);
+      for (const item of Array.isArray(b.items) ? b.items : [])
+        validateRich(item, `${p}：列表项`);
+      if (b.type === "table") {
+        for (const row of Array.isArray(b.rows) ? b.rows : [])
+          if (Array.isArray(row))
+            for (const cell of row) validateRich(cell, `${p}：表格单元格`);
+        for (const col of Array.isArray(b.table?.columns)
+          ? b.table.columns
+          : [])
+          validateRich(col?.label, `${p}：表头`);
+        for (const cell of Array.isArray(b.table?.headers)
+          ? b.table.headers
+          : [])
+          validateRich(cell, `${p}：表头`);
+      }
       if (b.type === "equation" && typeof b.text === "string") {
         const issue = mathError(b.text);
         if (issue) fail(issue);
