@@ -63,3 +63,34 @@ describe("theme propagation to preview and PPTX", () => {
     }
   });
 });
+
+it("exports expanded custom layouts, basic shapes and their grouped animations", async () => {
+  const d = parseDeck(`
+    func Report(title, completed = 0.8) {
+      Panel {
+        Columns(weights: [1, 3]) {
+          Circle(fill: "#245abc").frame(width: 80, height: 80)
+          VStack(spacing: 12) {
+            Heading(title)
+            Progress(completed, label: "验证")
+            Content()
+          }
+        }
+      }
+    }
+    Deck("布局函数")
+    Slide(title: "报告") {
+      Report("结果") { Numbered(["假设", "结论"]) }
+        .appear(.rise, step: 1, duration: 720)
+    }
+  `);
+  const blob = await buildPptx(d, {}, { textMode: "editable" });
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+  expect(xml).toContain('prst="ellipse"');
+  for (const content of ["结果", "80%", "验证", "假设", "结论"])
+    expect(xml).toContain(content);
+  expect(xml).toContain('nodeType="clickEffect"');
+  expect(xml).toContain('dur="720"');
+  expect(xml).not.toContain("undefined");
+});

@@ -1,6 +1,23 @@
 import { parseDeck } from "./dsl";
 /** The startup document is authored in the same flat DSL that users edit. */
 export const showcaseDeck = parseDeck(String.raw`
+func ForumPanel(title, subtitle, spacing = 16) {
+    Panel(radius: 20) {
+        VStack(spacing: spacing) {
+            Heading(title, level: 2)
+            Caption(subtitle)
+            Content()
+        }
+    }
+}
+
+func WeightedPair(gap = 24) {
+    Columns(weights: [2, 1], spacing: gap) {
+        Slot(0)
+        Slot(1)
+    }
+}
+
 Deck("Easy Slide 功能示例", author: "示例工程")
     .transition(.slide, duration: 650, direction: .left, easing: .easeOut)
 Theme(preset: .aurora)
@@ -12,7 +29,7 @@ let demoCosts = [120, 180, 95, 240]
 
 Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、主题与动画") {
     Cover {
-        Text("20 页示例 · 在 DSL 面板中查看和修改源码").font(18)
+        Text("25 页示例 · 在 DSL 面板中查看和修改源码").font(18)
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
@@ -215,11 +232,98 @@ Slide(title: "编辑、素材与工程文件", eyebrow: "19 / LOCAL WORKFLOW", s
     }
 }.notes("浏览器自动保存至 IndexedDB；重要内容请导出完整工程。工具栏的安装应用可将生产网站安装为 PWA；首次联网缓存完成后可离线编辑和导出，更新时先保存草稿。直接目录访问需要支持 File System Access 的浏览器及用户选择目录；连接目录后点击保存工程才会写入文件。备注只在编辑器显示，PPTX 中保存为演讲备注。")
 
-Slide(title: "功能示例结束", eyebrow: "20 / REFERENCE", subtitle: "修改源码、重播动画，或导出完整工程与 PPTX") {
+Slide(title: "工程与导出操作参考", eyebrow: "20 / REFERENCE", subtitle: "修改源码、重播动画，或导出完整工程与 PPTX") {
     Section {
         Text("切换示例可打开数学论坛与工程汇报工程。").font(18)
         Text("工具栏 → 安装应用；首次缓存完成后可离线编辑与导出。").font(18)
     }
 }.transition(.fade, duration: 550)
 .notes("本工程涵盖全部现有布局、内容类型、组合容器、修饰符和动画选项。素材图包含在工程 ZIP 中。既有本地工程不会被新版示例自动覆盖；需要时从切换示例打开此功能示例。")
+Slide(title: "基础元素与居中布局", eyebrow: "21 / ELEMENTS", subtitle: "Heading、Caption、Numbered、Circle 与 Badge") {
+    Center {
+        Panel(radius: 20) {
+            Columns(weights: [1, 3], spacing: 28) {
+                VStack(spacing: 20) {
+                    Circle(fill: "#23796e").frame(width: 100, height: 100)
+                    Badge("定义")
+                }.frame(width: 160)
+                VStack(spacing: 16) {
+                    Heading("分层呈现内容", level: 2)
+                    Caption("标题、说明与编号步骤分别承担不同层次")
+                    Numbered(["陈述定义", "给出例子", "解释结论"]).font(20)
+                }
+            }
+        }.frame(width: 900, height: 330)
+    }
+}.notes("Center 将内容放在主体区域中央；Panel 提供实色面板。Heading 支持 1–4 级，Caption 用于说明，Numbered 用于编号步骤。Circle 和 Badge 可设置颜色与尺寸，所有元素均可进入统一动画时间线。")
+
+Slide(title: "侧栏、图元与加权分配", eyebrow: "22 / SIDEBAR + ROWS", subtitle: "Sidebar 突出说明栏；Rows 用权重分配剩余高度") {
+    Sidebar(spacing: 24) {
+        Panel {
+            VStack(spacing: 16) {
+                Heading("图元", level: 3)
+                Circle(fill: "#4258b8").frame(width: 84, height: 84)
+                Badge("节点 A")
+            }
+        }
+        Rows(weights: [2, 1], spacing: 18) {
+            Panel {
+                VStack(spacing: 16) {
+                    Heading("规则与进度", level: 3)
+                    Caption("Divider 分隔内容，Rectangle 可构建色块")
+                    Divider(thickness: 2)
+                    Rectangle(fill: "#23796e", radius: 10).frame(height: 40)
+                }
+            }
+            Progress(0.72, label: "任务完成度")
+                .appear(.rise, step: 1, duration: 600)
+        }
+    }
+}.notes("Columns 和 Rows 接受 weights 数组，数量与内容一致，数值必须大于零；显式 frame 尺寸优先。Progress 接受 0–1 的数值，也可直接传入计算结果，并显示百分比。形状以独立原生形状导出，圆形保持真实圆形几何。")
+
+Slide(title: "可复用的布局函数", eyebrow: "23 / FUNC + CONTENT", subtitle: "func 定义参数和默认值；Content 接收调用处的内容") {
+    HeaderBody(spacing: 24) {
+        Heading("同一布局，承载不同内容", level: 2)
+        Columns(weights: [1, 1], spacing: 24) {
+            ForumPanel(title: "方法", subtitle: "参数在调用处填写", spacing: 12) {
+                Numbered(["采集数据", "建立模型", "验证假设"]).font(18)
+            }
+            ForumPanel("结果", "内容在花括号中传入", spacing: 16) {
+                Progress(0.9, label: "验证通过率")
+            }
+        }
+    }
+}.notes("顶部定义的 ForumPanel 函数被重复调用，支持位置参数、命名参数和默认值。Content() 将调用处的内容插入定义的位置；函数中的 let 只在函数内生效。右键生成元素可定位到调用处，传入的内容可独立定位、复制与修改。")
+
+Slide(title: "三栏与统一面板", eyebrow: "24 / THREE COLUMNS", subtitle: "修改一个函数定义，更新所有调用") {
+    ThreeColumns(spacing: 24) {
+        ForumPanel("问题", "先明确边界") {
+            Text("需要解释的现象与限制条件。").font(22)
+        }
+        ForumPanel("证据", "再展示依据") {
+            Text("数据、公式与实验结果。").font(22)
+        }
+        ForumPanel("行动", "最后给出结论") {
+            Progress(0.65, label: "后续计划")
+        }
+    }
+}.notes("ThreeColumns 提供等宽三栏；内容较多时自动换行。函数调用支持 .frame、.padding、.foreground、.appear 等通用修饰符，动画在展开后的内容间共享时间线；导入、导出工程时保留函数源码。")
+
+Slide(title: "主次布局与编号槽位", eyebrow: "25 / FOCUS + SLOT", subtitle: "Slot(0)、Slot(1) 将两块内容放到定义中的指定位置") {
+    Focus(spacing: 24) {
+        ForumPanel("主要结论", "WeightedPair 是第二个布局函数") {
+            WeightedPair(gap: 20) {
+                Text("一个主要观点，配合一个关键指标。").font(24)
+                Progress(0.88, label: "置信水平").frame(height: 80)
+            }
+        }
+        Panel {
+            VStack(spacing: 18) {
+                Heading("布局选择", level: 3)
+                Bullets(["Center 居中", "Sidebar 侧栏", "HeaderBody 上下", "ThreeColumns 三栏", "Focus 主次"]).font(18)
+            }
+        }
+    }
+}.notes("布局函数可组合调用，并通过 Slot(index) 指定内容位置，序号从零开始。Content() 插入所有尚未使用的内容；缺少槽位、重复使用槽位、未使用内容、未知参数和递归都会报告具体错误。计算与展开均在本地解释执行。")
+
 `);

@@ -67,6 +67,9 @@ export function formatSource(
     width = Math.max(40, Math.min(160, options.width ?? 88)),
     unit = Math.max(2, Math.min(8, options.indent ?? 4));
   const statements = new Set<number>();
+  const componentFunctions = new Set(
+    root.declarations?.map((d) => d.name) || [],
+  );
   const walk = (call: Call) => {
     statements.add(call.from);
     call.children.forEach(walk);
@@ -151,7 +154,13 @@ export function formatSource(
       const statement =
         statementsMode &&
         node.kind === "atom" &&
-        (statements.has(start) || node.token.value === "let");
+        (statements.has(start) ||
+          node.token.value === "let" ||
+          node.token.value === "func" ||
+          ((/^[A-Z]/.test(node.token.value) ||
+            componentFunctions.has(node.token.value)) &&
+            value(previous) !== "func" &&
+            value(previous) !== "."));
       if (statement && output.trim() && col > lineIndent) {
         newline(indent, indent === 0 && node.token.value !== "let");
         previous = undefined;

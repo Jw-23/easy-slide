@@ -19,6 +19,7 @@ export type SourceRecord = {
   scopeBindings: string[];
   childBindings: string[];
   synthetic?: boolean;
+  generated?: boolean;
   bodyEnd?: number;
   assetRange?: { from: number; to: number; path: string };
 };
@@ -95,7 +96,8 @@ export class SourceMap {
         revealTo: end,
         scopeBindings: scope,
         childBindings: [...scope, ...(call.bindings || [])],
-        ...(synthetic ? { synthetic: true } : {}),
+        ...(synthetic || call.generated ? { synthetic: true } : {}),
+        ...(call.generated ? { generated: true } : {}),
       };
       if (tokens[endIndex + 1]?.value === "{") {
         let depth = 0;
@@ -108,7 +110,7 @@ export class SourceMap {
           }
         }
       }
-      if (call.name === "Image") {
+      if (call.name === "Image" && !call.generated) {
         const group =
           groups.find((g) => g[0].value === "src" && g[1]?.value === ":") ||
           groups.find((g) => g[1]?.value !== ":");
@@ -177,7 +179,7 @@ export class SourceMap {
       }
       return record;
     };
-    const globals = root.bindings || [];
+    const globals = [...(root.functions || []), ...(root.bindings || [])];
     add(root, { scope: "deck", page: 0 }, globals);
     let page = 0;
     const walk = (

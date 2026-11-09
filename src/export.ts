@@ -71,7 +71,11 @@ export async function buildPptx(
         });
       } else if (e.kind === "rect" && !e.glass && !faithful) {
         page.addShape(
-          (e.radius ?? 0) > 0 ? pptx.ShapeType.roundRect : pptx.ShapeType.rect,
+          e.shape === "ellipse"
+            ? pptx.ShapeType.ellipse
+            : (e.radius ?? 0) > 0
+              ? pptx.ShapeType.roundRect
+              : pptx.ShapeType.rect,
           {
             x: e.x / 96,
             y: e.y / 96,

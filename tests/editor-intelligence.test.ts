@@ -51,7 +51,7 @@ describe("tolerant editor AST", () => {
       model.ast.root.children
         .map((n) => model.infer(n))
         .filter((t) => t.kind === "component" && t.name === "Slide"),
-    ).toHaveLength(20);
+    ).toHaveLength(25);
     const multiline = 'Text("first\nsecond")';
     expect(tokenize(multiline, { tolerant: true })).toEqual(
       tokenize(multiline),
