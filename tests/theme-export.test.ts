@@ -143,3 +143,17 @@ it("exports mathematical continuation pages, headings, step numbering, endings, 
     ).toContain("证明的演讲备注");
   }
 });
+
+it("exports custom teaching title size, small body text and hidden footer", async () => {
+  const d = parseDeck(
+    'Deck("Teaching") DynamicSlide(title:"Teaching title",titleSize:24,fontSize:10,margin:20,padding:4,showFooter:false){Text("Small body")}',
+  );
+  const zip = await JSZip.loadAsync(
+    await (await buildPptx(d, {}, { textMode: "editable" })).arrayBuffer(),
+  );
+  const xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+  expect(xml).toContain('sz="1800"');
+  expect(xml).toContain('sz="750"');
+  expect(xml).toContain("Small body");
+  expect(xml).not.toContain("<a:t>01</a:t>");
+});

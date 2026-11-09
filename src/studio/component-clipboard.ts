@@ -142,30 +142,6 @@ export function insertionPoint(
   }
   const slide = deck.slides[target.page];
   if (!slide) return;
-  if (slide.dynamic?.independentColumns) {
-    const column =
-      map.records.find(
-        (r) =>
-          r.target.scope === "block" &&
-          r.target.page === target.page &&
-          r.name === "RightColumn",
-      ) ||
-      map.records.find(
-        (r) =>
-          r.target.scope === "block" &&
-          r.target.page === target.page &&
-          r.name === "LeftColumn",
-      );
-    if (column) return { record: column, inside: true };
-    const side = slide.blocks[1]?.children?.length ? 1 : 0;
-    if (slide.blocks[side]?.children?.length)
-      return insertionPoint(
-        deck,
-        map,
-        { scope: "block", page: target.page, path: [side, 0] },
-        after,
-      );
-  }
   const owner =
     slide.blocks.length === 1 && slide.blocks[0].type === "layout"
       ? map.get({ scope: "block", page: target.page, path: [0] })

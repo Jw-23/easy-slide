@@ -64,7 +64,7 @@ describe("dynamic page source navigation and editing", () => {
     ).toBe(3);
     expect(
       map.at(source.indexOf('Text("Fixed statement")') + 2, 3)?.target.page,
-    ).toBe(3);
+    ).toBe(1);
     expect(sourcePages(source).pages.map((c) => c.named.title)).toEqual([
       "Before",
       "Proof",
@@ -107,7 +107,10 @@ describe("dynamic page source navigation and editing", () => {
     ]);
     expect(titles(deleteSlideSource(source, 2))).toEqual(["Before", "After"]);
     expect(deleteSlideSource(source, 2)).toContain("// preserved");
-    expect(() => setSlideLayout(source, 2, "content")).toThrow(/独立左右栏/);
+    expect(
+      parseDeck(setSlideLayout(source, 2, "content")).slides[1].dynamic
+        ?.columns,
+    ).toBe(1);
   });
   it("supports editable column counts for sequential flow and adds content into explicit right columns", () => {
     const flow = 'Deck("D") Slide(title:"S"){Proof{Text("content")}}';
@@ -139,7 +142,15 @@ describe("dynamic page source navigation and editing", () => {
       clip = copyComponent(project(source), d, map, {
         scope: "block",
         page: 2,
-        path: [1, 0],
+        path: (
+          map.records.find(
+            (r) =>
+              r.name === "Proof" &&
+              r.generated &&
+              r.target.page === 2 &&
+              r.target.scope === "block",
+          )!.target as { path: number[] }
+        ).path,
       });
     expect(clip.snapshotOnly).toBe(true);
     expect(clip.text).toContain("Proof");
@@ -182,4 +193,50 @@ describe("dynamic page source navigation and editing", () => {
       }),
     );
   });
+});
+
+it("edits teaching page settings through local source changes", () => {
+  const updated = editSlide(source, 2, {
+    titleSize: 24,
+    fontSize: 10,
+    margin: 20,
+    padding: 4,
+    columnGap: 12,
+    showFooter: false,
+  });
+  expect(updated).toContain("// preserved");
+  const page = parseDeck(updated).slides[1];
+  expect(page).toMatchObject({
+    titleSize: 24,
+    fontSize: 10,
+    margin: 20,
+    padding: 4,
+    columnGap: 12,
+    showFooter: false,
+  });
+  expect(new SourceMap(updated).records.length).toBeGreaterThan(0);
+});
+
+it("keeps editing the same declaration when smaller text removes continuation pages", () => {
+  const text = "说明。".repeat(1200),
+    source =
+      'Deck("D") DynamicSlide(title:"Proof",fontSize:32){Text("' +
+      text +
+      '")} Slide(title:"After"){Text("After")}';
+  const d = parseDeck(source),
+    last = d.slides.length - 2;
+  expect(last).toBeGreaterThan(0);
+  const changed = editSlide(source, last, {
+    fontSize: 8,
+    margin: 0,
+    padding: 0,
+    showFooter: false,
+  });
+  expect(parseDeck(changed).slides[0]).toMatchObject({
+    fontSize: 8,
+    margin: 0,
+    padding: 0,
+    showFooter: false,
+  });
+  expect(parseDeck(changed).slides.at(-1)?.title).toBe("After");
 });

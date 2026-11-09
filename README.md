@@ -76,7 +76,7 @@ Slide(title: "从直觉到证明") {
 }.notes("先解释假设，再给出结论")
 ```
 
-数学环境 `Definition` / `Theorem` / `Proof` / `ProofStep` 等在普通 Slide 中默认自动续页，步骤编号跨页连续；`DynamicSlide` 支持双栏流和左右独立续页，可固定题目。完整用法见 [数学环境](docs/DSL.md#数学环境与自动续页)，应用模板中提供「数学证明」。
+数学环境 `Definition` / `Theorem` / `Proof` / `ProofStep` 等在普通 Slide 中默认自动续页，步骤编号跨页连续；`DynamicSlide` 支持双栏自然顺延，标题字号、正文与留白可按教学需求调整。完整用法见 [数学环境](docs/DSL.md#数学环境与自动续页)，应用模板中提供「数学证明」。
 
 ## 设计参考
 

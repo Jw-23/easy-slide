@@ -13,7 +13,17 @@ export type SlideEdit = Partial<
     | "direction"
     | "easing"
   >
->;
+> &
+  Pick<
+    Partial<Slide>,
+    | "titleSize"
+    | "fontSize"
+    | "margin"
+    | "padding"
+    | "titleGap"
+    | "columnGap"
+    | "showFooter"
+  >;
 function splice(source: string, from: number, to: number, value: string) {
   return source.slice(0, from) + value + source.slice(to);
 }
@@ -71,9 +81,25 @@ export function editSlide(
   index: number,
   patch: SlideEdit,
 ): string {
-  for (const key of ["title", "subtitle", "notes"] as const) {
+  const original = selected(source, index);
+  const ordinal = sourcePages(source).calls.findIndex(
+    (c) => c.from === original.from,
+  );
+  const owner = () => sourcePages(source).calls[ordinal];
+  for (const key of [
+    "title",
+    "subtitle",
+    "notes",
+    "titleSize",
+    "fontSize",
+    "margin",
+    "padding",
+    "titleGap",
+    "columnGap",
+    "showFooter",
+  ] as const) {
     if (patch[key] === undefined) continue;
-    const call = selected(source, index),
+    const call = owner(),
       value = JSON.stringify(patch[key]);
     source =
       key === "notes" &&
@@ -88,13 +114,18 @@ export function editSlide(
     )
   ) {
     const deck = parseDeck(source),
-      slide = { ...deck.slides[index], ...patch };
+      slide = {
+        ...deck.slides[
+          sourcePages(source).pages.findIndex((c) => c.from === owner().from)
+        ],
+        ...patch,
+      };
     const value =
       `.${slide.transition || deck.transition || "fade"}` +
       (slide.duration !== undefined ? `, duration: ${slide.duration}` : "") +
       (slide.direction ? `, direction: .${slide.direction}` : "") +
       (slide.easing ? `, easing: .${slide.easing}` : "");
-    source = modifier(source, selected(source, index), "transition", value);
+    source = modifier(source, owner(), "transition", value);
   }
   return source;
 }
@@ -118,8 +149,6 @@ export function setSlideLayout(source: string, index: number, layout: Layout) {
   if (dynamic) {
     if (!["content", "split"].includes(layout))
       throw Error("自动续页支持单栏或双栏；其他布局请在 DSL 中编辑");
-    if (layout === "content" && dynamic.independentColumns)
-      throw Error("独立左右栏需在 DSL 中调整结构");
     return named(source, slide, "columns", layout === "split" ? "2" : "1");
   }
   if (slide.args.length) {

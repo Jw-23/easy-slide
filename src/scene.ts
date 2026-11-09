@@ -1,3 +1,4 @@
+import { pageGeometry } from "./page-layout";
 import { contentHeight, mathMetrics, textHeight } from "./content-measure";
 import { mathHeading, proofEnds } from "./math-environments";
 import { parseRichText, type RichDocument } from "./rich-text";
@@ -55,8 +56,9 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     { accent, muted, panel } = theme,
     fg = s.color || theme.color;
   const e: Element[] = [];
+  const geometry = pageGeometry(s);
   const slideBounds: Bounds = { x: 0, y: 0, w: 1280, h: 720 },
-    contentBounds: Bounds = { x: 74, y: 250, w: 1132, h: 370 };
+    contentBounds: Bounds = geometry.body;
   let pendingTransform = { scale: 1, x: 0, y: 0 };
   const layoutPath = [0];
   let pageRoot = s.blocks[0];
@@ -162,11 +164,20 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     );
   if (s.eyebrow)
     atSource({ scope: "slide", page: index, field: "eyebrow" }, () =>
-      text(s.eyebrow!, 72, 48, 1100, 24, 13, accent, true),
+      text(
+        s.eyebrow!,
+        geometry.custom ? geometry.title.x : 72,
+        geometry.custom ? geometry.title.y - 28 : 48,
+        geometry.title.w,
+        24,
+        13,
+        accent,
+        true,
+      ),
     );
   const preset = pageLayout(s);
   const cover = ["cover", "section"].includes(preset);
-  if (cover) {
+  if (cover && !geometry.custom) {
     rect(72, 119, 44, 4, accent, 2);
     atSource({ scope: "slide", page: index, field: "title" }, () =>
       text(
@@ -186,18 +197,55 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       );
   } else {
     atSource({ scope: "slide", page: index, field: "title" }, () =>
-      text(s.title, 72, 104, 1136, 80, 42, fg, true),
+      text(
+        s.title,
+        geometry.title.x,
+        geometry.title.y,
+        geometry.title.w,
+        geometry.title.h,
+        geometry.title.size,
+        fg,
+        true,
+      ),
     );
     if (s.subtitle)
       atSource({ scope: "slide", page: index, field: "subtitle" }, () =>
-        text(s.subtitle!, 74, 183, 1130, 45, 19, muted),
+        text(
+          s.subtitle!,
+          geometry.title.x,
+          geometry.subtitleY,
+          geometry.title.w,
+          34,
+          19,
+          muted,
+        ),
       );
   }
-  atSource(
-    { scope: "deck", page: index, field: deck.author ? "author" : "title" },
-    () => text(deck.author || deck.title, 72, 664, 1000, 20, 12, muted),
-  );
-  text(String(index + 1).padStart(2, "0"), 1160, 662, 50, 22, 14, accent, true);
+  if (geometry.showFooter) {
+    atSource(
+      { scope: "deck", page: index, field: deck.author ? "author" : "title" },
+      () =>
+        text(
+          deck.author || deck.title,
+          geometry.title.x,
+          geometry.footerY,
+          1000,
+          20,
+          12,
+          muted,
+        ),
+    );
+    text(
+      String(index + 1).padStart(2, "0"),
+      1280 - geometry.title.x - 50,
+      geometry.footerY,
+      50,
+      22,
+      14,
+      accent,
+      true,
+    );
+  }
   function block(
     b: Block,
     x: number,
@@ -412,7 +460,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           cursor,
           m.inner,
           m.reason - 10,
-          Math.max(15, m.size - 4),
+          Math.max(8, m.size - 2),
           muted,
           false,
           step,
@@ -1049,15 +1097,24 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       });
     }
   }
-  if (s.layout) renderLayout(s.layout, s.blocks, 74, 250, 1132, 370, true);
+  if (s.layout)
+    renderLayout(
+      s.layout,
+      s.blocks,
+      contentBounds.x,
+      contentBounds.y,
+      contentBounds.w,
+      contentBounds.h,
+      true,
+    );
   else
     s.blocks.forEach((b, i) =>
       block(
-        b,
-        74,
-        250 + (i * 370) / Math.max(1, s.blocks.length),
-        1132,
-        370 / Math.max(1, s.blocks.length),
+        { ...b, size: b.size ?? s.fontSize },
+        contentBounds.x,
+        contentBounds.y + (i * contentBounds.h) / Math.max(1, s.blocks.length),
+        contentBounds.w,
+        contentBounds.h / Math.max(1, s.blocks.length),
         false,
         [i],
       ),

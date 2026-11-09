@@ -450,14 +450,6 @@ for (const name of Object.keys(mathEnvironments))
     ],
     name + '("${Title}") {\n    Text(`${Body}`)\n}',
   );
-for (const name of ["LeftColumn", "RightColumn"])
-  add(
-    name,
-    "container",
-    "Independent content flow in a two-column slide",
-    [named("repeat", boolean, "Repeat this column on continuation slides")],
-    name + " {\n    ${}\n}",
-  );
 for (const name of ["PageBreak", "ColumnBreak"])
   add(
     name,
@@ -476,10 +468,10 @@ add(
     ),
     named("columns", number, "One or two columns"),
     spacing,
-    named("fontSize", number, "Default body font size, 16–40"),
+    named("fontSize", number, "Default body font size, 8–64"),
     named("maxPages", number, "Maximum generated pages, 1–200"),
   ],
-  'DynamicSlide(title: "${Proof}", columns: 2) {\n    LeftColumn(repeat: true) { Theorem("${Conclusion}") { Text(`${Statement}`) } }\n    RightColumn { Proof { ProofStep("${First step}") { Text(`${Reasoning}`) } } }\n}',
+  'DynamicSlide(title: "${Proof}", columns: 2, fontSize: 18) {\n    Theorem("${Statement}") { Text(`${Content}`) }\n    Proof { ProofStep("${First step}") { Text(`${Reasoning}`) } }\n}',
 );
 signatures
   .get("Numbered")!
@@ -496,6 +488,17 @@ slideSpec.params.push(
   named("fontSize", number, "Default font size for automatic flow"),
   named("maxPages", number, "Maximum page count"),
 );
+for (const name of ["Slide", "DynamicSlide"])
+  signatures
+    .get(name)!
+    .params.push(
+      named("titleSize", number, "Slide title font size, 8–96"),
+      named("margin", number, "Outer page margin in pixels, 0–160"),
+      named("padding", number, "Content padding in pixels, 0–120"),
+      named("titleGap", number, "Gap below the title in pixels, 0–80"),
+      named("columnGap", number, "Column gap in pixels, 0–120"),
+      named("showFooter", boolean, "Show author and page number"),
+    );
 const views = [...signatures.values()]
   .filter(
     (s) =>
