@@ -142,7 +142,7 @@ describe("scope-aware static inference", () => {
     expect(typeOf(source, "total")).toBe("Number");
     expect(typeOf(source, "text")).toBe("String");
     expect(typeOf(source, "columns")).toBe("[Column]");
-    expect(typeOf("let f=x=>f(x)\nlet result=f(1)", "result")).toBe("未知");
+    expect(typeOf("let f=x=>f(x)\nlet result=f(1)", "result")).toBe("Unknown");
     expect(typeOf("let huge=range(0,1e12).map(x=>[x,x*x])", "huge")).toBe(
       "[[Number]]",
     );

@@ -79,7 +79,7 @@ const optionFor = (s: Signature, boost = 0): Completion =>
 function argumentTemplate(p: ParameterSpec) {
   if (p.snippet) return p.snippet;
   if (p.enums) return ".${" + p.enums[0] + "}";
-  if (p.type.kind === "string") return '"${文字}"';
+  if (p.type.kind === "string") return '"${Text}"';
   if (p.type.kind === "boolean") return "${true}";
   if (p.type.kind === "array") return "${[]}";
   const value =
@@ -152,10 +152,10 @@ export function completeDsl(
         type: "text",
         detail:
           kind === "asset"
-            ? "工程素材"
+            ? "Project asset"
             : kind === "format"
-              ? "数字格式"
-              : "颜色",
+              ? "Number format"
+              : "Color",
       })),
     };
   }
@@ -208,11 +208,11 @@ export function completeDsl(
         ...["map", "filter", "reduce"].map((n) =>
           optionFor(signatures.get(n)!),
         ),
-        { label: "length", type: "property", detail: "Number · 数组长度" },
+        { label: "length", type: "property", detail: "Number · Array length" },
       ]);
     if (type.kind === "string")
       return result([
-        { label: "length", type: "property", detail: "Number · 文字长度" },
+        { label: "length", type: "property", detail: "Number · String length" },
       ]);
     if (type.kind === "component")
       return result(
@@ -261,7 +261,7 @@ export function completeDsl(
     for (const param of ctx.signature.params.filter(
       (p) => p.named && !used.has(p.name),
     )) {
-      const info = `${param.detail}\n类型：${typeLabel(param.type)}${param.enums ? " · " + param.enums.map((v) => "." + v).join(" / ") : ""}`;
+      const info = `${param.detail}\nType: ${typeLabel(param.type)}${param.enums ? " · " + param.enums.map((v) => "." + v).join(" / ") : ""}`;
       options.push(
         argument!.colon !== undefined
           ? {
@@ -317,7 +317,7 @@ export function completeDsl(
         label: symbol.name,
         type: type.kind === "function" ? "function" : "variable",
         detail: model.symbolDescription(symbol),
-        info: `${symbol.name}: ${typeLabel(type)}\n仅提示当前作用域中已经定义的名称。`,
+        info: `${symbol.name}: ${typeLabel(type)}\nOnly names already defined in the current scope are suggested.`,
         boost:
           25 +
           model.expectedBoost(
@@ -365,7 +365,7 @@ export function completeDsl(
         snippetCompletion("${x} => ${x}", {
           label: "x => …",
           type: "function",
-          detail: "回调函数",
+          detail: "Callback function",
           boost: 80,
         }),
       );
@@ -404,7 +404,11 @@ export function completeDsl(
     options.push(
       snippetCompletion(
         "func \${Name}(\${title}, spacing = 24) {\n    VStack(spacing: spacing) {\n        Heading(title)\n        Content()\n    }\n}",
-        { label: "func", type: "keyword", detail: "定义可复用布局函数" },
+        {
+          label: "func",
+          type: "keyword",
+          detail: "Define a reusable layout function",
+        },
       ),
     );
   const hasContent = block?.children.some(
@@ -415,7 +419,7 @@ export function completeDsl(
       snippetCompletion("let ${name} = ${value}", {
         label: "let",
         type: "keyword",
-        detail: "定义当前作用域中的常量",
+        detail: "Define a constant in the current scope",
       }),
     );
   return result(options);
