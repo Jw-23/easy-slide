@@ -24,7 +24,7 @@ describe("startup feature tour", () => {
       assets: initialAssets,
     });
     expect(parseDeck(p.source)).toEqual(showcaseDeck);
-    expect(showcaseDeck.slides).toHaveLength(26);
+    expect(showcaseDeck.slides).toHaveLength(27);
     expect(Object.keys(p.assets)).toEqual(["assets/convergence.png"]);
     expect(p.assets["assets/convergence.png"]).toMatch(
       /^data:image\/png;base64,/,

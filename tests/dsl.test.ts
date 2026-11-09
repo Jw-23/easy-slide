@@ -37,8 +37,7 @@ describe("DSL compilation", () => {
       {
         type: "text",
         text: "precise",
-        x: 100,
-        y: 150,
+        position: { x: 100, y: 520, relativeTo: "slide" },
         w: 200,
         h: 50,
         size: 22,

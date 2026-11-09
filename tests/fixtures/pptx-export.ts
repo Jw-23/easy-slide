@@ -18,11 +18,11 @@ Slide(title: "中文换行与数学排版", subtitle: "保持文字、表格和�
 }.notes("源码中的备注应保留在 PPTX。")
 Slide(title: "毛玻璃采样下层图片", subtitle: "图片、面板、文字保持各自的层级") {
   ZStack {
-    Image("assets/convergence.png").frame(x:74,y:250,width:700,height:370)
+    Image("assets/convergence.png").frame(width: 700, height: 370).position(x: 74, y: 100, relativeTo: .slide)
     Glass {
       Text("玻璃后的图表").font(28)
-    }.glass(blur:14,opacity:0.38,radius:20).frame(x:190,y:330,width:400,height:150)
-    Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#).frame(x:820,y:300,width:360,height:220)
+    }.glass(blur:14,opacity:0.38,radius:20).frame(width: 400, height: 150).position(x: 190, y: 240, relativeTo: .slide)
+    Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#).frame(width: 360, height: 220).position(x: 820, y: 200, relativeTo: .slide)
   }
 }.transition(.zoom,duration:440)
 Slide(title: "自动、点击、并行与先后", subtitle: "第 1 阶段自动；两次点击依次进入 step 1 与 step 3") {

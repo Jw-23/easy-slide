@@ -147,7 +147,7 @@ export default function StudioDialogs({
             {
               deck: showcaseDeck,
               title: "功能示例",
-              detail: "26 页 · 组件、主题、公式与动画",
+              detail: "27 页 · 组件、主题、公式与动画",
               icon: BookOpen,
             },
             {
@@ -268,11 +268,26 @@ ResultPanel(title: "结论") {
             Rows 用 weights 分配剩余宽度或高度，Panel
             提供面板。函数名、参数与插槽均有代码提示。
           </p>
+          <h3>位置、尺寸与缩放</h3>
+          <pre>{`Image("assets/plot.png")
+    .frame(width: 400, height: 200)
+    .position(x: 24, y: 24,
+              reference: .bottomLeft, anchor: .bottomLeft)
+    .scale(1.5)`}</pre>
+          <p>
+            position 默认参考父内容区的左下角，x 向右、y 向上。 reference
+            选择参考点，anchor 选择元素自身锚点，relativeTo: .slide
+            使用整个画布。frame 设置布局占位，scale
+            按锚点缩放最终内容，保持位置； 没有 position 时默认围绕中心缩放。旧
+            frame 的 x/y 参数请改用 position。
+          </p>
           <h3>布局与动画</h3>
           <p>
             使用 HStack / VStack / ZStack / Grid 自由嵌套，Spacer
-            分配空白。修饰符 .font()、.foreground()、.background()、.frame(x:,
-            y:, width:, height:)、.padding()、.step() 控制呈现；页面支持
+            分配空白。修饰符
+            .font()、.foreground()、.background()、.frame(width:,
+            height:)、.position(x:, y:, reference:,
+            anchor:)、.scale()、.padding()、.step() 控制呈现；页面支持
             .transition() 与 .notes()。用 .appear() 定义入场效果、step
             点击阶段、order 组内顺序、delay 延迟、duration 时长和 easing
             缓动。编辑器支持代码提示和行内错误定位。图片使用 assets/

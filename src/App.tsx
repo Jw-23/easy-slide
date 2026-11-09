@@ -31,7 +31,7 @@ export default function App() {
   const params = new URLSearchParams(window.location.search);
   const draftKey =
     params.get("example") === "features"
-      ? `draft:feature-tour:${["1", "2", "3", "4"].includes(params.get("revision") || "") ? params.get("revision") : "5"}`
+      ? `draft:feature-tour:${["1", "2", "3", "4", "5"].includes(params.get("revision") || "") ? params.get("revision") : "6"}`
       : "draft";
   const s = useStudio(draftKey),
     workspace = useWorkspace();

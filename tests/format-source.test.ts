@@ -51,7 +51,7 @@ Text("short")
     const source = serialize(showcaseDeck),
       formatted = formatSource(source);
     expect(tokens(formatted)).toEqual(tokens(source));
-    expect(parseDeck(formatted).slides).toHaveLength(26);
+    expect(parseDeck(formatted).slides).toHaveLength(27);
     expect(formatSource(formatted)).toBe(formatted);
   });
 });

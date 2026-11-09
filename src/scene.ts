@@ -3,9 +3,26 @@ import type { SceneTarget } from "./studio/source-map";
 import { resolveTheme, headerText } from "./themes";
 import { tableModel } from "./table";
 import { backdropData } from "./materials";
-import { pageLayout } from "./dsl";
+import { pageLayout, type positionAnchors } from "./dsl";
 import type { Block, Deck, Slide, Motion, GlassStyle } from "./dsl";
 export const TEXT_LINE_HEIGHT = 1.42;
+type Bounds = { x: number; y: number; w: number; h: number };
+function anchorPoint(
+  anchor: (typeof positionAnchors)[number],
+): [number, number] {
+  return [
+    anchor === "left" || anchor.endsWith("Left")
+      ? 0
+      : anchor === "right" || anchor.endsWith("Right")
+        ? 1
+        : 0.5,
+    anchor === "top" || anchor.startsWith("top")
+      ? 0
+      : anchor === "bottom" || anchor.startsWith("bottom")
+        ? 1
+        : 0.5,
+  ];
+}
 export type Element = {
   source?: SceneTarget;
   kind: "text" | "rect" | "image" | "equation";
@@ -36,6 +53,9 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     { accent, muted, panel } = theme,
     fg = s.color || theme.color;
   const e: Element[] = [];
+  const slideBounds: Bounds = { x: 0, y: 0, w: 1280, h: 720 },
+    contentBounds: Bounds = { x: 74, y: 250, w: 1132, h: 370 };
+  let pendingTransform = { scale: 1, x: 0, y: 0 };
   const layoutPath = [0];
   let pageRoot = s.blocks[0];
   while (pageRoot?.type === "component" && pageRoot.children?.length === 1) {
@@ -181,6 +201,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     h: number,
     card: boolean,
     path: number[],
+    parent: Bounds = contentBounds,
   ) {
     const previousSource = activeSource;
     activeSource = { scope: "block", page: index, path };
@@ -193,7 +214,52 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       activeMotion = { effect: "rise", duration: 450 };
       activeKey = "motion-" + counter++;
     }
+    w = b.w ?? w;
+    h = b.h ?? h;
+    let anchor: [number, number] = [0.5, 0.5];
+    if (b.position) {
+      const pos = b.position,
+        reference = pos.relativeTo === "slide" ? slideBounds : parent,
+        ref = anchorPoint(pos.reference || "bottomLeft");
+      anchor = anchorPoint(pos.anchor || pos.reference || "bottomLeft");
+      let targetX = reference.x + reference.w * ref[0] + (pos.x ?? 0),
+        targetY = reference.y + reference.h * ref[1] - (pos.y ?? 0);
+      if (pos.relativeTo === "slide") {
+        targetX = (targetX - pendingTransform.x) / pendingTransform.scale;
+        targetY = (targetY - pendingTransform.y) / pendingTransform.scale;
+      }
+      x = targetX - w * anchor[0];
+      y = targetY - h * anchor[1];
+    }
+    const first = e.length,
+      scale = b.scale ?? 1,
+      pivotX = x + w * anchor[0],
+      pivotY = y + h * anchor[1];
+    const previousTransform = pendingTransform;
+    pendingTransform = {
+      scale: previousTransform.scale * scale,
+      x: previousTransform.x + previousTransform.scale * pivotX * (1 - scale),
+      y: previousTransform.y + previousTransform.scale * pivotY * (1 - scale),
+    };
     renderBlock(b, x, y, w, h, card);
+    pendingTransform = previousTransform;
+    if (scale !== 1)
+      for (let i = first; i < e.length; i++) {
+        const item = e[i],
+          glassRadius = item.glass?.radius ?? item.radius ?? 28;
+        item.x = pivotX + (item.x - pivotX) * scale;
+        item.y = pivotY + (item.y - pivotY) * scale;
+        item.w *= scale;
+        item.h *= scale;
+        if (item.size !== undefined) item.size *= scale;
+        if (item.radius !== undefined) item.radius *= scale;
+        if (item.glass)
+          item.glass = {
+            ...item.glass,
+            blur: (item.glass.blur ?? 24) * scale,
+            radius: glassRadius * scale,
+          };
+      }
     activeMotion = previousMotion;
     activeKey = previousKey;
     activeSource = previousSource;
@@ -206,10 +272,6 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     h: number,
     card: boolean,
   ) {
-    x = b.x ?? x;
-    y = b.y ?? y;
-    w = b.w ?? w;
-    h = b.h ?? h;
     const step = b.step || 0,
       c = b.color || fg;
     if (card) {
@@ -423,6 +485,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
             ...(activeSource.scope === "block" ? activeSource.path : []),
             children.indexOf(c),
           ],
+          { x, y, w, h },
         );
       if (b.type === "zstack") children.forEach((c) => child(c, x, y, w, h));
       else if (b.type === "grid") {
@@ -718,6 +781,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         Math.max(0, bh),
         card,
         [...(activeSource.scope === "block" ? activeSource.path : []), i],
+        { x, y, w, h },
       );
     }
     if (preset === "center") {

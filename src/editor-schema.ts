@@ -1,5 +1,12 @@
 import { themeIds } from "./themes";
-import { effects, easings, layouts, layoutComponents } from "./dsl";
+import {
+  effects,
+  easings,
+  layouts,
+  layoutComponents,
+  positionAnchors,
+  positionReferences,
+} from "./dsl";
 
 export type ValueType = {
   kind:
@@ -464,8 +471,8 @@ for (const [name, type, detail, snippet] of [
 add(
   "frame",
   "modifier",
-  "固定尺寸或画布绝对位置，像素",
-  ["x", "y", "width", "height"].map((n) =>
+  "布局尺寸，像素；位置使用 position，缩放使用 scale",
+  ["width", "height"].map((n) =>
     named(
       n,
       number,
@@ -481,6 +488,39 @@ add(
   unknown,
   views,
 );
+add(
+  "position",
+  "modifier",
+  "参考点与自身锚点分开；x 向右，y 向上，默认父内容区左下角",
+  [
+    named("x", number, "向右偏移，可为负数"),
+    named("y", number, "向上偏移，可为负数"),
+    enumParam("reference", positionAnchors, "参考区域上的点，默认 bottomLeft"),
+    enumParam(
+      "anchor",
+      positionAnchors,
+      "元素自身的锚点，默认与 reference 一致",
+    ),
+    enumParam(
+      "relativeTo",
+      positionReferences,
+      "参考父内容区或整个画布，默认 parent",
+    ),
+  ],
+  "position(x: ${24}, y: ${24}, reference: .${bottomLeft}, anchor: .${bottomLeft})",
+  unknown,
+  views,
+);
+add(
+  "scale",
+  "modifier",
+  "呈现缩放系数，大于 0 且不超过 10；不改变布局占位",
+  [p("factor", number, "统一缩放系数")],
+  "scale(${1.2})",
+  unknown,
+  views,
+);
+
 add(
   "glass",
   "modifier",

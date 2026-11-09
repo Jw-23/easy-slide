@@ -135,3 +135,36 @@ test("backtick strings keep single LaTeX backslashes through completion and form
   await expect(editor).toContainText("`\\nabla f(x)`");
   await expect(page.locator(".preview-wrap")).toContainText("误差");
 });
+
+test("position reference and scale keep the bottom-left point and preview coordinates stable", async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .locator(".tabs")
+    .getByRole("tab", { name: "DSL", exact: true })
+    .click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  await editor.fill(
+    'Deck("Position") Theme(preset:.paper) Slide(title:"S"){Panel(fill:"#eeeeee"){ZStack{Rectangle(fill:"#ff0000").frame(width:100,height:50).position(x:10,y:15).scale(2)}}.frame(width:500,height:300).padding(20).position(x:100,y:220,relativeTo:.slide)}',
+  );
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
+  await expect
+    .poll(async () =>
+      page.locator(".preview-wrap [data-scene-element]").evaluateAll((nodes) =>
+        nodes
+          .filter(
+            (n) => (n as HTMLElement).style.background === "rgb(255, 0, 0)",
+          )
+          .map((n) => {
+            const s = (n as HTMLElement).style;
+            return [s.left, s.top, s.width, s.height];
+          }),
+      ),
+    )
+    .toEqual([["130px", "365px", "200px", "100px"]]);
+  await editor.fill(
+    'Deck("Position") Slide(title:"S"){Text("X").frame(x:10,y:20)}',
+  );
+  await expect(page.locator(".editor-diagnostic")).toContainText("position");
+});
