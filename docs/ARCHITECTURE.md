@@ -53,6 +53,8 @@ PPTX 模块在导出时加载，代码编辑器在打开 DSL 面板时加载。�
 
 ## 数学环境与自动分页
 
-`math-environments.ts` 在分页前完成环境编号和证明内步骤编号。`content-measure.ts` 用同一富文本 AST、浏览器 Canvas 字形和 MathJax 尺寸测量自然高度；非浏览器环境使用保守字宽。`pagination.ts` 将普通数学 Slide 或 DynamicSlide 排成物理页面，拆分纵向环境和长文字，重复环境标题，保留样式和运动配置；独立左右栏分别分页并可重复单侧内容。固定 frame 高度参与占位，自由 position / scale 需显式关闭自动分页。
+`math-environments.ts` 在分页前完成环境编号和证明内步骤编号。`content-measure.ts` 用同一富文本 AST、浏览器 Canvas 字形和 MathJax 尺寸测量自然高度；非浏览器环境使用保守字宽。`pagination.ts` 将普通数学 Slide 或 DynamicSlide 排成物理页面，拆分纵向环境和长文字，重复环境标题，保留样式和运动配置；所有内容按栏自然顺延，旧的侧栏包装仅作为纵向容器解释。固定 frame 高度参与占位，自由 position / scale 需显式关闭自动分页。
 
 物理页面保留声明序号、原始声明源码和片段的 sourcePath。序列化只写一次原始动态声明，不把分页结果固化成多份 DSL。`studio/page-groups.ts` 在物理页与原始声明间映射，组级操作不会截断证明；SourceMap 把每个生成片段映射回原始环境和词法作用域，复制时移除计算生成的尺寸与定位。scene 与分页共享环境度量，并为内容流固定自然尺寸，PPTX 继续使用同一几何和动画树。
+
+`page-layout.ts` 统一计算标题、正文和页脚位置，分页与场景共享计算结果。教学页使用紧凑默认值，支持标题字号、8px 起正文字号、外边距、正文内边距、标题间距、栏间距与可隐藏页脚。

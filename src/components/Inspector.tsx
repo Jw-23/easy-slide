@@ -119,16 +119,7 @@ export function Inspector({
                 ).map((layout) => (
                   <button
                     key={layout}
-                    disabled={
-                      locked ||
-                      (slide.dynamic?.independentColumns &&
-                        layout === "content")
-                    }
-                    title={
-                      slide.dynamic?.independentColumns && layout === "content"
-                        ? "独立左右栏需在 DSL 中调整结构"
-                        : undefined
-                    }
+                    disabled={locked}
                     aria-pressed={
                       layout ===
                       (slide.dynamic
@@ -156,6 +147,49 @@ export function Inspector({
                 ))}
               </div>
             </section>
+            <details className="settings-section" open>
+              <summary>教学版式</summary>
+              {(
+                [
+                  ["titleSize", "标题字号", 8, 96, slide.dynamic ? 32 : 42],
+                  ["fontSize", "正文字号", 8, 64, 22],
+                  ["margin", "页边距", 0, 160, 32],
+                  ["padding", "内容内边距", 0, 120, 8],
+                  ["titleGap", "标题与正文间距", 0, 80, 12],
+                  ["columnGap", "栏间距", 0, 120, 20],
+                ] as const
+              ).map(([key, label, min, max, fallback]) => (
+                <label key={key}>
+                  {label}
+                  <input
+                    type="number"
+                    aria-label={label}
+                    min={min}
+                    max={max}
+                    value={slide[key] ?? fallback}
+                    disabled={locked}
+                    onChange={(e) => {
+                      if (e.target.value !== "")
+                        s.field({ [key]: Number(e.target.value) });
+                    }}
+                  />
+                </label>
+              ))}
+              <label>
+                页脚
+                <select
+                  aria-label="页脚"
+                  disabled={locked}
+                  value={slide.showFooter === false ? "hide" : "show"}
+                  onChange={(e) =>
+                    s.field({ showFooter: e.target.value === "show" })
+                  }
+                >
+                  <option value="show">显示</option>
+                  <option value="hide">隐藏</option>
+                </select>
+              </label>
+            </details>
             <details className="settings-section" open>
               <summary>页面过渡</summary>
               <label>

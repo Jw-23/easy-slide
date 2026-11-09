@@ -164,7 +164,7 @@ export default function StudioDialogs({
             {
               deck: mathProofDeck,
               title: "数学证明",
-              detail: "自动续页、独立双栏与证明步骤",
+              detail: "自然分栏、自动续页与证明步骤",
               icon: Code2,
             },
             {
@@ -246,11 +246,13 @@ Slide(title: "一个清晰的结论") {
             }
           </pre>
           <p>
-            DynamicSlide(columns: 2) 先填左栏再填右栏；LeftColumn / RightColumn
-            定义独立内容流，repeat: true 在续页重复该栏。PageBreak()
-            开始下一页，ColumnBreak()
-            开始下一栏。页面列表中的复制、移动、删除作用于整组动态页。需要手动定位或缩放时，用
-            Slide(autoPages: false) 关闭自动续页。
+            DynamicSlide(columns: 2)
+            按第一栏、第二栏、下一页自然顺延，无需分别定义左右栏。 titleSize
+            设置标题字号，fontSize 设置正文（8–64），margin 设置页边距，padding
+            设置内容内边距，columnGap 设置栏间距，titleGap
+            设置标题与正文间距。showFooter: false 隐藏页脚，增加可用空间。
+            PageBreak() 和 ColumnBreak()
+            可手动控制换页、换栏；页面操作作用于整组续页。
           </p>
           <h3>富文本与行内公式</h3>
           <pre>

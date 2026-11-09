@@ -57,7 +57,7 @@ describe("mathematical environments and automatic slides", () => {
     ).toBeGreaterThan(600);
     expect(scene(d, d.slides[1], 1).some((e) => e.text === "4")).toBe(true);
   });
-  it("can repeat a theorem on the left while the proof continues on the right", () => {
+  it("reads legacy side wrappers in sequential order without repeating content", () => {
     const d = parseDeck(
       'Deck("D") DynamicSlide(title:"证明",columns:2){LeftColumn(repeat:true){Theorem("命题"){Text("原命题")}} RightColumn{Proof{' +
         Array.from(
@@ -67,8 +67,11 @@ describe("mathematical environments and automatic slides", () => {
         "}}}",
     );
     expect(d.slides.length).toBeGreaterThan(1);
-    for (const [i, s] of d.slides.entries())
-      expect(scene(d, s, i).filter((e) => e.text === "原命题")).toHaveLength(1);
+    expect(
+      d.slides
+        .flatMap((s, i) => scene(d, s, i))
+        .filter((e) => e.text === "原命题"),
+    ).toHaveLength(1);
   });
   it("splits long formatted text, keeping formulas atomic and explicit breaks effective", () => {
     const d = parseDeck(
@@ -175,7 +178,8 @@ it("retains flow/column styles and delays QED until the final proof stage", asyn
   const right = scene(col, col.slides[0], 0).find((e) => e.text === "right")!;
   expect(right.size).toBe(18);
   expect(right.color).toBe("#315973");
-  expect(right.x).toBeGreaterThan(674);
+  expect(right.x).toBeGreaterThan(40);
+  expect(right.x).toBeLessThan(640);
 });
 
 it("detects nested page breaks in a normal Slide without a math environment", () => {
@@ -184,4 +188,46 @@ it("detects nested page breaks in a normal Slide without a math environment", ()
   );
   expect(d.slides).toHaveLength(2);
   expect(scene(d, d.slides[1], 1).some((e) => e.text === "B")).toBe(true);
+});
+
+it("uses teaching page geometry, small fonts and natural column order in preview and serialization", () => {
+  const d = parseDeck(
+    'Deck("D") DynamicSlide(title:"教学",columns:2,titleSize:24,fontSize:10,margin:20,padding:4,titleGap:8,columnGap:30,showFooter:false){' +
+      Array.from(
+        { length: 7 },
+        (_, i) => `Text("教学内容${i}").frame(height:250)`,
+      ).join(" ") +
+      "}",
+  );
+  expect(d.slides).toHaveLength(2);
+  const first = scene(d, d.slides[0], 0),
+    second = scene(d, d.slides[1], 1);
+  expect(first.find((e) => e.text === "教学")?.size).toBe(24);
+  expect(first.find((e) => e.text === "教学内容0")).toMatchObject({
+    x: 24,
+    size: 10,
+  });
+  expect(first.find((e) => e.text === "教学内容2")!.x).toBeGreaterThan(640);
+  expect(second.some((e) => e.text === "教学内容4")).toBe(true);
+  expect(first.some((e) => e.text === "01")).toBe(false);
+  for (const e of [...first, ...second])
+    expect(e.y + e.h).toBeLessThanOrEqual(720);
+  expect(parseDeck(serialize(d))).toEqual(d);
+  const small = parseDeck(
+    'Deck("D") Slide(title:"S",fontSize:8){ProofStep("小字"){Text("解释")}}',
+  );
+  expect(
+    scene(small, small.slides[0], 0).find((e) => e.text === "解释")?.size,
+  ).toBe(8);
+  for (const option of [
+    "fontSize:7",
+    "titleSize:100",
+    "margin:200",
+    "padding:-1",
+    "columnGap:200",
+    "showFooter:1",
+  ])
+    expect(() =>
+      parseDeck('Deck("D") Slide(title:"S",' + option + '){Text("A")}'),
+    ).toThrow();
 });
