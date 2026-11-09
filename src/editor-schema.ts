@@ -294,8 +294,107 @@ add(
   'Column("${标题}", width: ${1}, align: .${right}, format: "${0.00}")',
   column,
 );
+for (const name of ["Heading", "Caption", "Badge"]) {
+  add(
+    name,
+    "view",
+    (
+      { Heading: "分级标题", Caption: "说明文字", Badge: "徽标" } as Record<
+        string,
+        string
+      >
+    )[name],
+    [
+      p("text", string, "文字"),
+      named("text", string, "文字"),
+      ...(name === "Heading" ? [named("level", number, "标题层级 1–4")] : []),
+      ...(name === "Badge"
+        ? [color("fill"), named("radius", number, "圆角")]
+        : []),
+    ],
+    `${name}("\${内容}"${name === "Heading" ? ", level: 2" : ""})`,
+  );
+}
+add(
+  "Numbered",
+  "view",
+  "编号列表",
+  [p("items", array(string), "条目"), named("items", array(string), "条目")],
+  'Numbered(["\${第一步}", "\${第二步}"])',
+);
+for (const name of ["Rectangle", "Circle"])
+  add(
+    name,
+    "view",
+    name === "Circle" ? "圆形" : "矩形",
+    [
+      color("fill"),
+      ...(name === "Rectangle" ? [named("radius", number, "圆角")] : []),
+    ],
+    `${name}(fill: "\${#23796e}").frame(width: 100, height: 100)`,
+  );
+add(
+  "Divider",
+  "view",
+  "分隔线",
+  [
+    enumParam("direction", ["horizontal", "vertical"], "方向"),
+    named("thickness", number, "线宽 0–100"),
+  ],
+  "Divider(thickness: \${2})",
+);
+add(
+  "Progress",
+  "view",
+  "进度条",
+  [
+    p("value", number, "进度 0–1"),
+    named("value", number, "进度 0–1"),
+    named("label", string, "说明"),
+    named("showValue", boolean, "显示百分比"),
+    color("fill"),
+  ],
+  'Progress(\${0.75}, label: "\${完成度}")',
+);
+for (const name of ["Columns", "Rows"])
+  add(
+    name,
+    "container",
+    "按权重分配空间",
+    [
+      spacing,
+      named("weights", array(number), "每个内容的正数权重"),
+      enumParam(
+        "alignment",
+        name === "Columns"
+          ? ["top", "center", "bottom"]
+          : ["leading", "center", "trailing"],
+        "交叉轴对齐",
+      ),
+    ],
+    `${name}(weights: [1, 2], spacing: 24) {\n    \${}\n}`,
+  );
+add(
+  "Panel",
+  "container",
+  "实色面板",
+  [color("fill"), named("radius", number, "圆角")],
+  "Panel {\n    \${}\n}",
+);
+add("Content", "container", "函数中放置所有剩余传入内容", [], "Content()");
+add(
+  "Slot",
+  "container",
+  "函数中放置指定序号内容",
+  [p("index", number, "从 0 开始的内容序号")],
+  "Slot(\${0})",
+);
 const views = [...signatures.values()]
-  .filter((s) => ["view", "container"].includes(s.category))
+  .filter(
+    (s) =>
+      ["view", "container"].includes(s.category) &&
+      !["Content", "Slot"].includes(s.name),
+  )
   .map((s) => s.name);
 add(
   "transition",

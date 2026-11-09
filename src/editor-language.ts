@@ -48,7 +48,7 @@ export const slideLanguage = StreamLanguage.define({
       }
     if (stream.match(/^-?\d+(\.\d+)?/)) return "number";
     if (stream.match(/^\.[A-Za-z_]\w*/)) return "atom";
-    if (stream.match(/^(?:let|true|false|null)\b/)) return "keyword";
+    if (stream.match(/^(?:let|func|true|false|null)\b/)) return "keyword";
     if (stream.match(/^[A-Za-z_]\w*/))
       return /^[A-Z]/.test(stream.current()) ? "keyword" : "propertyName";
     stream.next();
@@ -155,7 +155,7 @@ export function completeDsl(
   if (
     path.some(
       (n) =>
-        n.kind === "parameter" ||
+        (n.kind === "parameter" && pos < (n.equals ?? n.to + 1)) ||
         (n.kind === "binding" &&
           pos >= n.from + 3 &&
           pos < (n.equals ?? n.to + 1)),
@@ -294,11 +294,14 @@ export function completeDsl(
       n.kind === "argument" ||
       n.kind === "array" ||
       n.kind === "lambda" ||
+      (n.kind === "parameter" && n.equals !== undefined && pos >= n.equals) ||
       n.kind === "binary",
   );
   const expected = model.expectedAt(pos);
   if (inExpression) {
-    const visible = model.visibleSymbols(pos);
+    const visible = model
+      .visibleSymbols(pos)
+      .filter((s) => s.node.kind !== "declaration");
     for (const symbol of visible) {
       const type = model.symbolType(symbol);
       const details: Completion = {
@@ -377,7 +380,23 @@ export function completeDsl(
         ? s.category === "root" && (s.name === "Slide" || !existing.has(s.name))
         : ["view", "container"].includes(s.category),
   );
-  options.push(...declarations.map((s) => optionFor(s)));
+  const inFunction = path.some((n) => n.kind === "declaration");
+  options.push(
+    ...declarations
+      .filter((spec) => inFunction || !["Content", "Slot"].includes(spec.name))
+      .map((s) => optionFor(s)),
+  );
+  if (!root)
+    options.push(
+      ...model.componentFunctions(pos).map((spec) => optionFor(spec)),
+    );
+  if (root)
+    options.push(
+      snippetCompletion(
+        "func \${Name}(\${title}, spacing = 24) {\n    VStack(spacing: spacing) {\n        Heading(title)\n        Content()\n    }\n}",
+        { label: "func", type: "keyword", detail: "定义可复用布局函数" },
+      ),
+    );
   const hasContent = block?.children.some(
     (n) => n.kind !== "binding" && n.to < pos,
   );

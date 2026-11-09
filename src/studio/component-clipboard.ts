@@ -20,6 +20,7 @@ export type ComponentClip = {
   assets: Record<string, string>;
   images: { from: number; to: number; path: string }[];
   snapshotOnly: boolean;
+  snapshotForAssets?: boolean;
 };
 export function blockAt(deck: Deck, target: SceneTarget): Block | undefined {
   if (target.scope !== "block") return;
@@ -51,7 +52,9 @@ export function copyComponent(
     record = map.get(target);
   if (!block || !record) throw Error("请选择内容组件");
   const assets: Record<string, string> = {};
+  let hasCustom = false;
   const collect = (b: Block) => {
+    if (b.type === "component") hasCustom = true;
     if (b.src) {
       if (!project.assets[b.src]) throw Error(`找不到图片：${b.src}`);
       assets[b.src] = project.assets[b.src];
@@ -69,6 +72,7 @@ export function copyComponent(
     assets,
     bindings: record.scopeBindings,
     snapshotOnly,
+    snapshotForAssets: hasCustom,
     images: snapshotOnly
       ? []
       : map.records
@@ -92,6 +96,10 @@ const containers = new Set([
   "vstack",
   "zstack",
   "grid",
+  "component",
+  "panel",
+  "columns",
+  "rows",
 ]);
 export function insertionPoint(
   deck: Deck,
@@ -102,6 +110,16 @@ export function insertionPoint(
   const selected = blockAt(deck, target),
     record = map.get(target);
   if (selected && record) {
+    if (record.generated) {
+      const owner = map.records.find(
+        (r) =>
+          !r.synthetic &&
+          r.target.scope === "block" &&
+          r.from === record.from &&
+          r.to === record.to,
+      );
+      if (owner) return { record: owner, inside: false };
+    }
     if (!after && containers.has(selected.type))
       return { record, inside: true };
     return { record, inside: false };
@@ -168,6 +186,8 @@ export function pasteComponent(
     paths[path] = destination;
     assets[destination] = data;
   }
+  if (clip.snapshotForAssets && Object.entries(paths).some(([a, b]) => a !== b))
+    materialized = true;
   let text = materialized
     ? serializeBlock(snapshot(clip.block, paths))
     : clip.text;

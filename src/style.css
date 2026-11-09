@@ -632,6 +632,33 @@ textarea {
 .layout-mini.image i:first-child {
   flex: 2;
 }
+.layout-mini.threeColumns i:nth-child(3) {
+  display: block;
+}
+.layout-mini.sidebar i:first-child {
+  flex: 0.43;
+}
+.layout-mini.focus i:first-child {
+  flex: 2.12;
+}
+.layout-mini.headerBody {
+  flex-direction: column;
+}
+.layout-mini.headerBody i:first-child {
+  flex: 0.33;
+}
+.layout-mini.center {
+  align-items: center;
+  justify-content: center;
+}
+.layout-mini.center i:first-child {
+  flex: none;
+  width: 15px;
+  height: 9px;
+}
+.layout-mini.center i:nth-child(2) {
+  display: none;
+}
 .range-label {
   display: flex;
   flex-wrap: wrap;

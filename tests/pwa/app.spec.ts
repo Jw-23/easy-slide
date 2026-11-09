@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { importProjectArchive } from "../../src/project-archive";
 async function cached(page: import("@playwright/test").Page) {
   await page.goto("/?example=features");
-  await expect(page.locator(".slide-item")).toHaveCount(20);
+  await expect(page.locator(".slide-item")).toHaveCount(25);
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
@@ -81,7 +81,7 @@ test("browser recognises the manifest, icons and offline app shell", async ({
   const zip = await JSZip.loadAsync(await readFile((await (await dl).path())!));
   expect(
     Object.keys(zip.files).filter((x) => /^ppt\/slides\/slide\d+.xml$/.test(x)),
-  ).toHaveLength(20);
+  ).toHaveLength(25);
   expect(errors).toEqual([]);
 });
 test("installation button invokes a captured prompt and hides after appinstalled", async ({

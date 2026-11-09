@@ -95,16 +95,21 @@ Table(
 
 `Slide(title: "标题", eyebrow: "页眉", subtitle: "副标题") { 布局组件 { 内容 } }`。Slide 只负责页面元数据与页级过渡，不接收布局参数。
 
-| 布局        | 适用内容                                     |
-| ----------- | -------------------------------------------- |
-| `Cover`     | 大标题、摘要、署名，建议一个文字块和一个公式 |
-| `Section`   | 章节、结束页                                 |
-| `Flow`      | 正文纵向分配；自由组合时可仅放一个容器       |
-| `Split`     | 双栏，适合 2 块                              |
-| `Cards`     | 最多三列自动换行，推荐 3–6 块                |
-| `Compare`   | 双栏卡片对比                                 |
-| `Timeline`  | 横向里程碑卡片                               |
-| `ImageText` | 双栏图文                                     |
+| 布局           | 适用内容                                     |
+| -------------- | -------------------------------------------- |
+| `Cover`        | 大标题、摘要、署名，建议一个文字块和一个公式 |
+| `Section`      | 章节、结束页                                 |
+| `Flow`         | 正文纵向分配；自由组合时可仅放一个容器       |
+| `Split`        | 双栏，适合 2 块                              |
+| `Cards`        | 最多三列自动换行，推荐 3–6 块                |
+| `Compare`      | 双栏卡片对比                                 |
+| `Timeline`     | 横向里程碑卡片                               |
+| `ImageText`    | 双栏图文                                     |
+| `Center`       | 主体区域中居中排列内容，可用 frame 控制大小  |
+| `Sidebar`      | 左侧 30% 说明栏，右侧正文；推荐 2 块         |
+| `HeaderBody`   | 上方 25% 摘要区，下方正文；推荐 2 块         |
+| `ThreeColumns` | 三栏，超过三块时自动换行                     |
+| `Focus`        | 左侧 68% 主内容，右侧补充说明；推荐 2 块     |
 
 页面修饰符：`.notes("讲述思路")`、`.background("#fafbf9")`、`.foreground("#192c2a")`、`.transition(...)`。
 
@@ -156,15 +161,63 @@ Deck 设置全局默认；Slide 可覆盖。效果 `fade / slide / zoom / none`�
 
 ## 布局组合
 
-| 声明                                    | 行为                         |
-| --------------------------------------- | ---------------------------- |
-| `HStack(spacing: 24) { ... }`           | 水平排列，默认等分可用宽度   |
-| `VStack(spacing: 24) { ... }`           | 垂直排列，默认等分可用高度   |
-| `Grid(columns: 2, spacing: 24) { ... }` | 固定列数、自动计算行数       |
-| `ZStack { ... }`                        | 后声明的内容叠放在上层       |
-| `Spacer`                                | 占据一份剩余空间，可固定尺寸 |
+| 声明                                            | 行为                                |
+| ----------------------------------------------- | ----------------------------------- |
+| `HStack(spacing: 24) { ... }`                   | 水平排列，默认等分可用宽度          |
+| `VStack(spacing: 24) { ... }`                   | 垂直排列，默认等分可用高度          |
+| `Grid(columns: 2, spacing: 24) { ... }`         | 固定列数、自动计算行数              |
+| `ZStack { ... }`                                | 后声明的内容叠放在上层              |
+| `Spacer`                                        | 占据一份剩余空间，可固定尺寸        |
+| `Columns(weights: [2, 1], spacing: 24) { ... }` | 按权重横向分配剩余宽度              |
+| `Rows(weights: [1, 2], spacing: 24) { ... }`    | 按权重纵向分配剩余高度              |
+| `Panel(fill: "#e9efed", radius: 20) { ... }`    | 实色面板，默认纵向排列、内边距 24px |
+
+Columns / Rows 的 weights 可省略，默认为等分；指定时需与直接子项数量一致且均为正数。固定尺寸先分配，余下空间按权重分配。Columns 的 alignment 支持 `.top / .center / .bottom`；Rows 支持 `.leading / .center / .trailing`，用于对齐设置了固定跨轴尺寸的子项。Panel 不指定 fill 时使用当前主题面板色，可用 `.glass()` 切换为毛玻璃；`.padding()` 设置面板内部留白。Heading、Caption、Badge、Divider、Progress 在纵向布局中有默认高度，其他子项分配剩余空间。
 
 HStack 内的 `.frame(width: ...)` 先分配固定宽度，其余平分剩余空间；VStack 对 height 同理。跨轴默认填满。spacing 默认 24，columns 为 1–12。每页最多 30 个顶层块、300 个总块，最多 30 层嵌套。
+
+## 自定义布局函数
+
+`func` 定义可复用的布局或元素组合。函数与 Deck、Slide 并列书写，先定义再调用；函数体内可以引用稍后定义、但在调用前已存在的其他布局函数。参数支持位置、命名和 `=` 默认值；调用时使用 `name: value`。
+
+```swift
+func ResearchCard(title, spacing = 16) {
+    let inset = spacing * 1.5
+    Panel(radius: 20) {
+        VStack(spacing: spacing) {
+            Heading(title, level: 2)
+            Content()
+        }
+    }.padding(inset)
+}
+
+func MainAndAside(gap = 28) {
+    Columns(weights: [2, 1], spacing: gap) {
+        Slot(0)
+        Slot(1)
+    }
+}
+
+Deck("研究进展")
+Slide(title: "实验结果") {
+    MainAndAside {
+        ResearchCard(title: "收敛速度") {
+            Equation(#"\|x_k-x^*\| \le C/k"#)
+            Caption("相同初始条件，重复 10 次")
+        }
+        ResearchCard("检查项", spacing: 12) {
+            Numbered(["误差下降", "结果可复现"])
+            Progress(mean([0.7, 0.9]), label: "验证完成度")
+        }
+    }.stagger(120).appear(.rise, step: 1)
+}
+```
+
+- `Content()` 放入调用处尚未使用的全部直接子项；不传内容时为空。`Slot(0)` 放入第一个子项，序号从 0 开始，可改变顺序。每项最多放置一次；遗漏、重复或越界会报错。插槽本身不接收修饰符，请修饰传入的元素或外层容器。
+- 参数可传文字、数字、数组和受限计算的结果；默认值可以引用全局常量和前面的参数。函数体内的 let 遵守原有作用域规则，不会泄漏到外部；传入的子项在调用处的作用域求值。函数体至少产生一个组件，多根组件默认纵向排列。
+- 自定义调用支持 `.frame()`、`.padding()`、`.foreground()`、`.glass()`、`.appear()`、`.stagger()` 等通用修饰符；可继续嵌套内置布局或其他自定义布局。作为唯一根布局返回 Cover / Section 时保留页面大标题。
+- 编辑器按 AST 提示函数名、命名参数、默认值类型和作用域参数，并提供签名帮助。格式化保留定义、调用、注释与计算。右键定位生成内容会跳到调用处，传入的插槽内容跳到自身源码；生成元素不能单独剪切或删除，可修改定义或调用。跨工程复制会在缺少原定义时保留已计算的内容和图片。
+- 最多 100 个布局函数、24 个参数、16 层调用，不允许直接或间接递归，不允许覆盖内置组件名称。每页原有组件数量及计算预算继续生效。`func` 用于生成布局，数值计算继续使用 `let square = x => x^2`；两者均由本地解释器处理。
 
 ## 内容组件
 
@@ -177,9 +230,19 @@ Metric("99.95%", label: "可用性", text: "过去 30 天")
 Code("const answer = 42;")
 Quote("一个有价值的问题，是研究的起点。")
 Table([["事项", "状态"], ["基准测试", "已完成"]])
+Heading("方法", level: 2)
+Caption("样本数 n = 128")
+Numbered(["建立模型", "求解", "验证"])
+Divider(direction: .horizontal, thickness: 2)
+Rectangle(fill: "#23796e", radius: 12).frame(width: 160, height: 80)
+Circle(fill: "#23796e").frame(width: 80, height: 80)
+Badge("结论", fill: "#e9efed")
+Progress(0.75, label: "完成度", showValue: true)
 ```
 
-每类组件接受一个未命名内容参数；也可用命名参数 text，图片为 src，指标为 value，列表为 items，表格为 rows。可选 title 为块标题。
+Heading 的 level 为 1–4，默认 2；Caption 默认使用主题次要文字色；Numbered 与 Bullets 一样支持 `.stagger()`。图元的 fill 使用 `#RRGGBB`，Circle 保持正圆。Progress 接收 0–1 的数字或计算表达式，可用 fill 设置进度色，showValue 控制百分比显示。Divider 支持 `.horizontal / .vertical`；垂直分隔线宜放在 Columns 中并设置 `.frame(width: ...)`。上述基础元素均支持通用样式、源码定位和动画修饰符。
+
+文字、列表等组件接受一个未命名内容参数；也可用命名参数 text，图片为 src，指标为 value，列表为 items，表格为 rows。可选 title 为块标题。
 
 | 通用修饰符                                       | 含义                          |
 | ------------------------------------------------ | ----------------------------- |
@@ -223,7 +286,7 @@ Slide(title: "依次展开思路") {
 }
 ```
 
-`.stagger(120)` 让后一个子项比前一个晚 120ms 启动，可相互重叠。适用于 Bullets 列表条目、Table 表格行，以及布局组件、Glass、HStack / VStack / Grid / ZStack 的直接子项。与 order 不同，stagger 不等待前项完成。与 delay 叠加，范围 0–10000ms；同时作用于网页与 PPTX。
+`.stagger(120)` 让后一个子项比前一个晚 120ms 启动，可相互重叠。适用于 Bullets / Numbered 列表条目、Table 表格行，以及布局组件、Glass、HStack / VStack / Grid / ZStack 的直接子项。与 order 不同，stagger 不等待前项完成。与 delay 叠加，范围 0–10000ms；同时作用于网页与 PPTX。
 
 ## 独立布局组件与毛玻璃
 

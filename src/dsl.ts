@@ -13,6 +13,11 @@ export const layouts = [
   "compare",
   "timeline",
   "image",
+  "center",
+  "sidebar",
+  "headerBody",
+  "threeColumns",
+  "focus",
 ] as const;
 export type Layout = (typeof layouts)[number];
 export const layoutLabels: Record<Layout, string> = {
@@ -24,6 +29,11 @@ export const layoutLabels: Record<Layout, string> = {
   compare: "对比",
   timeline: "时间线",
   image: "图文",
+  center: "居中",
+  sidebar: "侧栏",
+  headerBody: "上下",
+  threeColumns: "三栏",
+  focus: "主次",
 };
 export const effects = [
   "fade",
@@ -51,9 +61,15 @@ export const layoutComponents: Record<Layout, string> = {
   compare: "Compare",
   timeline: "Timeline",
   image: "ImageText",
+  center: "Center",
+  sidebar: "Sidebar",
+  headerBody: "HeaderBody",
+  threeColumns: "ThreeColumns",
+  focus: "Focus",
 };
 export type Block = {
   expressionSource?: string;
+  componentName?: string;
   bindings?: string[];
   table?: TableOptions;
   preset?: Layout;
@@ -75,7 +91,19 @@ export type Block = {
     | "grid"
     | "spacer"
     | "layout"
-    | "glass";
+    | "glass"
+    | "component"
+    | "panel"
+    | "columns"
+    | "rows"
+    | "heading"
+    | "caption"
+    | "numbered"
+    | "divider"
+    | "rectangle"
+    | "circle"
+    | "badge"
+    | "progress";
   text?: string;
   title?: string;
   items?: string[];
@@ -95,6 +123,15 @@ export type Block = {
   gap?: number;
   padding?: number;
   columns?: number;
+  weights?: number[];
+  alignment?: "leading" | "center" | "trailing" | "top" | "bottom";
+  radius?: number;
+  fill?: string;
+  thickness?: number;
+  orientation?: "horizontal" | "vertical";
+  level?: number;
+  progress?: number;
+  showValue?: boolean;
 };
 export type Slide = {
   bindings?: string[];
@@ -114,6 +151,7 @@ export type Slide = {
   blocks: Block[];
 };
 export type Deck = {
+  functions?: string[];
   bindings?: string[];
   version: 1;
   title: string;
@@ -183,6 +221,18 @@ export function validateDeck(input: unknown): Deck {
           "spacer",
           "layout",
           "glass",
+          "component",
+          "panel",
+          "columns",
+          "rows",
+          "heading",
+          "caption",
+          "numbered",
+          "divider",
+          "rectangle",
+          "circle",
+          "badge",
+          "progress",
         ].includes(b.type)
       )
         fail(`${p}：未知内容 type`);
@@ -202,6 +252,50 @@ export function validateDeck(input: unknown): Deck {
           b.items.some((x: unknown) => typeof x !== "string"))
       )
         fail(`${p}：items 必须是文本数组`);
+      if (b.weights && b.children && b.weights.length !== b.children.length)
+        fail(`${p}：weights 数量需与内容数量一致`);
+      if (
+        b.weights !== undefined &&
+        (!Array.isArray(b.weights) ||
+          b.weights.length > 30 ||
+          b.weights.some(
+            (n: unknown) =>
+              typeof n !== "number" || !Number.isFinite(n) || n <= 0,
+          ))
+      )
+        fail(`${p}：weights 需要至多 30 个正数`);
+      if (
+        b.alignment !== undefined &&
+        !["leading", "center", "trailing", "top", "bottom"].includes(
+          b.alignment,
+        )
+      )
+        fail(`${p}：未知 alignment`);
+      if (
+        b.level !== undefined &&
+        (!Number.isInteger(b.level) || b.level < 1 || b.level > 4)
+      )
+        fail(`${p}：level 支持 1–4`);
+      if (
+        b.progress !== undefined &&
+        (!Number.isFinite(b.progress) || b.progress < 0 || b.progress > 1)
+      )
+        fail(`${p}：Progress 的 value 范围为 0–1`);
+      if (
+        b.orientation !== undefined &&
+        !["horizontal", "vertical"].includes(b.orientation)
+      )
+        fail(`${p}：direction 支持 .horizontal / .vertical`);
+      if (b.showValue !== undefined && typeof b.showValue !== "boolean")
+        fail(`${p}：showValue 必须是 true / false`);
+      if (b.fill !== undefined && !color.test(b.fill))
+        fail(`${p}：fill 使用 #RRGGBB`);
+      for (const key of ["radius", "thickness"] as const)
+        if (
+          b[key] !== undefined &&
+          (!Number.isFinite(b[key]) || b[key] < 0 || b[key] > 100)
+        )
+          fail(`${p}：${key} 范围 0–100`);
       if (b.type === "table") validateTable(b.rows || [], b.table);
       for (const k of [
         "x",
@@ -255,6 +349,11 @@ export function validateDeck(input: unknown): Deck {
             "grid",
             "layout",
             "glass",
+            "component",
+            "panel",
+            "columns",
+            "rows",
+            "numbered",
           ].includes(b.type)
         )
           fail(`${p}：stagger 仅支持列表、表格和布局容器`);
@@ -370,11 +469,14 @@ function at<T>(c: Call, fn: () => T): T {
       c.to,
       c.line,
       c.col,
-      detail.includes("LaTeX")
-        ? '检查命令拼写与花括号；建议使用 #"..."# 原始字符串。在公式中输入反斜杠呼出 LaTeX 补全。'
-        : detail.includes("未知")
-          ? "检查拼写；按 Ctrl / ⌘ + Space 查看可用声明与参数。"
-          : "请根据提示修改此声明。尺寸、时长和顺序均使用非负数字。",
+      (c.definitionLine
+        ? `此元素由第 ${c.definitionLine} 行定义的布局函数生成；检查函数定义与此调用参数。 `
+        : "") +
+        (detail.includes("LaTeX")
+          ? '检查命令拼写与花括号；建议使用 #"..."# 原始字符串。在公式中输入反斜杠呼出 LaTeX 补全。'
+          : detail.includes("未知")
+            ? "检查拼写；按 Ctrl / ⌘ + Space 查看可用声明与参数。"
+            : "请根据提示修改此声明。尺寸、时长和顺序均使用非负数字。"),
     );
   }
 }
@@ -399,6 +501,17 @@ const blockNames: Record<string, Block["type"]> = {
   Grid: "grid",
   Spacer: "spacer",
   Glass: "glass",
+  Columns: "columns",
+  Rows: "rows",
+  Panel: "panel",
+  Heading: "heading",
+  Caption: "caption",
+  Numbered: "numbered",
+  Divider: "divider",
+  Rectangle: "rectangle",
+  Circle: "circle",
+  Badge: "badge",
+  Progress: "progress",
   ...Object.fromEntries(
     Object.values(layoutComponents).map((n) => [n, "layout" as const]),
   ),
@@ -497,24 +610,39 @@ const apply = (
 };
 function compileBlock(c: Call): Block {
   return at(c, () => {
-    const type = blockNames[c.name];
+    const type = c.custom ? "component" : blockNames[c.name];
     if (!type)
       fail(
         `未知内容声明 ${c.name}${closest(c.name, Object.keys(blockNames)) ? `，是否想写 ${closest(c.name, Object.keys(blockNames))}？` : ""}`,
       );
-    plain(c, [
-      "title",
-      "text",
-      "items",
-      "src",
-      "value",
-      "label",
-      "rows",
-      "spacing",
-      "columns",
-      ...(type === "table" ? tableKeys : []),
-    ]);
-    const b: Record<string, unknown> = { type, ...c.named };
+    if (!c.custom)
+      plain(c, [
+        "title",
+        "text",
+        "items",
+        "src",
+        "value",
+        "label",
+        "rows",
+        "spacing",
+        "columns",
+        "weights",
+        "alignment",
+        "radius",
+        "fill",
+        "thickness",
+        "direction",
+        "level",
+        "showValue",
+        ...(type === "table" ? tableKeys : []),
+      ]);
+    const b: Record<string, unknown> = c.custom
+      ? { type, componentName: c.name }
+      : { type, ...c.named };
+    if (type === "divider" && c.named.direction !== undefined) {
+      b.orientation = c.named.direction;
+      delete b.direction;
+    }
     if (type === "table") {
       const opts: Record<string, unknown> = {};
       for (const key of tableKeys) {
@@ -532,24 +660,41 @@ function compileBlock(c: Call): Block {
         ([, name]) => name === c.name,
       )![0];
     if (type === "glass") b.glass = {};
-    if (c.named.spacing !== undefined) {
+    if (!c.custom && c.named.spacing !== undefined) {
       b.gap = c.named.spacing;
       delete b.spacing;
     }
-    if (c.args.length > 1) fail(`${c.name} 只接受一个未命名参数`);
+    if (!c.custom && c.args.length > 1) fail(`${c.name} 只接受一个未命名参数`);
     const field =
       type === "image"
         ? "src"
         : type === "metric"
           ? "value"
-          : type === "bullets"
+          : ["bullets", "numbered"].includes(type)
             ? "items"
             : type === "table"
               ? "rows"
-              : "text";
-    if (c.args.length) b[field] = c.args[0];
+              : type === "progress"
+                ? "progress"
+                : "text";
+    if (!c.custom && c.args.length) b[field] = c.args[0];
+    if (type === "progress" && c.named.value !== undefined) {
+      b.progress = c.named.value;
+      delete b.value;
+    }
     if (
-      ["hstack", "vstack", "zstack", "grid", "layout", "glass"].includes(type)
+      [
+        "hstack",
+        "vstack",
+        "zstack",
+        "grid",
+        "layout",
+        "glass",
+        "component",
+        "panel",
+        "columns",
+        "rows",
+      ].includes(type)
     )
       b.children = c.children.map(compileBlock);
     else if (c.children.length) fail(`${c.name} 不能嵌套内容`);
@@ -574,6 +719,7 @@ export function parseDeck(source: string): Deck {
       title: root.args[0],
       ...(root.named.author !== undefined ? { author: root.named.author } : {}),
       slides: [],
+      ...(root.functions ? { functions: root.functions } : {}),
       ...(root.bindings ? { bindings: root.bindings } : {}),
     };
     for (const c of root.children) {
@@ -668,7 +814,7 @@ function writeBlock(b: Block, indent: string): string {
       ? "src"
       : b.type === "metric"
         ? "value"
-        : b.type === "bullets"
+        : ["bullets", "numbered"].includes(b.type)
           ? "items"
           : b.type === "table"
             ? "rows"
@@ -700,11 +846,27 @@ function writeBlock(b: Block, indent: string): string {
           "]",
       );
   }
+  if (b.progress !== undefined) args.unshift(str(b.progress));
+  for (const key of [
+    "weights",
+    "radius",
+    "fill",
+    "thickness",
+    "level",
+    "showValue",
+  ] as const)
+    if (b[key] !== undefined) args.push(`${key}: ${str(b[key])}`);
+  if (b.alignment) args.push(`alignment: .${b.alignment}`);
+  if (b.orientation) args.push(`direction: .${b.orientation}`);
   if (b.gap !== undefined) args.push(`spacing: ${b.gap}`);
   if (b.columns !== undefined) args.push(`columns: ${b.columns}`);
   let result =
     indent +
-    (b.type === "layout" ? layoutComponents[b.preset!] : names[b.type]) +
+    (b.type === "layout"
+      ? layoutComponents[b.preset!]
+      : b.type === "component"
+        ? "VStack"
+        : names[b.type]) +
     (args.length ? "(" + args.join(", ") + ")" : "");
   if (b.children)
     result +=
@@ -732,6 +894,7 @@ function transitionText(s: Deck | Slide, fallback = "fade"): string {
 }
 export function serialize(d: Deck): string {
   const parts = [
+    ...(d.functions || []),
     ...(d.bindings || []),
     `Deck(${str(d.title)}${d.author ? `, author: ${str(d.author)}` : ""})` +
       transitionText(d),
@@ -773,10 +936,14 @@ export function serialize(d: Deck): string {
 }
 
 export function pageLayout(s: Slide): Layout {
-  return s.blocks[0]?.type === "layout"
-    ? s.blocks[0].preset || "content"
+  let root = s.blocks[0];
+  while (root?.type === "component" && root.children?.length === 1)
+    root = root.children[0];
+  return root?.type === "layout"
+    ? root.preset || "content"
     : s.layout || "content";
 }
+
 export function pageContent(s: Slide): Block[] {
   return s.blocks.length === 1 && s.blocks[0].type === "layout"
     ? s.blocks[0].children || []

@@ -8,6 +8,7 @@ export const TEXT_LINE_HEIGHT = 1.42;
 export type Element = {
   source?: SceneTarget;
   kind: "text" | "rect" | "image" | "equation";
+  shape?: "ellipse";
   glass?: GlassStyle;
   data?: string;
   x: number;
@@ -33,6 +34,29 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     { accent, muted, panel } = theme,
     fg = s.color || theme.color;
   const e: Element[] = [];
+  const layoutPath = [0];
+  let pageRoot = s.blocks[0];
+  while (pageRoot?.type === "component" && pageRoot.children?.length === 1) {
+    layoutPath.push(0);
+    pageRoot = pageRoot.children[0];
+  }
+  const intrinsic = (b: Block): number | undefined =>
+    b.h ??
+    (b.type === "divider"
+      ? Math.max(16, (b.thickness ?? 2) + 12)
+      : b.type === "heading"
+        ? (b.size ?? [44, 32, 26, 21][(b.level ?? 2) - 1]) * TEXT_LINE_HEIGHT +
+          8
+        : b.type === "caption"
+          ? 36
+          : b.type === "badge"
+            ? 42
+            : b.type === "progress"
+              ? b.label || b.showValue !== false
+                ? 76
+                : 36
+              : undefined);
+
   let activeMotion: Motion | undefined,
     activeKey: string | undefined,
     counter = 0;
@@ -215,7 +239,11 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         step,
       });
     if (b.background) rect(x, y, w, h, b.background, 12, step);
-    const padding = b.padding ?? (b.type === "glass" && !card ? 28 : 0);
+    if (b.type === "panel" && !b.glass)
+      rect(x, y, w, h, b.fill || panel, b.radius ?? theme.radius, step);
+    const padding =
+      b.padding ??
+      (b.type === "panel" ? 24 : b.type === "glass" && !card ? 28 : 0);
     if (padding) {
       x += padding;
       y += padding;
@@ -228,6 +256,106 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       h -= 54;
     }
     if (b.type === "spacer") return;
+    if (b.type === "heading" || b.type === "caption") {
+      text(
+        b.text || "",
+        x,
+        y,
+        w,
+        h,
+        b.size ??
+          (b.type === "heading" ? [44, 32, 26, 21][(b.level ?? 2) - 1] : 16),
+        b.color || (b.type === "caption" ? muted : fg),
+        b.type === "heading",
+        step,
+      );
+      return;
+    }
+    if (b.type === "rectangle" || b.type === "circle") {
+      if (b.type === "circle") {
+        const d = Math.min(w, h);
+        push({
+          kind: "rect",
+          shape: "ellipse",
+          x: x + (w - d) / 2,
+          y: y + (h - d) / 2,
+          w: d,
+          h: d,
+          fill: b.fill || b.color || accent,
+          radius: d / 2,
+          step,
+        });
+      } else rect(x, y, w, h, b.fill || b.color || accent, b.radius ?? 0, step);
+      return;
+    }
+    if (b.type === "divider") {
+      const t = Math.min(
+        b.thickness ?? 2,
+        b.orientation === "vertical" ? w : h,
+      );
+      if (b.orientation === "vertical")
+        rect(x + (w - t) / 2, y, t, h, b.color || theme.border, 0, step);
+      else rect(x, y + (h - t) / 2, w, t, b.color || theme.border, 0, step);
+      return;
+    }
+    if (b.type === "badge") {
+      const size = b.size ?? 18,
+        bw =
+          b.w ??
+          Math.min(
+            w,
+            Math.max(
+              60,
+              Array.from(b.text || "").reduce(
+                (n, c) => n + (/[\u0000-\u00ff]/.test(c) ? size * 0.6 : size),
+                0,
+              ) + 28,
+            ),
+          ),
+        bh = Math.min(h, 42);
+      rect(x, y, bw, bh, b.fill || panel, b.radius ?? bh / 2, step);
+      text(
+        b.text || "",
+        x + 10,
+        y + Math.max(0, (bh - size * TEXT_LINE_HEIGHT) / 2),
+        Math.max(0, bw - 20),
+        bh,
+        size,
+        b.color || accent,
+        true,
+        step,
+      );
+      e[e.length - 1].align = "center";
+      return;
+    }
+    if (b.type === "progress") {
+      const size = b.size ?? 18,
+        label = b.label || "",
+        show = b.showValue !== false,
+        offset = label || show ? 36 : Math.max(0, (h - 12) / 2),
+        barY = y + Math.min(offset, Math.max(0, h - 12)),
+        bh = Math.min(12, h);
+      if (label)
+        text(label, x, y, w - (show ? 75 : 0), 30, size, c, true, step);
+      if (show) {
+        text(
+          `${Math.round((b.progress ?? 0) * 100)}%`,
+          x + Math.max(0, w - 70),
+          y,
+          70,
+          30,
+          size,
+          accent,
+          true,
+          step,
+        );
+        e[e.length - 1].align = "right";
+      }
+      rect(x, barY, w, bh, panel, bh / 2, step);
+      rect(x, barY, w * (b.progress ?? 0), bh, b.fill || accent, bh / 2, step);
+      return;
+    }
+
     if (b.type === "layout") {
       renderLayout(
         b.preset || "content",
@@ -236,12 +364,26 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         y,
         w,
         h,
-        b === s.blocks[0] && s.blocks.length === 1,
+        activeSource.scope === "block" &&
+          activeSource.path.join(".") === layoutPath.join(".") &&
+          s.blocks.length === 1,
         b,
       );
       return;
     }
-    if (["hstack", "vstack", "zstack", "grid", "glass"].includes(b.type)) {
+    if (
+      [
+        "hstack",
+        "vstack",
+        "zstack",
+        "grid",
+        "glass",
+        "component",
+        "panel",
+        "columns",
+        "rows",
+      ].includes(b.type)
+    ) {
       const children = b.children || [],
         gap = b.gap ?? 24;
       const child = (
@@ -293,22 +435,40 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           ),
         );
       } else {
-        const row = b.type === "hstack",
-          axis = row ? "w" : "h",
-          fixed = children.reduce((sum, c) => sum + (c[axis] ?? 0), 0),
-          flex = children.filter((c) => c[axis] === undefined).length;
+        const row = b.type === "hstack" || b.type === "columns",
+          lengthOf = (c: Block) => (row ? c.w : intrinsic(c)),
+          fixed = children.reduce((sum, c) => sum + (lengthOf(c) ?? 0), 0),
+          flex = children.reduce(
+            (sum, c, i) =>
+              sum + (lengthOf(c) === undefined ? (b.weights?.[i] ?? 1) : 0),
+            0,
+          );
         const each = Math.max(
           0,
           ((row ? w : h) - gap * Math.max(0, children.length - 1) - fixed) /
             Math.max(1, flex),
         );
         let cursor = row ? x : y;
-        children.forEach((c) => {
-          const length = c[axis] ?? each;
+        children.forEach((c, i) => {
+          const length = lengthOf(c) ?? each * (b.weights?.[i] ?? 1);
           child(
             c,
-            row ? cursor : x,
-            row ? y : cursor,
+            row
+              ? cursor
+              : x +
+                  (b.alignment === "center"
+                    ? Math.max(0, w - (c.w ?? w)) / 2
+                    : b.alignment === "trailing"
+                      ? Math.max(0, w - (c.w ?? w))
+                      : 0),
+            row
+              ? y +
+                  (b.alignment === "center"
+                    ? Math.max(0, h - (c.h ?? h)) / 2
+                    : b.alignment === "bottom"
+                      ? Math.max(0, h - (c.h ?? h))
+                      : 0)
+              : cursor,
             row ? length : w,
             row ? h : length,
           );
@@ -355,9 +515,16 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           false,
           step,
         );
-    } else if (b.type === "bullets") {
+    } else if (b.type === "bullets" || b.type === "numbered") {
       const items = b.items || [];
-      const gap = Math.min(74, h / Math.max(items.length, 1));
+      const gap = Math.min(74, h / Math.max(items.length, 1)),
+        markerWidth =
+          b.type === "numbered"
+            ? Math.max(
+                36,
+                String(items.length).length * (b.size || 23) * 0.65 + 14,
+              )
+            : 23;
       items.forEach((item, i) => {
         const oldMotion = activeMotion,
           oldKey = activeKey;
@@ -368,13 +535,25 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           };
           activeKey = oldKey + "-item-" + i;
         }
-        rect(x, y + i * gap + 11, 6, 6, accent, 3, step);
+        if (b.type === "numbered")
+          text(
+            `${i + 1}.`,
+            x,
+            y + i * gap,
+            markerWidth - 6,
+            Math.max(0, gap - 5),
+            b.size || 23,
+            accent,
+            true,
+            step,
+          );
+        else rect(x, y + i * gap + 11, 6, 6, accent, 3, step);
         text(
           item,
-          x + 23,
+          x + markerWidth,
           y + i * gap,
-          w - 23,
-          gap - 5,
+          Math.max(0, w - markerWidth),
+          Math.max(0, gap - 5),
           b.size || 23,
           c,
           false,
@@ -536,7 +715,70 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         [...(activeSource.scope === "block" ? activeSource.path : []), i],
       );
     }
-    if (root && ["cover", "section"].includes(preset)) {
+    if (preset === "center") {
+      const heights = bs.map(
+          (b) =>
+            intrinsic(b) ??
+            Math.min(100, (h - gap * Math.max(0, n - 1)) / Math.max(1, n)),
+        ),
+        total = heights.reduce((a, b) => a + b, 0) + gap * Math.max(0, n - 1);
+      let cy = y + Math.max(0, (h - total) / 2);
+      bs.forEach((b, i) => {
+        const bw = Math.min(w, b.w ?? 900),
+          bh = Math.min(heights[i], Math.max(0, y + h - cy));
+        place(b, i, x + (w - bw) / 2, cy, bw, bh);
+        cy += heights[i] + gap;
+      });
+    } else if (
+      preset === "sidebar" ||
+      preset === "headerBody" ||
+      preset === "focus"
+    ) {
+      const vertical = preset === "headerBody",
+        available = (vertical ? h : w) - gap,
+        lead =
+          available *
+          (preset === "focus" ? 0.68 : preset === "sidebar" ? 0.3 : 0.25);
+      if (bs[0])
+        place(
+          bs[0],
+          0,
+          x,
+          y,
+          vertical ? w : lead,
+          vertical ? lead : h,
+          preset === "focus",
+        );
+      const rest = bs.slice(1),
+        rh =
+          (vertical ? h - lead - gap : h) - gap * Math.max(0, rest.length - 1);
+      rest.forEach((b, i) =>
+        place(
+          b,
+          i + 1,
+          vertical ? x : x + lead + gap,
+          (vertical ? y + lead + gap : y) +
+            i * (rh / Math.max(1, rest.length) + gap),
+          vertical ? w : w - lead - gap,
+          rh / Math.max(1, rest.length),
+          preset === "focus",
+        ),
+      );
+    } else if (preset === "threeColumns") {
+      const rows = Math.ceil(n / 3) || 1,
+        cw = (w - 2 * gap) / 3,
+        ch = (h - (rows - 1) * gap) / rows;
+      bs.forEach((b, i) =>
+        place(
+          b,
+          i,
+          x + (i % 3) * (cw + gap),
+          y + Math.floor(i / 3) * (ch + gap),
+          cw,
+          ch,
+        ),
+      );
+    } else if (root && ["cover", "section"].includes(preset)) {
       bs.forEach((b, i) =>
         place(
           b,
@@ -579,8 +821,18 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         ),
       );
     } else {
-      const ch = (h - gap * Math.max(0, n - 1)) / Math.max(n, 1);
-      bs.forEach((b, i) => place(b, i, x, y + i * (ch + gap), w, ch));
+      const fixed = bs.reduce((sum, b) => sum + (intrinsic(b) ?? 0), 0),
+        flex = bs.filter((b) => intrinsic(b) === undefined).length,
+        ch = Math.max(
+          0,
+          (h - gap * Math.max(0, n - 1) - fixed) / Math.max(1, flex),
+        );
+      let cy = y;
+      bs.forEach((b, i) => {
+        const bh = intrinsic(b) ?? ch;
+        place(b, i, x, cy, w, bh);
+        cy += bh + gap;
+      });
     }
   }
   if (s.layout) renderLayout(s.layout, s.blocks, 74, 250, 1132, 370, true);

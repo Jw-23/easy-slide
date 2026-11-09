@@ -5,13 +5,14 @@ import { importProjectArchive, ARCHIVE_FILE } from "../../src/project-archive";
 test("edit, persist, stage content, export and reimport a portable project", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".slide-item")).toHaveCount(20);
+  await expect(page.locator(".slide-item")).toHaveCount(25);
   await page
     .getByRole("textbox", { name: "页标题", exact: true })
     .fill("本地测试标题");
@@ -69,7 +70,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   const zip = await JSZip.loadAsync(await readFile((await file.path())!));
   expect(
     Object.keys(zip.files).filter((x) => /^ppt\/slides\/slide\d+.xml$/.test(x)),
-  ).toHaveLength(20);
+  ).toHaveLength(25);
   const first = await zip.file("ppt/slides/slide1.xml")!.async("string");
   expect(first).toContain("本地测试标题");
   expect(first).toContain("<p:transition");
@@ -395,11 +396,11 @@ test("the full startup tour renders without missing assets or clipped text and c
   page,
 }) => {
   await page.goto("/");
-  await expect(page.locator(".slide-item")).toHaveCount(20);
+  await expect(page.locator(".slide-item")).toHaveCount(25);
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 25; i++) {
     await page.locator(".slide-item").nth(i).click();
     await expect(page.locator(".preview-wrap .missing-image")).toHaveCount(0);
     await expect
@@ -452,13 +453,13 @@ test("the full startup tour renders without missing assets or clipped text and c
     .locator(".modal")
     .getByRole("button", { name: "切换示例", exact: true })
     .click();
-  await expect(page.locator(".slide-item")).toHaveCount(20);
+  await expect(page.locator(".slide-item")).toHaveCount(25);
   await expect(page.locator(".asset-list img")).toHaveCount(1);
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
   await page.reload();
-  await expect(page.locator(".slide-item")).toHaveCount(20);
+  await expect(page.locator(".slide-item")).toHaveCount(25);
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
   const p = await importProjectArchive(
@@ -485,7 +486,7 @@ test("direct feature tour isolates its saved draft from the existing working pro
   await expect(
     page.getByText("已保存在此浏览器", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".slide-item")).toHaveCount(20);
+  await expect(page.locator(".slide-item")).toHaveCount(25);
   await expect(page.locator(".preview-wrap")).toContainText("Easy Slide");
   await expect(page.locator(".preview-wrap")).not.toContainText(
     "保留的工作工程",

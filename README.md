@@ -57,7 +57,7 @@ npm test
 
 ## DSL
 
-详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；由本地专用解释器处理声明与受限计算，不执行 JavaScript。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。布局通过独立 Cover / Split / Cards / Flow 等组件组合，也可嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。标题、备注、布局、过渡和素材插入只改写对应源码片段；规范化格式是单独的显式操作。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
+详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；由本地专用解释器处理声明与受限计算，不执行 JavaScript。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。布局通过独立 Cover / Split / Cards / Flow 等组件组合，也可嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置；Columns / Rows 可按权重分配空间，Panel 和 Heading / Caption / Numbered / 图元等基础元素用于组合内容；`func` 可定义带默认参数、局部计算及 Content / Slot 插槽的自定义布局。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。标题、备注、布局、过渡和素材插入只改写对应源码片段；规范化格式是单独的显式操作。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
 
 ```swift
 Deck("一个清晰的结论", author: "研究组")
@@ -99,16 +99,17 @@ React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢�
 
 ## 初始功能示例
 
-首次启动打开 20 页「功能示例」。已有本地草稿优先恢复；通过「切换示例 → 功能示例」可打开新版示例，替换前仍可导出当前工程。
+首次启动打开 25 页「功能示例」。已有本地草稿优先恢复；通过「切换示例 → 功能示例」可打开新版示例，替换前仍可导出当前工程。
 
 - 1–8 页：八种独立布局、正文与引用、玻璃面板、指标、对比、里程碑和内嵌图片。
 - 9–12 页：组合容器、叠层与精确定位、LaTeX 分式/积分/矩阵/分段函数、代码和表格。
 - 13–14 页：使用 let、range、map、filter、reduce 和条件表达式计算表格数据，设置列宽、对齐和数字格式。
 - 15–18 页：全部入场效果、四种缓动、点击阶段与先后顺序、样式修饰符和页面覆盖。
 - 19–20 页：编辑、素材、工程保存与导出操作参考。
+- 21–25 页：基础元素、加权分栏和分区布局、参数化布局函数、Content 与 Slot 内容插槽。
 
 每页备注解释对应源码与操作方式。PNG 图表随工程导出，不依赖远程地址；可选开发脚本 `python scripts/generate-example-chart.py` 重建图表源码（仅运行该脚本时需要 matplotlib 与 numpy，网站运行不需要 Python）。
 
 线上功能示例可直接通过 `/?example=features` 打开。此入口使用独立、按示例版本隔离的浏览器草稿，不会覆盖普通入口恢复的工作工程；在示例中进行的修改也会单独保存。普通首页默认恢复最近的工作工程，因此已保存的旧内容不会因网站发布而自动改变。
 
-新版功能示例的草稿独立保存于修订版 2；`/?example=features` 打开最新版，`/?example=features&revision=1` 可恢复此前独立入口保存的修订版 1 草稿。普通首页的工作工程不受影响。
+新版功能示例的草稿独立保存于修订版 3；`/?example=features` 打开最新版，`/?example=features&revision=1` 或 `revision=2` 可恢复此前独立入口保存的对应草稿。普通首页的工作工程不受影响。

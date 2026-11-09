@@ -61,6 +61,12 @@ export class EditorAnalysis {
       };
     }
     const visit = (node: AstNode, scope: LexicalScope) => {
+      if (node.kind === "declaration" && node.name) {
+        const symbol = { name: node.name, node, scope };
+        scope.symbols.set(node.name, symbol);
+        this.symbols.set(node, symbol);
+        scope = { parent: scope, symbols: new Map() };
+      }
       if (
         (node.kind === "block" && node.parent?.name !== "Deck") ||
         node.kind === "lambda"
@@ -72,7 +78,7 @@ export class EditorAnalysis {
         scope.symbols.set(node.name, symbol);
         this.symbols.set(node, symbol);
       }
-      if (node.kind === "lambda")
+      if (node.kind === "lambda" || node.kind === "declaration")
         node.params?.forEach((p, index) => {
           const symbol = { name: p.name!, node: p, scope, parameter: index };
           scope.symbols.set(p.name!, symbol);
@@ -115,8 +121,17 @@ export class EditorAnalysis {
   }
   private visible(symbol: SymbolInfo, pos: number) {
     if (symbol.node.kind === "parameter")
-      return pos >= symbol.node.parent!.body!.from;
+      return symbol.node.parent?.kind === "declaration"
+        ? pos > symbol.node.to
+        : pos >= (symbol.node.parent?.body?.from ?? Infinity);
     const n = symbol.node;
+    if (n.kind === "declaration")
+      return (
+        n.to < pos ||
+        this.path(pos).some(
+          (p) => p.kind === "declaration" && !!p.body && pos >= p.body.from,
+        )
+      );
     return (
       n.to < pos ||
       (n.initializer?.kind === "lambda" &&
@@ -152,7 +167,8 @@ export class EditorAnalysis {
       if (node.kind === "identifier" && node.name === token.value)
         return this.resolve(token.value, node);
       if (
-        ((node.kind === "binding" && node.nameFrom === token.from) ||
+        ((["binding", "declaration"].includes(node.kind) &&
+          node.nameFrom === token.from) ||
           (node.kind === "parameter" && node.from === token.from)) &&
         node.name === token.value
       )
@@ -178,6 +194,8 @@ export class EditorAnalysis {
     if (symbol) {
       const type = this.symbolType(symbol);
       if (type.kind !== "function") return;
+      if (symbol.node.kind === "declaration")
+        return this.componentSignature(symbol.node);
       const lambda = symbol.node.initializer;
       return {
         name: symbol.name,
@@ -193,6 +211,31 @@ export class EditorAnalysis {
       };
     }
     return signatures.get(callee.name ?? "");
+  }
+  componentSignature(node: AstNode): Signature {
+    const params = (node.params || []).map((p) => ({
+      name: p.name || "arg",
+      type: p.initializer ? this.infer(p.initializer) : unknown,
+      detail: "布局函数参数",
+      optional: !!p.initializer,
+    }));
+    const required = (node.params || [])
+      .filter((p) => !p.initializer)
+      .map((p) => `${p.name}: "\${${p.name}}"`)
+      .join(", ");
+    return {
+      name: node.name!,
+      detail: "自定义布局函数",
+      category: "container",
+      params: [...params, ...params.map((p) => ({ ...p, named: true }))],
+      snippet: `${node.name}(${required}) {\n    \${}\n}`,
+      result: { kind: "component", name: "VStack" },
+    };
+  }
+  componentFunctions(pos: number) {
+    return this.visibleSymbols(pos)
+      .filter((s) => s.node.kind === "declaration")
+      .map((s) => this.componentSignature(s.node));
   }
   callContext(pos: number): CallContext | undefined {
     const path = this.path(pos);
@@ -276,6 +319,13 @@ export class EditorAnalysis {
     let result: ValueType = unknown;
     try {
       switch (node.kind) {
+        case "declaration":
+          result = {
+            kind: "function",
+            params: (node.params || []).map(infer),
+            result: { kind: "component", name: "VStack" },
+          };
+          break;
         case "binding":
           result = infer(node.initializer);
           break;
@@ -422,7 +472,9 @@ export class EditorAnalysis {
           } else {
             const symbol = this.resolve(callee.name!, callee),
               spec = signatures.get(callee.name!);
-            if (symbol)
+            if (symbol?.node.kind === "declaration")
+              result = { kind: "component", name: "VStack" };
+            else if (symbol)
               result = this.lambdaResult(
                 symbol.node.initializer,
                 types,
@@ -480,6 +532,10 @@ export class EditorAnalysis {
     overrides: Map<AstNode, ValueType>,
     depth: number,
   ): ValueType {
+    if (node.parent?.kind === "declaration")
+      return node.initializer
+        ? this.infer(node.initializer, overrides, depth + 1)
+        : unknown;
     const lambda = node.parent,
       argument = lambda?.parent,
       call = argument?.parent;

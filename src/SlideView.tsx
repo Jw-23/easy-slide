@@ -78,7 +78,7 @@ function SceneElement({
         borderRadius: e.glass.radius ?? 28,
       });
     }
-    style.borderRadius = e.radius;
+    style.borderRadius = e.shape === "ellipse" ? "50%" : e.radius;
   } else if (e.kind === "text") {
     Object.assign(style, {
       fontSize: e.size,

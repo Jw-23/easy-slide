@@ -7,6 +7,7 @@ export type AstNode = {
     | "program"
     | "block"
     | "binding"
+    | "declaration"
     | "identifier"
     | "literal"
     | "enum"
@@ -74,14 +75,67 @@ export function parseEditorAst(source: string): EditorAst {
   const isEnd = () => peek().kind === "eof";
   const startsStatement = () =>
     peek().kind === "id" &&
-    (peek().value === "let" ||
+    (["let", "func"].includes(peek().value) ||
       (/^[A-Z]/.test(peek().value) && peek().value !== "Column"));
 
   function statements(end?: string): AstNode[] {
     const result: AstNode[] = [];
     while (!isEnd() && !(end && at(end))) {
       const before = pos;
-      if (at("let")) {
+      if (at("func")) {
+        const start = take(),
+          name = peek().kind === "id" ? take() : undefined,
+          params: AstNode[] = [];
+        if (at("(")) take();
+        while (!isEnd() && !at(")") && !at("{")) {
+          const beforeParam = pos,
+            token = peek().kind === "id" ? take() : undefined;
+          const equals = at("=") ? take().to : undefined,
+            initializer = equals !== undefined ? expression() : undefined;
+          if (token)
+            params.push(
+              make("parameter", token.from, initializer ? [initializer] : [], {
+                name: token.value,
+                nameFrom: token.from,
+                nameTo: token.to,
+                initializer,
+                equals,
+                to: initializer?.to ?? token.to,
+              }),
+            );
+          if (at(",")) take();
+          else if (pos === beforeParam) {
+            take();
+          } else break;
+        }
+        if (at(")")) take();
+        let body: AstNode | undefined;
+        if (at("{")) {
+          const open = take(),
+            children = statements("}"),
+            close = at("}") ? take() : undefined;
+          body = make("block", open.from, children, {
+            open: open.to,
+            close: close?.from,
+            to: close?.to ?? source.length,
+          });
+        }
+        result.push(
+          make(
+            "declaration",
+            start.from,
+            [...params, ...(body ? [body] : [])],
+            {
+              name: name?.value,
+              nameFrom: name?.from,
+              nameTo: name?.to,
+              params,
+              body,
+              to: body?.to ?? peek().from,
+            },
+          ),
+        );
+      } else if (at("let")) {
         const start = take();
         const id = peek().kind === "id" ? take() : undefined;
         const equals = at("=") ? take().to : undefined;

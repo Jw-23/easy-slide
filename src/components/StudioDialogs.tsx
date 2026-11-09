@@ -147,7 +147,7 @@ export default function StudioDialogs({
             {
               deck: showcaseDeck,
               title: "功能示例",
-              detail: "20 页 · 组件、主题、公式与动画",
+              detail: "25 页 · 组件、主题、公式与动画",
               icon: BookOpen,
             },
             {
@@ -206,16 +206,19 @@ Slide(title: "一个清晰的结论") {
             accent、background、color、font、material 覆盖默认值。切换菜单只修改
             Theme 声明；页面和组件的显式样式优先。
           </p>
-          <h3>八种布局</h3>
+          <h3>预设布局</h3>
           <p>
             Cover 封面 · Section 章节 · Flow 正文 · Split 双栏 · Cards 卡片 ·
-            Compare 对比 · Timeline 时间线 · ImageText 图文
+            Compare 对比 · Timeline 时间线 · ImageText 图文 · Center 居中 ·
+            Sidebar 侧栏 · HeaderBody 上下 · ThreeColumns 三栏 · Focus 主次
           </p>
-          <h3>八类内容</h3>
+          <h3>内容与基础元素</h3>
           <p>
             Text / Quote / Code 接受文字；Bullets 接受文本数组；Equation 接受
             LaTeX 原始字符串；Image 接受素材路径；Metric 接受指标值和
-            label；Table 接受二维数组。
+            label；Table 接受二维数组。Heading 设置标题层级，Caption
+            写说明；Numbered 编号，Divider 分隔；Rectangle / Circle
+            绘制图元，Badge 显示徽标，Progress 接收 0–1 的进度值。
           </p>
           <h3>计算与表格</h3>
           <pre>{`let data = range(0, 6).map(k => [k, k^2])
@@ -229,6 +232,26 @@ Slide(title: "计算数据") {
             支持 let 常量、算术与条件表达式、数组下标、map / filter /
             reduce，以及 sum、mean、round、fixed、percent
             等函数。计算在本地解释执行；错误会显示行列位置。表格可设置表头、列宽、对齐、数字格式、行高与边框。
+          </p>
+          <h3>自定义布局</h3>
+          <pre>{`func ResultPanel(title, gap = 16) {
+    Panel(radius: 20) {
+        VStack(spacing: gap) {
+            Heading(title, level: 2)
+            Content()
+        }
+    }
+}
+// 在 Slide 中调用：
+ResultPanel(title: "结论") {
+    Numbered(["误差下降", "结果可复现"])
+    Progress(mean([0.7, 0.9]), label: "验证进度")
+}`}</pre>
+          <p>
+            func 支持默认参数和局部 let 计算。Content()
+            放入所有剩余内容，Slot(0) 放入第一个子项；每项只放置一次。Columns /
+            Rows 用 weights 分配剩余宽度或高度，Panel
+            提供面板。函数名、参数与插槽均有代码提示。
           </p>
           <h3>布局与动画</h3>
           <p>
