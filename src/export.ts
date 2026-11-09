@@ -43,9 +43,27 @@ export async function buildPptx(
       const layer = layers[i];
       if (!layer) continue;
       const objectName = `easy-slide-element-${i}`;
-      if (e.kind === "text" && !faithful) {
+      if (e.kind === "text" && !e.rich?.hasMath && !faithful) {
         const size = e.size ?? 24;
-        page.addText((layer.textLines ?? []).map((l) => l.text).join("\n"), {
+        const content = e.rich
+          ? (layer.textLines ?? []).flatMap((line, row) =>
+              (line.runs?.length ? line.runs : [{ text: line.text }]).map(
+                (run, j) => ({
+                  text: run.text,
+                  options: {
+                    bold: run.bold ?? e.bold,
+                    italic: run.italic,
+                    strike: run.strike,
+                    fontFace: run.mono ? "Courier New" : undefined,
+                    breakLine:
+                      row < layer.textLines!.length - 1 &&
+                      j === (line.runs?.length || 1) - 1,
+                  },
+                }),
+              ),
+            )
+          : (layer.textLines ?? []).map((l) => l.text).join("\n");
+        page.addText(content, {
           x: e.x / 96,
           y: e.y / 96,
           w: e.w / 96,
@@ -140,7 +158,9 @@ export async function buildPptx(
     const textIds = faithful
       ? []
       : page.elements.flatMap((e, j) =>
-          e.kind === "text" && ids[j] !== null ? [ids[j]!] : [],
+          e.kind === "text" && !e.rich?.hasMath && ids[j] !== null
+            ? [ids[j]!]
+            : [],
         );
     xml = patchSlideMotion(
       xml,

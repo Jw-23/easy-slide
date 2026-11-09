@@ -3,6 +3,9 @@ import {
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
+import { builtinComponentNames } from "./component-names";
+import { parseRichText, richRuns } from "./rich-text";
+import { stringContent } from "./string-content";
 import { latexCommands } from "./latex-commands";
 import { mathSvg } from "./math";
 import { astPath, parseEditorAst, type AstNode } from "./editor-ast";
@@ -12,7 +15,11 @@ export function equationContext(
   root?: AstNode,
 ): { from: number; to: number; raw: boolean } | null {
   try {
-    const path = astPath(root ?? parseEditorAst(source).root, pos);
+    const ast = root ?? parseEditorAst(source).root,
+      path = astPath(ast, pos),
+      names = new Set<string>([...builtinComponentNames, "Column", "title"]);
+    for (const n of ast.children)
+      if (n.kind === "declaration" && n.name) names.add(n.name);
     const literal = [...path]
       .reverse()
       .find((n) => n.kind === "literal" && n.token?.kind === "string");
@@ -32,6 +39,54 @@ export function equationContext(
         to: token.contentTo!,
         raw: !!token.raw,
       };
+    if (token && pos >= token.contentFrom! && pos <= token.contentTo!) {
+      // Follow AST ancestry through list/table arrays, without treating Code or asset/config strings as prose.
+      const owner = [...path]
+        .reverse()
+        .find((n) => n.kind === "call" && names.has(n.name || ""));
+      const argument = owner && path[path.indexOf(owner) + 1];
+      const prose =
+        owner &&
+        argument?.kind === "argument" &&
+        (argument.name
+          ? [
+              "text",
+              "title",
+              "subtitle",
+              "eyebrow",
+              "label",
+              "value",
+              "items",
+              "rows",
+              "headers",
+              "author",
+            ].includes(argument.name) &&
+            !(owner.name === "Code" && argument.name === "text")
+          : !["Code", "Image", "Slide"].includes(owner.name || ""));
+      if (prose) {
+        const content = stringContent(source, token),
+          p = content.at(pos),
+          document = parseRichText(content.value),
+          runs = richRuns(document);
+        if (
+          runs.some(
+            (run) =>
+              run.node.kind === "code" && p >= run.node.from && p < run.node.to,
+          )
+        )
+          return null;
+        const math = [
+          ...runs.filter((run) => run.kind === "math").map((run) => run.node),
+          ...document.pendingMath,
+        ].find((node) => p >= node.contentFrom! && p <= node.contentTo!);
+        if (math)
+          return {
+            from: content.offsets[math.contentFrom!],
+            to: content.offsets[math.contentTo!],
+            raw: !!token.raw,
+          };
+      }
+    }
   } catch {
     /* Oversized or invalid documents still retain the normal editor. */
   }

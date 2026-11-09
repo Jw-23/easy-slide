@@ -14,7 +14,7 @@ test("PPTX preserves browser text layers, vectors, click groups, keyframes and s
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  await expect(page.locator(".slide-item")).toHaveCount(25);
+  await expect(page.locator(".slide-item")).toHaveCount(26);
   const output = process.env.PPTX_QA_DIR ?? testInfo.outputPath("pptx");
   await mkdir(output, { recursive: true });
   for (let index = 0; index < exportFixture.slides.length; index++) {
@@ -212,7 +212,7 @@ test("glass includes underlying imagery without revealing a future click stage",
   page,
 }) => {
   await page.goto("/");
-  await expect(page.locator(".slide-item")).toHaveCount(25);
+  await expect(page.locator(".slide-item")).toHaveCount(26);
   const pixels = await page.evaluate(async () => {
     const path = "/src/pptx-render.ts",
       { renderExportLayers, loadExportImage } = await import(path);

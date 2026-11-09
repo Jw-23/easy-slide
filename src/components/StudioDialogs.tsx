@@ -105,7 +105,7 @@ export default function StudioDialogs({
             <small>
               {mode === "faithful"
                 ? "文字导出为图片；两种方式都保留动画。"
-                : "文字可编辑，字体由演示设备决定。"}
+                : "纯文字可编辑；含行内公式的段落保留为图像，字体由演示设备决定。"}
             </small>
           </fieldset>
           <button
@@ -147,7 +147,7 @@ export default function StudioDialogs({
             {
               deck: showcaseDeck,
               title: "功能示例",
-              detail: "25 页 · 组件、主题、公式与动画",
+              detail: "26 页 · 组件、主题、公式与动画",
               icon: BookOpen,
             },
             {
@@ -221,6 +221,14 @@ Slide(title: "一个清晰的结论") {
             label；Table 接受二维数组。Heading 设置标题层级，Caption
             写说明；Numbered 编号，Divider 分隔；Rectangle / Circle
             绘制图元，Badge 显示徽标，Progress 接收 0–1 的进度值。
+          </p>
+          <h3>富文本与行内公式</h3>
+          <pre>{String.raw`Text(#"**结论**：误差为 $\frac{1}{n}$，*收敛*。"#)`}</pre>
+          <p>
+            支持 **粗体**、*斜体*、~~删除线~~ 和反引号行内代码，可嵌套。
+            公式使用 $…$ 或反斜杠括号，独立显示使用 $$…$$ 或反斜杠方括号。
+            建议使用原始字符串；反斜杠可转义标记，未闭合时保留原文。 行内公式有
+            LaTeX 提示，Code 块与行内代码保持原样。
           </p>
           <h3>计算与表格</h3>
           <pre>{`let data = range(0, 6).map(k => [k, k^2])

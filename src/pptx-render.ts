@@ -1,3 +1,10 @@
+import {
+  measureRichText,
+  richTextLines,
+  richTextSvg,
+  baseline,
+  type StyledRun,
+} from "./rich-text-export";
 import { resolveTheme } from "./themes";
 import type { Deck, Slide } from "./dsl";
 import { TEXT_LINE_HEIGHT, type Element } from "./scene";
@@ -6,7 +13,7 @@ import { svgData } from "./materials";
 import { timeline } from "./motion";
 
 export const EXPORT_SCALE = 3;
-export type TextLine = { text: string; top: number };
+export type TextLine = { text: string; top: number; runs?: StyledRun[] };
 export type ExportLayer = {
   data: string;
   x: number;
@@ -120,6 +127,39 @@ export function measureText(element: Element, fontFamily: string) {
   }
 }
 async function textLayer(e: Element, fontFamily: string): Promise<ExportLayer> {
+  if (e.rich) {
+    const fragments = await measureRichText(e, fontFamily),
+      { canvas: c, ctx } = canvas(e.w, e.h);
+    ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
+    ctx.fillStyle = e.color || "#192c2a";
+    ctx.textBaseline = "alphabetic";
+    const baselines: number[] = [];
+    for (const f of fragments) {
+      const y = f.data ? f.y + f.h : baseline(f, ctx);
+      baselines.push(y);
+      if (f.data)
+        ctx.drawImage(await loadExportImage(f.data), f.x, f.y, f.w, f.h);
+      else ctx.fillText(f.text, f.x, y);
+      if (f.strike) {
+        ctx.beginPath();
+        ctx.strokeStyle = e.color || "#192c2a";
+        ctx.lineWidth = Math.max(1, f.size / 16);
+        const strikeY = f.data ? f.y + f.h / 2 : y - f.size * 0.3;
+        ctx.moveTo(f.x, strikeY);
+        ctx.lineTo(f.x + f.w, strikeY);
+        ctx.stroke();
+      }
+    }
+    const layer = {
+      ...e,
+      data: c.toDataURL("image/png"),
+      svg: richTextSvg(e, fragments, baselines),
+      textLines: richTextLines(fragments, e.size ?? 24),
+    };
+    c.width = 0;
+    c.height = 0;
+    return layer;
+  }
   const layout = measureText(e, fontFamily),
     { canvas: c, ctx } = canvas(e.w, e.h);
   const svg = svgData(
