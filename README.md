@@ -58,7 +58,7 @@ npm test
 
 ## DSL
 
-详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；由本地专用解释器处理声明与受限计算，不执行 JavaScript。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。布局通过独立 Cover / Split / Cards / Flow 等组件组合，也可嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置；Columns / Rows 可按权重分配空间，Panel 和 Heading / Caption / Numbered / 图元等基础元素用于组合内容；`func` 可定义带默认参数、局部计算及 Content / Slot 插槽的自定义布局。文字使用有源码范围的行内 AST 识别粗体、斜体、删除线、代码及 LaTeX 公式；Code 块保持原样。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。标题、备注、布局、过渡和素材插入只改写对应源码片段；规范化格式是单独的显式操作。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
+详见 [DSL 说明](docs/DSL.md)。所有内容在同一份声明式数据中定义，网页和 PPTX 共享布局引擎；由本地专用解释器处理声明与受限计算，不执行 JavaScript。格式版本为 `1`。Deck、Theme、每个 Slide 在顶层并列书写。布局通过独立 Cover / Split / Cards / Flow 等组件组合，也可嵌套 HStack、VStack、ZStack、Grid 与 Spacer；支持链式字体、颜色、尺寸、边距与动画设置；Columns / Rows 可按权重分配空间，Panel 和 Heading / Caption / Numbered / 图元等基础元素用于组合内容；`func` 可定义带默认参数、局部计算及 Content / Slot 插槽的自定义布局。文字使用有源码范围的行内 AST 识别粗体、斜体、删除线、代码及 LaTeX 公式；Code 块保持原样。编辑器具有 CodeMirror 代码提示、语法着色和错误定位。标题、备注、布局、过渡和素材插入只改写对应源码片段；规范化格式是单独的显式操作。公式可用反引号原始字符串直接书写，如 ``Equation(`\frac{1}{n}`)``，无需双写反斜杠；三个反引号支持多行，旧的 `#"..."#` 语法继续兼容。DSL 是专用语言，不需要 Swift 工具链，也不执行 JavaScript。
 
 ```swift
 Deck("一个清晰的结论", author: "研究组")
@@ -114,4 +114,4 @@ React + TypeScript + Vite；专用词法与语法解析器；MathJax 本地矢�
 
 线上功能示例可直接通过 `/?example=features` 打开。此入口使用独立、按示例版本隔离的浏览器草稿，不会覆盖普通入口恢复的工作工程；在示例中进行的修改也会单独保存。普通首页默认恢复最近的工作工程，因此已保存的旧内容不会因网站发布而自动改变。
 
-新版功能示例的草稿独立保存于修订版 4；`/?example=features` 打开最新版，`/?example=features&revision=1`、`revision=2` 或 `revision=3` 可恢复此前独立入口保存的对应草稿。普通首页的工作工程不受影响。
+新版功能示例的草稿独立保存于修订版 5；`/?example=features` 打开最新版，`/?example=features&revision=1`、`revision=2`、`revision=3` 或 `revision=4` 可恢复此前独立入口保存的对应草稿。普通首页的工作工程不受影响。
