@@ -1,3 +1,6 @@
+import { formatSource } from "./format-source";
+import { SourceMap, type SceneTarget } from "./source-map";
+import { pasteCanvasText } from "./component-clipboard";
 import { useEffect, useRef, useState } from "react";
 import { parseDeck, serialize, type Deck, type Layout } from "../dsl";
 import { exampleAssetsFor } from "../examples";
@@ -278,14 +281,14 @@ export function useStudio(draftKey: string) {
       );
     });
   }
-  async function addImages(files: File[], insert = true) {
+  async function addImages(files: File[], insert = true, target?: SceneTarget) {
     if (!files.length) return;
     if (!editable || locked.current) {
       notify("请先完成当前操作并修复 DSL 再添加图片", "error");
       return;
     }
     const snapshot = doc.project,
-      page = doc.active;
+      page = target?.page ?? doc.active;
     await run("正在添加图片…", async () => {
       const added: Record<string, string> = {};
       for (const file of files) {
@@ -297,13 +300,20 @@ export function useStudio(draftKey: string) {
         added[`assets/${crypto.randomUUID().slice(0, 8)}-${name}`] =
           await readData(file);
       }
-      const source = insert
-        ? appendSlideBlocks(
-            snapshot.source,
-            page,
-            Object.keys(added).map((path) => `Image(${JSON.stringify(path)})`),
-          )
-        : snapshot.source;
+      const declarations = Object.keys(added).map(
+        (path) => `Image(${JSON.stringify(path)})`,
+      );
+      const source = !insert
+        ? snapshot.source
+        : target
+          ? pasteCanvasText(
+              { ...snapshot, assets: { ...snapshot.assets, ...added } },
+              doc.deck,
+              new SourceMap(snapshot.source),
+              target,
+              declarations.join("\n"),
+            ).source
+          : appendSlideBlocks(snapshot.source, page, declarations);
       const project = {
         ...snapshot,
         source,
@@ -314,8 +324,35 @@ export function useStudio(draftKey: string) {
       notify(`已添加 ${files.length} 张图片`, "success", true);
     });
   }
+  function contextCommit(
+    expected: typeof doc.project,
+    next: typeof doc.project,
+    page = doc.active,
+  ) {
+    if (!editable || locked.current) return false;
+    if (
+      expected.source !== current.current.project.source ||
+      expected.assets !== current.current.project.assets
+    ) {
+      notify("工程已变更，请重新打开菜单后操作", "error");
+      return false;
+    }
+    try {
+      parseDeck(next.source);
+      if (next.assets !== expected.assets) validatePortableProject(next);
+      doc.commit(next, undefined, page);
+      return true;
+    } catch (problem) {
+      notify(
+        problem instanceof Error ? problem.message : String(problem),
+        "error",
+      );
+      return false;
+    }
+  }
   return {
     ...doc,
+    contextCommit,
     busy,
     editable,
     operation,
@@ -348,7 +385,7 @@ export function useStudio(draftKey: string) {
     addImages,
     rename: (title: string) =>
       mutate(() => renameDeck(doc.project.source, title), "deck-title"),
-    format: () => mutate(() => serialize(doc.deck)),
+    format: () => mutate(() => formatSource(doc.project.source)),
   };
 }
 export type Studio = ReturnType<typeof useStudio>;

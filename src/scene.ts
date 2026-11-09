@@ -1,3 +1,4 @@
+import type { SceneTarget } from "./studio/source-map";
 import { resolveTheme, headerText } from "./themes";
 import { tableModel } from "./table";
 import { backdropData } from "./materials";
@@ -5,6 +6,7 @@ import { pageLayout } from "./dsl";
 import type { Block, Deck, Slide, Motion, GlassStyle } from "./dsl";
 export const TEXT_LINE_HEIGHT = 1.42;
 export type Element = {
+  source?: SceneTarget;
   kind: "text" | "rect" | "image" | "equation";
   glass?: GlassStyle;
   data?: string;
@@ -34,8 +36,20 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
   let activeMotion: Motion | undefined,
     activeKey: string | undefined,
     counter = 0;
+  let activeSource: SceneTarget = { scope: "slide", page: index };
+  const atSource = (source: SceneTarget, render: () => void) => {
+    const previous = activeSource;
+    activeSource = source;
+    render();
+    activeSource = previous;
+  };
   const push = (el: Element) =>
-    e.push({ ...el, appear: activeMotion, motionKey: activeKey });
+    e.push({
+      ...el,
+      source: activeSource,
+      appear: activeMotion,
+      motionKey: activeKey,
+    });
   const text = (
     t: string,
     x: number,
@@ -75,27 +89,60 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       (b) => b.glass || b.type === "glass" || glassBlocks(b.children || []),
     );
   if (theme.material === "glass" || glassBlocks(s.blocks))
-    push({
-      kind: "image",
-      data: backdropData(deck, s),
-      x: 0,
-      y: 0,
-      w: 1280,
-      h: 720,
-      step: 0,
-    });
-  if (s.eyebrow) text(s.eyebrow, 72, 48, 1100, 24, 13, accent, true);
+    atSource(
+      s.background
+        ? { scope: "slide", page: index, field: "background" }
+        : deck.theme
+          ? { scope: "theme", page: index }
+          : { scope: "slide", page: index },
+      () =>
+        push({
+          kind: "image",
+          data: backdropData(deck, s),
+          x: 0,
+          y: 0,
+          w: 1280,
+          h: 720,
+          step: 0,
+        }),
+    );
+  if (s.eyebrow)
+    atSource({ scope: "slide", page: index, field: "eyebrow" }, () =>
+      text(s.eyebrow!, 72, 48, 1100, 24, 13, accent, true),
+    );
   const preset = pageLayout(s);
   const cover = ["cover", "section"].includes(preset);
   if (cover) {
     rect(72, 119, 44, 4, accent, 2);
-    text(s.title, 72, 155, preset === "cover" ? 760 : 1136, 250, 68, fg, true);
-    if (s.subtitle) text(s.subtitle, 76, 430, 1000, 70, 25, muted);
+    atSource({ scope: "slide", page: index, field: "title" }, () =>
+      text(
+        s.title,
+        72,
+        155,
+        preset === "cover" ? 760 : 1136,
+        250,
+        68,
+        fg,
+        true,
+      ),
+    );
+    if (s.subtitle)
+      atSource({ scope: "slide", page: index, field: "subtitle" }, () =>
+        text(s.subtitle!, 76, 430, 1000, 70, 25, muted),
+      );
   } else {
-    text(s.title, 72, 104, 1136, 80, 42, fg, true);
-    if (s.subtitle) text(s.subtitle, 74, 183, 1130, 45, 19, muted);
+    atSource({ scope: "slide", page: index, field: "title" }, () =>
+      text(s.title, 72, 104, 1136, 80, 42, fg, true),
+    );
+    if (s.subtitle)
+      atSource({ scope: "slide", page: index, field: "subtitle" }, () =>
+        text(s.subtitle!, 74, 183, 1130, 45, 19, muted),
+      );
   }
-  text(deck.author || deck.title, 72, 664, 1000, 20, 12, muted);
+  atSource(
+    { scope: "deck", page: index, field: deck.author ? "author" : "title" },
+    () => text(deck.author || deck.title, 72, 664, 1000, 20, 12, muted),
+  );
   text(String(index + 1).padStart(2, "0"), 1160, 662, 50, 22, 14, accent, true);
   function block(
     b: Block,
@@ -104,7 +151,10 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     w: number,
     h: number,
     card: boolean,
+    path: number[],
   ) {
+    const previousSource = activeSource;
+    activeSource = { scope: "block", page: index, path };
     const previousMotion = activeMotion,
       previousKey = activeKey;
     if (b.appear) {
@@ -117,6 +167,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
     renderBlock(b, x, y, w, h, card);
     activeMotion = previousMotion;
     activeKey = previousKey;
+    activeSource = previousSource;
   }
   function renderBlock(
     b: Block,
@@ -221,6 +272,10 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           Math.max(0, cw),
           Math.max(0, ch),
           false,
+          [
+            ...(activeSource.scope === "block" ? activeSource.path : []),
+            children.indexOf(c),
+          ],
         );
       if (b.type === "zstack") children.forEach((c) => child(c, x, y, w, h));
       else if (b.type === "grid") {
@@ -478,6 +533,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         Math.max(0, bw),
         Math.max(0, bh),
         card,
+        [...(activeSource.scope === "block" ? activeSource.path : []), i],
       );
     }
     if (root && ["cover", "section"].includes(preset)) {
@@ -537,6 +593,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         1132,
         370 / Math.max(1, s.blocks.length),
         false,
+        [i],
       ),
     );
   return e;

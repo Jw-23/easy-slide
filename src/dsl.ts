@@ -805,3 +805,8 @@ export function addPageBlock(s: Slide, b: Block): Block[] {
     return [{ ...s.blocks[0], children: [...(s.blocks[0].children || []), b] }];
   return [...s.blocks, b];
 }
+
+/** Serialize an individual content component for portable clipboard operations. */
+export function serializeBlock(block: Block): string {
+  return writeBlock(block, "");
+}

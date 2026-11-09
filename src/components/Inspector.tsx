@@ -1,3 +1,8 @@
+import type {
+  EditorContext,
+  RevealRequest,
+} from "../studio/use-context-actions";
+import type { StudioClipboard } from "../studio/clipboard";
 import { lazy, Suspense, useRef } from "react";
 import { Code2, ImagePlus, PanelLeft, Upload } from "lucide-react";
 import { layouts, layoutLabels, pageLayout, type Slide } from "../dsl";
@@ -13,12 +18,18 @@ export function Inspector({
   onTab,
   onHelp,
   onImages,
+  reveal,
+  onEditorContext,
+  clipboard,
 }: {
   studio: Studio;
   tab: InspectorTab;
   onTab: (tab: InspectorTab) => void;
   onHelp: () => void;
   onImages: () => void;
+  reveal?: RevealRequest | null;
+  onEditorContext?: (context: EditorContext) => void;
+  clipboard?: StudioClipboard;
 }) {
   const theme = resolveTheme(s.deck.theme),
     locked = !s.editable,
@@ -253,6 +264,10 @@ export function Inspector({
               onRedo={s.redo}
               readOnly={!s.ready || s.busy}
               session={session.current}
+              reveal={reveal}
+              onContextMenu={onEditorContext}
+              clipboard={clipboard}
+              onMessage={(message) => s.notify(message)}
             />
           </Suspense>
         ) : (

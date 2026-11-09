@@ -16,7 +16,7 @@ Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "�
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
-}.notes("此工程展示现有的全部组件与编排方式。上方主题菜单提供 10 套样式，切换时保留所有页面源码。Theme(preset: .aurora) 可在 DSL 中声明主题，页面和组件的显式颜色优先。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
+}.notes("此工程展示现有的全部组件与编排方式。上方主题菜单提供 10 套样式，切换时保留所有页面源码。Theme(preset: .aurora) 可在 DSL 中声明主题，页面和组件的显式颜色优先。右键内容与 DSL 可以双向定位。Ctrl / ⌘ + Shift + F 格式化长参数并保留注释。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
 
 Slide(title: "页面与布局\n分别声明", eyebrow: "02 / STRUCTURE", subtitle: "Deck、Theme 与 Slide 并列；布局由独立组件负责") {
     Section {
