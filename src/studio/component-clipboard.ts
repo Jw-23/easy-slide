@@ -1,3 +1,4 @@
+import { tokenize } from "../tokens";
 import {
   parseDeck,
   serializeBlock,
@@ -149,9 +150,10 @@ export function pasteComponent(
   const bindings = point.inside
     ? point.record.childBindings
     : parent?.childBindings || [];
+  const signature = (values: string[]) =>
+    JSON.stringify(tokenize(values.join("\n")).map((t) => [t.kind, t.value]));
   let materialized =
-    clip.snapshotOnly ||
-    JSON.stringify(bindings) !== JSON.stringify(clip.bindings);
+    clip.snapshotOnly || signature(bindings) !== signature(clip.bindings);
   const paths: Record<string, string> = {},
     assets = { ...project.assets };
   for (const [path, data] of Object.entries(clip.assets)) {

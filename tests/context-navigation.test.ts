@@ -1,3 +1,4 @@
+import { formatSource } from "../src/studio/format-source";
 import { describe, it, expect } from "vitest";
 import { parseDeck, serialize, type Project } from "../src/dsl";
 import {
@@ -229,4 +230,49 @@ it("maps a glass backdrop without a Theme declaration to the page", () => {
   scene(deck, deck.slides[0], 0).forEach((element) =>
     expect(map.get(element.source!)).toBeDefined(),
   );
+});
+
+it("keeps computed source portable within the same scope after formatting its declarations", () => {
+  const original = project(),
+    old = parseDeck(source),
+    clip = copyComponent(
+      original,
+      old,
+      new SourceMap(source),
+      target([0, 1, 1]),
+    );
+  const formatted = project(formatSource(source)),
+    deck = parseDeck(formatted.source),
+    result = pasteComponent(
+      formatted,
+      deck,
+      new SourceMap(formatted.source),
+      target([0, 1, 1]),
+      clip,
+      "formatted",
+      true,
+    );
+  expect(result.materialized).toBe(false);
+  expect(result.project.source).toContain("rows:rows");
+});
+it("rewrites only the copied Image argument when raw source encounters an asset collision", () => {
+  const original = project(
+    source.replace(
+      'Image("assets/图片.png")',
+      'Text("assets/图片.png")\n   Image("assets/图片.png")',
+    ),
+  );
+  const deck = parseDeck(original.source),
+    map = new SourceMap(original.source),
+    clip = copyComponent(original, deck, map, target([0, 1]));
+  const other =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  const dest = { ...original, assets: { "assets/图片.png": other } },
+    result = pasteComponent(dest, deck, map, target([0, 1]), clip, "raw", true);
+  expect(result.materialized).toBe(false);
+  expect(
+    result.project.source.match(/Text\("assets\/图片.png"\)/g),
+  ).toHaveLength(2);
+  expect(result.project.source).toContain('Image("assets/paste-raw-图片.png")');
+  expect(result.project.assets["assets/paste-raw-图片.png"]).toBe(pixel);
 });
