@@ -66,7 +66,12 @@ describe("mathematical environments and automatic slides", () => {
         ).join(" ") +
         "}}}",
     );
-    expect(d.slides.length).toBeGreaterThan(1);
+    expect(d.slides.length).toBeGreaterThanOrEqual(1);
+    expect(
+      d.slides
+        .flatMap((s, i) => scene(d, s, i))
+        .filter((e) => e.text?.startsWith("步骤 ")),
+    ).toHaveLength(7);
     expect(
       d.slides
         .flatMap((s, i) => scene(d, s, i))
@@ -166,7 +171,7 @@ it("retains flow/column styles and delays QED until the final proof stage", asyn
     qed = es.find((e) => e.text === "∎")!;
   expect(a.size).toBe(18);
   expect(a.color).toBe("#315973");
-  expect(a.x).toBeGreaterThan(74 + 16);
+  expect(a.x).toBe(40 + 16);
   expect(qed.step).toBe(2);
   const cues = timeline(es),
     end = cues.find((c) => c.elements.includes(es.indexOf(qed)))!,
@@ -230,4 +235,60 @@ it("uses teaching page geometry, small fonts and natural column order in preview
     expect(() =>
       parseDeck('Deck("D") Slide(title:"S",' + option + '){Text("A")}'),
     ).toThrow();
+});
+
+it("starts proof below the theorem and fills the remaining column before continuing", () => {
+  const d = parseDeck(
+    'Deck("D") DynamicSlide(title:"教学",columns:2,fontSize:18){Theorem("结论"){Text("定理内容").frame(height:100)} Proof{' +
+      Array.from(
+        { length: 7 },
+        (_, i) =>
+          `ProofStep("推理${i + 1}"){Text("正文${i + 1}").frame(height:65)}`,
+      ).join(" ") +
+      "}}",
+  );
+  const all = d.slides.flatMap((s, i) => scene(d, s, i)),
+    first = scene(d, d.slides[0], 0);
+  const theorem = first.find((e) => e.text?.startsWith("定理 1"))!,
+    proof = first.find((e) => e.text === "证明")!,
+    step = first.find((e) => e.text?.includes("步骤 1 ·"))!;
+  expect(proof.x).toBeLessThan(640);
+  expect(proof.y).toBeGreaterThan(theorem.y);
+  expect(step.x).toBe(proof.x);
+  expect(step.y).toBeGreaterThan(proof.y + proof.h);
+  expect(first.some((e) => e.text?.startsWith("证明（续）") && e.x > 640)).toBe(
+    true,
+  );
+  for (let i = 1; i <= 7; i++)
+    expect(all.filter((e) => e.text === `正文${i}`)).toHaveLength(1);
+  expect(all.filter((e) => e.text === "∎")).toHaveLength(1);
+  for (const e of all) expect(e.y + e.h).toBeLessThanOrEqual(720);
+  // Plain proof and step environments have no nested vertical rules.
+  const rules = all.filter((e) => e.kind === "rect" && e.w <= 4 && e.h > 30);
+  expect(rules).toHaveLength(1);
+  expect(parseDeck(serialize(d))).toEqual(d);
+});
+
+it("uses the remainder for a long formatted paragraph and keeps atomic blocks intact", () => {
+  const d = parseDeck(
+    'Deck("D") DynamicSlide(title:"S",columns:2){Text("Intro").frame(height:240) Text("' +
+      "**连续正文** ".repeat(400) +
+      '") Equation(`x=y`) }',
+  );
+  const first = scene(d, d.slides[0], 0),
+    intro = first.find((e) => e.text === "Intro")!;
+  expect(
+    first.some(
+      (e) =>
+        e.kind === "text" &&
+        e.text?.includes("连续正文") &&
+        e.x < 640 &&
+        e.y >= intro.y + intro.h,
+    ),
+  ).toBe(true);
+  expect(
+    d.slides
+      .flatMap((s, i) => scene(d, s, i))
+      .filter((e) => e.kind === "equation"),
+  ).toHaveLength(1);
 });

@@ -388,8 +388,8 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         ].includes(b.environment || "");
       if (!b.glass && (!plain || b.fill))
         rect(x, y, w, h, b.fill || panel, b.radius ?? 14, step);
-      rect(x, y, plain ? 2 : 4, h, accent, 1, step);
-      const innerX = x + m.pad + 4,
+      if (!plain) rect(x, y, 4, h, accent, 1, step);
+      const innerX = x + m.pad + m.inset,
         innerY = y + m.pad + m.heading + 12;
       text(
         mathHeading(b),

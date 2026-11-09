@@ -101,9 +101,17 @@ export function textHeight(
   );
 }
 export function mathMetrics(b: Block, w: number, font: string, inherited = 22) {
-  const pad = b.padding ?? (b.environment === "ProofStep" ? 10 : 18),
+  const plain = [
+    "Proof",
+    "Solution",
+    "Derivation",
+    "Reasoning",
+    "ProofStep",
+  ].includes(b.environment || "");
+  const pad = b.padding ?? (plain ? 0 : 18),
+    inset = plain ? 0 : 4,
     size = b.size ?? inherited,
-    inner = Math.max(1, w - pad * 2 - 4),
+    inner = Math.max(1, w - pad * 2 - inset),
     heading = textHeight(mathHeading(b), inner, size, font),
     body = b.text ? textHeight(b.text, inner, size, font) + 12 : 0,
     reason = b.reason
@@ -112,6 +120,7 @@ export function mathMetrics(b: Block, w: number, font: string, inherited = 22) {
     footer = proofEnds(b) ? 30 : 0;
   return {
     pad,
+    inset,
     size,
     inner,
     heading,
@@ -276,6 +285,7 @@ export function splitText(
   max: number,
   font: string,
   size: number,
+  firstMax = max,
 ): Block[] {
   const pad = b.padding ?? 0,
     overhead = pad * 2 + (b.title ? 54 : 0) + 6,
@@ -286,13 +296,16 @@ export function splitText(
       font,
     ),
     chunks: MeasuredLine[][] = [[]];
-  let used = overhead;
+  let used = overhead,
+    capacity = Math.min(max, firstMax);
+  if (!lines.length || capacity < overhead + lines[0].height) capacity = max;
   for (const line of lines) {
     if (line.height + overhead > max)
       throw Error("单个公式或文本行超出动态页高度，请拆分公式或调整字号");
-    if (used + line.height > max && chunks.at(-1)!.length) {
+    if (used + line.height > capacity && chunks.at(-1)!.length) {
       chunks.push([]);
       used = overhead;
+      capacity = max;
     }
     chunks.at(-1)!.push(line);
     used += line.height;

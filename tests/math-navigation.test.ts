@@ -240,3 +240,18 @@ it("keeps editing the same declaration when smaller text removes continuation pa
   });
   expect(parseDeck(changed).slides.at(-1)?.title).toBe("After");
 });
+
+it("keeps the built-in gradient descent proof directly below its theorem", () => {
+  const page = mathProofDeck.slides.findIndex(
+      (s) => s.title === "梯度下降的收敛率",
+    ),
+    elements = scene(mathProofDeck, mathProofDeck.slides[page], page);
+  const proof = elements.find((e) => e.text === "证明")!,
+    theorem = elements.find((e) => e.text?.startsWith("定理 1"))!;
+  expect(proof).toBeDefined();
+  expect(proof.x).toBeLessThan(640);
+  expect(proof.y).toBeGreaterThan(theorem.y + theorem.h);
+  expect(
+    elements.some((e) => e.text?.startsWith("步骤 1") && e.x === proof.x),
+  ).toBe(true);
+});
