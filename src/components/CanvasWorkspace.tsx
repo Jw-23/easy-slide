@@ -1,3 +1,4 @@
+import { moveImage } from "../studio/image-actions";
 import type { FocusRequest } from "../studio/use-context-actions";
 import type { SceneTarget } from "../studio/source-map";
 import type { Element } from "../scene";
@@ -79,6 +80,21 @@ export function CanvasWorkspace({
             step={step}
             epoch={preview.epoch}
             animate
+            onImageMove={
+              s.editable
+                ? (target, x, y, w, h) => {
+                    try {
+                      const next = moveImage(s.project, target, x, y, w, h);
+                      s.contextCommit(s.project, next.project, target.page);
+                    } catch (e) {
+                      s.notify(
+                        e instanceof Error ? e.message : String(e),
+                        "error",
+                      );
+                    }
+                  }
+                : undefined
+            }
             onContextMenu={onContextMenu}
             highlight={
               focus?.source === s.project.source ? focus.target : undefined

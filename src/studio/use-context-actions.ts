@@ -54,6 +54,7 @@ export function useContextActions(
   openCode: () => void,
   openCanvas: () => void,
   pickImages: () => void,
+  editImage?: (path: string) => void,
 ) {
   const map = useMemo(() => {
     if (s.error) return null;
@@ -303,6 +304,12 @@ export function useContextActions(
       items.push({
         label: "复制文本",
         action: safe(() => textCopy(element.text!)),
+      });
+    if (element?.src && editImage)
+      items.push({
+        label: "编辑图片 / 重命名",
+        disabled: !s.editable,
+        action: () => editImage(element.src!),
       });
     items.push(...componentItems(target));
     if (!thumbnail) {

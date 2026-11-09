@@ -1,0 +1,82 @@
+.modal.image-editor {
+  width: min(1100px, 95vw);
+  max-width: 95vw;
+}
+.image-editor-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.image-editor-toolbar label {
+  display: grid;
+  gap: 4px;
+}
+.image-editor-toolbar input[type="number"] {
+  width: 80px;
+}
+.image-tools {
+  display: flex;
+  gap: 4px;
+}
+.image-tools button[aria-pressed="true"] {
+  background: var(--accent);
+  color: white;
+}
+.image-edit-viewport {
+  max-height: 55vh;
+  overflow: auto;
+  background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50%/20px 20px;
+  border: 1px solid var(--line);
+  text-align: center;
+  padding: 8px;
+}
+.image-edit-surface {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+.image-edit-surface canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+.image-crop-box {
+  position: absolute;
+  border: 2px dashed #147ed4;
+  pointer-events: none;
+  background: #147ed422;
+  box-sizing: border-box;
+}
+.image-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+.sample-value {
+  width: 100%;
+  margin-top: 8px;
+}
+.asset-entry {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.asset-entry .asset-actions {
+  display: flex;
+  gap: 4px;
+}
+.asset-actions button {
+  font-size: 12px;
+  padding: 4px 8px;
+  flex: 1;
+}
+
+.slide-frame[data-image-draggable="true"] [data-image-asset="true"] {
+  cursor: grab;
+  touch-action: none;
+}
