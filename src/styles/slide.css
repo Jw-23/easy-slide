@@ -50,3 +50,14 @@
     translate: 0 0;
   }
 }
+
+.source-highlight {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  border: 3px solid #387fe9;
+  border-radius: 5px;
+  box-shadow:
+    0 0 0 3px #ffffffcc,
+    0 0 0 5px #387fe955;
+}

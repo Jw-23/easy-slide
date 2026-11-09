@@ -1,3 +1,4 @@
+import { targetContains, type SceneTarget } from "./studio/source-map";
 import { resolveTheme } from "./themes";
 import { memo, useMemo, useLayoutEffect, useRef, useState } from "react";
 import type { Deck, Slide } from "./dsl";
@@ -10,12 +11,14 @@ function SceneElement({
   step,
   animate,
   delay,
+  elementIndex,
 }: {
   e: Element;
   assets: Record<string, string>;
   step: number;
   animate: boolean;
   delay: number;
+  elementIndex: number;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     visible = e.step <= step;
@@ -108,7 +111,13 @@ function SceneElement({
     );
   }
   return (
-    <div ref={ref} style={style} data-motion={e.motionKey} data-step={e.step}>
+    <div
+      ref={ref}
+      style={style}
+      data-scene-element={elementIndex}
+      data-motion={e.motionKey}
+      data-step={e.step}
+    >
       {content}
     </div>
   );
@@ -121,6 +130,8 @@ function SlideViewContent({
   step = Infinity,
   animate = false,
   epoch = 0,
+  onContextMenu,
+  highlight,
 }: {
   deck: Deck;
   slide: Slide;
@@ -129,6 +140,12 @@ function SlideViewContent({
   step?: number;
   animate?: boolean;
   epoch?: number;
+  onContextMenu?: (
+    event: React.MouseEvent,
+    target: SceneTarget,
+    element?: Element,
+  ) => void;
+  highlight?: SceneTarget;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(1);
@@ -154,13 +171,55 @@ function SlideViewContent({
       ),
     [elements],
   );
+  const selected =
+    highlight?.page === index
+      ? elements.filter(
+          (e) =>
+            e.source &&
+            targetContains(highlight, e.source) &&
+            e.w > 0 &&
+            e.h > 0,
+        )
+      : [];
+  const bounds = selected.length
+    ? {
+        x: Math.max(0, Math.min(...selected.map((e) => e.x))),
+        y: Math.max(0, Math.min(...selected.map((e) => e.y))),
+        right: Math.min(1280, Math.max(...selected.map((e) => e.x + e.w))),
+        bottom: Math.min(720, Math.max(...selected.map((e) => e.y + e.h))),
+      }
+    : highlight?.page === index
+      ? { x: 4, y: 4, right: 1276, bottom: 716 }
+      : null;
   const transition = slide.transition || deck.transition || "fade";
   const direction = slide.direction || deck.direction || "left";
   const offset = { left: "4% 0", right: "-4% 0", up: "0 4%", down: "0 -4%" }[
     direction
   ];
   return (
-    <div ref={ref} className="slide-frame">
+    <div
+      ref={ref}
+      className="slide-frame"
+      tabIndex={onContextMenu ? 0 : undefined}
+      aria-label={onContextMenu ? "幻灯片画布" : undefined}
+      onContextMenu={
+        onContextMenu
+          ? (event) => {
+              const node = (event.target as HTMLElement).closest<HTMLElement>(
+                "[data-scene-element]",
+              );
+              const element = node
+                ? elements[Number(node.dataset.sceneElement)]
+                : undefined;
+              onContextMenu(
+                event,
+                element?.source || { scope: "slide", page: index },
+                element,
+              );
+            }
+          : undefined
+      }
+    >
       <div
         key={`${index}-${epoch}`}
         className={`slide-canvas ${animate ? "animate " + transition : ""}`}
@@ -178,6 +237,7 @@ function SlideViewContent({
         {elements.map((e, i) => (
           <SceneElement
             key={i}
+            elementIndex={i}
             e={e}
             assets={assets}
             step={step}
@@ -185,6 +245,18 @@ function SlideViewContent({
             delay={starts.get(i) || 0}
           />
         ))}
+        {bounds && (
+          <div
+            className="source-highlight"
+            aria-hidden="true"
+            style={{
+              left: bounds.x,
+              top: bounds.y,
+              width: Math.max(0, bounds.right - bounds.x),
+              height: Math.max(0, bounds.bottom - bounds.y),
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -193,6 +265,8 @@ function SlideViewContent({
 export const SlideView = memo(
   SlideViewContent,
   (a, b) =>
+    a.highlight === b.highlight &&
+    a.onContextMenu === b.onContextMenu &&
     a.slide === b.slide &&
     a.index === b.index &&
     a.assets === b.assets &&

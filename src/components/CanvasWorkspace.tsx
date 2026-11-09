@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import type { FocusRequest } from "../studio/use-context-actions";
+import type { SceneTarget } from "../studio/source-map";
+import type { Element } from "../scene";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -14,10 +17,23 @@ import type { Studio } from "../studio/use-studio";
 export function CanvasWorkspace({
   studio: s,
   onCode,
+  focus,
+  onContextMenu,
+  onPaste,
+  onClearFocus,
 }: {
   studio: Studio;
   onCode: () => void;
+  focus?: FocusRequest | null;
+  onPaste?: (event: React.ClipboardEvent) => void;
+  onClearFocus?: () => void;
+  onContextMenu?: (
+    event: React.MouseEvent,
+    target: SceneTarget,
+    element?: Element,
+  ) => void;
 }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
   const [drawer, setDrawer] = useState<"notes" | "motion" | null>(null),
     [preview, setPreview] = useState({
       page: s.active,
@@ -28,6 +44,17 @@ export function CanvasWorkspace({
     () => setPreview((p) => ({ ...p, page: s.active, step: Infinity })),
     [s.active],
   );
+  useEffect(() => {
+    if (focus?.source === s.project.source && focus.target.page === s.active) {
+      setPreview((p) => ({ ...p, page: s.active, step: Infinity }));
+      if (focus.focusCanvas)
+        canvasRef.current
+          ?.querySelector<HTMLElement>(".slide-frame")
+          ?.focus({ preventScroll: true });
+      if (focus.target.scope === "slide" && focus.target.field === "notes")
+        setDrawer("notes");
+    }
+  }, [focus, s.active, s.project.source]);
   const cues = useMemo(
     () => timeline(scene(s.deck, s.slide, s.active)),
     [s.deck, s.slide, s.active],
@@ -36,7 +63,14 @@ export function CanvasWorkspace({
   return (
     <main className="main" aria-label="幻灯片预览">
       <div className="canvas-area">
-        <div className="preview-wrap">
+        <div
+          className="preview-wrap"
+          ref={canvasRef}
+          onPaste={onPaste}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") onClearFocus?.();
+          }}
+        >
           <SlideView
             deck={s.deck}
             slide={s.slide}
@@ -45,6 +79,10 @@ export function CanvasWorkspace({
             step={step}
             epoch={preview.epoch}
             animate
+            onContextMenu={onContextMenu}
+            highlight={
+              focus?.source === s.project.source ? focus.target : undefined
+            }
           />
         </div>
       </div>

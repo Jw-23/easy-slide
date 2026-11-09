@@ -1,3 +1,9 @@
+import { whitespaceSelection } from "./studio/format-source";
+import type {
+  EditorContext,
+  RevealRequest,
+} from "./studio/use-context-actions";
+import { StudioClipboard } from "./studio/clipboard";
 import { minimalTextChange } from "./studio/source-edits";
 import { useEffect, useRef, useState } from "react";
 import { EditorView, keymap } from "@codemirror/view";
@@ -43,6 +49,10 @@ export function DslEditor({
   onRedo,
   readOnly = false,
   session,
+  reveal,
+  onContextMenu,
+  clipboard,
+  onMessage,
 }: {
   value: string;
   onChange: (s: string) => void;
@@ -53,6 +63,10 @@ export function DslEditor({
   onRedo?: () => void;
   readOnly?: boolean;
   session?: { anchor: number; head: number; scrollTop: number };
+  reveal?: RevealRequest | null;
+  onContextMenu?: (context: EditorContext) => void;
+  clipboard?: StudioClipboard;
+  onMessage?: (message: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
@@ -60,9 +74,17 @@ export function DslEditor({
     assetRef = useRef(assets),
     undo = useRef(onUndo),
     redo = useRef(onRedo),
+    format = useRef(onFormat),
     readOnlyConfig = useRef(new Compartment());
+  const contextHandler = useRef(onContextMenu),
+    clip = useRef(clipboard || new StudioClipboard()),
+    feedback = useRef(onMessage);
+  contextHandler.current = onContextMenu;
+  clip.current = clipboard || clip.current;
+  feedback.current = onMessage;
   undo.current = onUndo;
   redo.current = onRedo;
+  format.current = onFormat;
   change.current = onChange;
   assetRef.current = assets;
   const [error, setError] = useState<DslError | null>(null);
@@ -95,9 +117,98 @@ export function DslEditor({
         doc: value,
         extensions: [
           basicSetup,
+          EditorView.domEventHandlers({
+            contextmenu(event, editor) {
+              if (
+                (event.shiftKey && (event.clientX || event.clientY)) ||
+                !contextHandler.current
+              )
+                return false;
+              event.preventDefault();
+              const pos =
+                event.clientX || event.clientY
+                  ? (editor.posAtCoords({
+                      x: event.clientX,
+                      y: event.clientY,
+                    }) ?? editor.state.selection.main.head)
+                  : editor.state.selection.main.head;
+              const old = editor.state.selection.main;
+              if (pos < old.from || pos > old.to || old.empty)
+                editor.dispatch({ selection: { anchor: pos } });
+              const selection = editor.state.selection.main,
+                doc = editor.state.doc,
+                text = doc.sliceString(selection.from, selection.to);
+              const check = () => {
+                if (editor.state.doc !== doc)
+                  throw Error("源码已变更，请重新打开菜单");
+              };
+              const copy = async () => {
+                const system = await clip.current.write(text);
+                if (!system)
+                  feedback.current?.("已复制到应用剪贴板，系统剪贴板不可用");
+              };
+              const cut = async () => {
+                if (editor.state.readOnly) return;
+                await copy();
+                check();
+                editor.dispatch({
+                  changes: {
+                    from: selection.from,
+                    to: selection.to,
+                    insert: "",
+                  },
+                  selection: { anchor: selection.from },
+                });
+                editor.focus();
+              };
+              const paste = async () => {
+                if (editor.state.readOnly) return;
+                const data = await clip.current.read();
+                check();
+                if (data.files?.length) throw Error("图片请在画布中粘贴");
+                editor.dispatch({
+                  changes: {
+                    from: selection.from,
+                    to: selection.to,
+                    insert: data.text,
+                  },
+                  selection: { anchor: selection.from + data.text.length },
+                });
+                editor.focus();
+                if (data.local) feedback.current?.("已从应用剪贴板粘贴");
+              };
+              const coords = editor.coordsAtPos(pos);
+              contextHandler.current({
+                position: pos,
+                x: event.clientX || coords?.left || 0,
+                y: event.clientY || coords?.bottom || 0,
+                text,
+                hasSelection: !selection.empty,
+                origin: editor.contentDOM,
+                copy,
+                cut,
+                paste,
+                selectAll: () => {
+                  editor.dispatch({
+                    selection: { anchor: 0, head: editor.state.doc.length },
+                  });
+                  editor.focus();
+                },
+              });
+              return true;
+            },
+          }),
           readOnlyConfig.current.of(EditorState.readOnly.of(readOnly)),
           Prec.highest(
             keymap.of([
+              {
+                key: "Mod-Shift-f",
+                run: (editor) => {
+                  if (editor.state.readOnly) return true;
+                  format.current();
+                  return true;
+                },
+              },
               {
                 key: "Mod-z",
                 run: () => {
@@ -217,14 +328,29 @@ export function DslEditor({
   }, []);
   useEffect(() => {
     const editor = view.current;
-    if (editor && editor.state.doc.toString() !== value)
+    if (editor && editor.state.doc.toString() !== value) {
+      const before = editor.state.doc.toString(),
+        selection = whitespaceSelection(
+          before,
+          value,
+          editor.state.selection.main,
+        );
       editor.dispatch({
-        changes: minimalTextChange(editor.state.doc.toString(), value),
+        changes: minimalTextChange(before, value),
+        ...(selection
+          ? {
+              selection,
+              effects: EditorView.scrollIntoView(selection.head, {
+                y: "nearest",
+              }),
+            }
+          : {}),
         annotations: [
           externalChange.of(true),
           Transaction.addToHistory.of(false),
         ],
       });
+    }
   }, [value]);
   useEffect(() => {
     view.current?.dispatch({
@@ -233,6 +359,17 @@ export function DslEditor({
       ),
     });
   }, [readOnly]);
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor || !reveal || reveal.source !== value) return;
+    const from = Math.min(reveal.from, editor.state.doc.length),
+      to = Math.min(reveal.to, editor.state.doc.length);
+    editor.dispatch({
+      selection: { anchor: to, head: from },
+      effects: EditorView.scrollIntoView(from, { y: "center" }),
+    });
+    editor.focus();
+  }, [reveal, value]);
   const jump = () => {
     const editor = view.current;
     if (!editor || !error) return;
@@ -259,12 +396,14 @@ export function DslEditor({
             <Sparkles size={15} />
           </button>
           <button
-            title="整理为扁平结构（会规范格式并移除注释）"
+            aria-label="格式化 DSL"
+            title="格式化 DSL（Ctrl / ⌘ + Shift + F）"
             className="icon-button"
             disabled={!!error || readOnly}
             onClick={onFormat}
           >
             <Code2 size={15} />
+            <span>格式化</span>
           </button>
           <button className="icon-button" title="DSL 语法指南" onClick={onHelp}>
             <BookOpen size={15} />

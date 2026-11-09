@@ -11,7 +11,13 @@ import {
 import { SlideView } from "../SlideView";
 import { layoutLabels, pageLayout } from "../dsl";
 import type { Studio } from "../studio/use-studio";
-export function SlideNavigator({ studio: s }: { studio: Studio }) {
+export function SlideNavigator({
+  studio: s,
+  onContextMenu,
+}: {
+  studio: Studio;
+  onContextMenu?: (event: React.MouseEvent, page: number) => void;
+}) {
   const [query, setQuery] = useState("");
   const list = useRef<HTMLDivElement>(null);
   const pages = s.deck.slides
@@ -74,6 +80,7 @@ export function SlideNavigator({ studio: s }: { studio: Studio }) {
             aria-label={`第 ${index + 1} 页 ${slide.title.replaceAll("\n", " ")}`}
             aria-current={index === s.active ? "page" : undefined}
             onClick={() => s.go(index)}
+            onContextMenu={(event) => onContextMenu?.(event, index)}
             onKeyDown={(event) => {
               const pos = pages.findIndex((p) => p.index === index);
               const next =

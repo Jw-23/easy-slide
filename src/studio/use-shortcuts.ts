@@ -50,7 +50,8 @@ export function useShortcuts(studio: Studio, present: () => void) {
       }
     };
     const paste = (event: ClipboardEvent) => {
-      if (document.querySelector("dialog[open]")) return;
+      if (event.defaultPrevented || document.querySelector("dialog[open]"))
+        return;
       const images = Array.from(event.clipboardData?.files || []).filter(
         (file) => file.type.startsWith("image/"),
       );

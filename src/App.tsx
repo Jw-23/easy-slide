@@ -1,3 +1,5 @@
+import { ContextMenu } from "./components/ContextMenu";
+import { useContextActions } from "./studio/use-context-actions";
 import { useShortcuts } from "./studio/use-shortcuts";
 import { lazy, Suspense, useRef, useState, type CSSProperties } from "react";
 import {
@@ -53,6 +55,12 @@ export default function App() {
     if (value === "design" || value === "dsl" || value === "assets")
       setTab(value);
   }
+  const context = useContextActions(
+    s,
+    () => onTab("dsl"),
+    () => workspace.setMobile("preview"),
+    () => imageRef.current?.click(),
+  );
   const saveLabel = {
     restoring: "正在恢复草稿…",
     pending: "等待保存…",
@@ -194,9 +202,16 @@ export default function App() {
                 workspace.setMobile("preview");
             }}
           >
-            <SlideNavigator studio={s} />
+            <SlideNavigator studio={s} onContextMenu={context.thumbnail} />
           </div>
-          <CanvasWorkspace studio={s} onCode={() => onTab("dsl")} />
+          <CanvasWorkspace
+            studio={s}
+            onCode={() => onTab("dsl")}
+            focus={context.focus}
+            onContextMenu={context.canvas}
+            onPaste={context.pasteEvent}
+            onClearFocus={context.clearFocus}
+          />
           <div
             className="workspace-splitter"
             role="separator"
@@ -251,6 +266,9 @@ export default function App() {
               onTab={onTab}
               onHelp={() => setDialog("help")}
               onImages={() => imageRef.current?.click()}
+              reveal={context.reveal}
+              onEditorContext={context.editor}
+              clipboard={context.clipboard}
             />
           </div>
         </div>
@@ -332,6 +350,9 @@ export default function App() {
               <X size={14} />
             </button>
           </div>
+        )}
+        {context.menu && (
+          <ContextMenu menu={context.menu} onClose={context.close} />
         )}
         {playing && (
           <PresentationView studio={s} onClose={() => setPlaying(false)} />
