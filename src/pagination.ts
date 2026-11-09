@@ -61,6 +61,7 @@ function splitBlock(
   max: number,
   font: string,
   size: number,
+  firstMax = max,
 ): Block[] {
   if (b.type === "pageBreak" || b.type === "columnBreak") return [b];
   if (b.w !== undefined && b.w > w)
@@ -70,20 +71,24 @@ function splitBlock(
     forced = (b.children || []).some(
       (c) => c.type === "pageBreak" || c.type === "columnBreak" || hasBreak(c),
     );
-  if (h <= max && !forced) return [measureBlock(b, w, font, size)];
+  if (h <= Math.min(max, firstMax) && !forced)
+    return [measureBlock(b, w, font, size)];
+  if ((b.h !== undefined || b.keepTogether) && h <= max && !forced)
+    return [measureBlock(b, w, font, size)];
   if (b.h !== undefined || b.keepTogether)
     throw Error(
       `${b.type === "math" ? mathHeading(b) : b.type} 超出一栏高度；请移除固定 height / keepTogether、拆分公式或调整字号`,
     );
   if (["text", "caption", "quote"].includes(b.type))
-    return splitText(b, w, max, font, size);
+    return splitText(b, w, max, font, size, firstMax);
   if (["bullets", "numbered"].includes(b.type)) {
     const chunks: Block[] = [];
+    let capacity = Math.max(32, firstMax);
     let items: string[] = [],
       start = b.start ?? 1;
     for (const item of b.items || []) {
       const candidate = { ...b, items: [...items, item] };
-      if (contentHeight(candidate, w, font, size) > max && items.length) {
+      if (contentHeight(candidate, w, font, size) > capacity && items.length) {
         chunks.push({
           ...b,
           items,
@@ -94,7 +99,13 @@ function splitBlock(
         });
         start += items.length;
         items = [];
+        capacity = max;
       }
+      if (
+        !items.length &&
+        contentHeight({ ...b, items: [item] }, w, font, size) > capacity
+      )
+        capacity = max;
       items.push(item);
       if (contentHeight({ ...b, items }, w, font, size) > max)
         throw Error("单个列表项超出动态页，请拆成 Text 或 ProofStep");
@@ -139,11 +150,10 @@ function splitBlock(
       inner = m?.inner ?? Math.max(1, w - pad * 2);
     if (available < 32)
       throw Error("数学环境标题或字号过大，没有足够空间容纳正文");
-    const units = children.flatMap((c) =>
-        splitBlock(c, inner, available, font, b.size ?? size),
-      ),
-      pieces: (Block[] | Block)[] = [],
+    const pieces: (Block[] | Block)[] = [],
       groups: Block[][] = [];
+    let capacity = Math.min(available, firstMax - overhead);
+    if (capacity < 32) capacity = available;
     let group: Block[] = [],
       used = 0;
     const flush = () => {
@@ -152,19 +162,32 @@ function splitBlock(
         groups.push(group);
         group = [];
         used = 0;
+        capacity = available;
       }
     };
-    for (const unit of units) {
-      if (unit.type === "pageBreak" || unit.type === "columnBreak") {
-        flush();
-        pieces.push(unit);
-        continue;
+    for (const child of children) {
+      const budget = capacity - used - (group.length ? gap : 0);
+      for (const unit of splitBlock(
+        child,
+        inner,
+        available,
+        font,
+        b.size ?? size,
+        budget,
+      )) {
+        if (unit.type === "pageBreak" || unit.type === "columnBreak") {
+          flush();
+          pieces.push(unit);
+          capacity = available;
+          continue;
+        }
+        const h = unit.h ?? contentHeight(unit, inner, font, b.size ?? size),
+          extra = group.length ? gap : 0;
+        if (used + extra + h > capacity && group.length) flush();
+        if (!group.length && h > capacity) capacity = available;
+        group.push(unit);
+        used += h + (group.length > 1 ? gap : 0);
       }
-      const h = unit.h ?? contentHeight(unit, inner, font, b.size ?? size),
-        extra = group.length ? gap : 0;
-      if (used + extra + h > available && group.length) flush();
-      group.push(unit);
-      used += h + (group.length > 1 ? gap : 0);
     }
     flush();
     let index = 0;
@@ -174,7 +197,7 @@ function splitBlock(
         ...b,
         text: undefined,
         children: piece,
-        continued: index > 0,
+        continued: !!b.continued || index > 0,
         fragment: true,
         ...(b.environment === "Proof" && index < groups.length - 1
           ? { qed: false }
@@ -186,6 +209,7 @@ function splitBlock(
       return measureBlock(part, w, font, size);
     });
   }
+  if (h <= max && !forced) return [measureBlock(b, w, font, size)];
   throw Error(`${b.type} 超出动态页一栏；请设置较小尺寸、拆分表格或使用单栏`);
 }
 function paged(
@@ -216,7 +240,14 @@ function paged(
       advance();
       continue;
     }
-    for (const unit of splitBlock(source, w, h, font, size)) {
+    for (const unit of splitBlock(
+      source,
+      w,
+      h,
+      font,
+      size,
+      h - used - (pages.at(-1)![col].length ? gap : 0),
+    )) {
       if (unit.type === "pageBreak") {
         if (pages.at(-1)!.some((c) => c.length)) advance(true);
         continue;

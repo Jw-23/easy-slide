@@ -54,3 +54,51 @@ test("continues math environments and edits whole groups with source navigation"
   await page.getByRole("button", { name: "删除动态页组", exact: true }).click();
   await expect(page.locator(".slide-item")).toHaveCount(3);
 });
+
+test("proof starts below its theorem and has clear step spacing", async ({
+  page,
+}) => {
+  const source =
+    'Deck("D") DynamicSlide(title:"教学",columns:2,fontSize:18){Theorem("结论"){Text("定理内容").frame(height:100)} Proof{' +
+    Array.from(
+      { length: 7 },
+      (_, i) =>
+        `ProofStep("推理${i + 1}"){Text("正文${i + 1}").frame(height:65)}`,
+    ).join(" ") +
+    "}}";
+  await page.goto("/");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  await page
+    .locator('input[type="file"]')
+    .first()
+    .setInputFiles({
+      name: "proof.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: "easy-slide",
+          version: 1,
+          source,
+          assets: {},
+        }),
+      ),
+    });
+  const preview = page.locator(".preview-wrap");
+  const theorem = await preview
+    .locator("[data-scene-element]")
+    .filter({ hasText: /^定理 1 · 结论$/ })
+    .boundingBox();
+  const proof = await preview
+    .locator("[data-scene-element]")
+    .filter({ hasText: /^证明$/ })
+    .boundingBox();
+  const step = await preview
+    .locator("[data-scene-element]")
+    .filter({ hasText: /^步骤 1 · 推理1$/ })
+    .boundingBox();
+  expect(proof!.y).toBeGreaterThan(theorem!.y + theorem!.height);
+  expect(Math.abs(proof!.x - step!.x)).toBeLessThan(1);
+  expect(step!.y).toBeGreaterThanOrEqual(proof!.y + proof!.height);
+});
