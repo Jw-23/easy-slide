@@ -117,7 +117,7 @@ export function StudioHeader({
           onClick={() => command(onTemplates)}
         >
           <Layers size={15} />
-          切换示例
+          示例与模板
         </button>
         <hr />
         <button role="menuitem" onClick={() => command(onHelp)}>

@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Maximize } from "lucide-react";
 import { SlideView } from "../SlideView";
 import { scene } from "../scene";
-import { nextPosition, previousPosition } from "../studio/presentation";
+import {
+  nextPosition,
+  previousPosition,
+  wheelNavigator,
+} from "../studio/presentation";
 import type { Studio } from "../studio/use-studio";
 export function PresentationView({
   studio: s,
@@ -22,10 +26,17 @@ export function PresentationView({
       ),
     [s.deck],
   );
+  const [controls, setControls] = useState(false);
+  const active = useRef(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const current = stages[position.page],
     last =
       position.page === s.deck.slides.length - 1 &&
       position.step >= current.at(-1)!;
+  const lastPosition = useRef(last);
+  lastPosition.current = last;
   const callbacks = useRef({
     next: () => {},
     previous: () => {},
@@ -48,6 +59,41 @@ export function PresentationView({
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
+    dialog.focus({ preventScroll: true });
+    active.current = true;
+    const root = document.documentElement,
+      previousFullscreen = document.fullscreenElement;
+    if (!previousFullscreen)
+      void root
+        .requestFullscreen?.()
+        .then(() => {
+          if (active.current) dialog.focus({ preventScroll: true });
+          if (!active.current && document.fullscreenElement === root)
+            void document.exitFullscreen().catch(() => {});
+        })
+        .catch(() => {});
+    let owned = !!previousFullscreen;
+    const fullscreen = () => {
+      if (!previousFullscreen && document.fullscreenElement === root)
+        owned = true;
+      else if (owned) callbacks.current.close();
+    };
+    document.addEventListener("fullscreenchange", fullscreen);
+    const navigate = wheelNavigator();
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY))
+        return;
+      const direction = navigate(
+        event.deltaY,
+        event.timeStamp,
+        event.deltaMode,
+      );
+      if (direction === 1) {
+        if (!lastPosition.current) callbacks.current.next();
+      } else if (direction === -1) callbacks.current.previous();
+    };
+    dialog.addEventListener("wheel", wheel, { passive: false });
     const key = (event: KeyboardEvent) => {
       if (
         ["ArrowRight", " ", "PageDown", "Enter"].includes(event.key) &&
@@ -64,6 +110,12 @@ export function PresentationView({
     dialog.addEventListener("keydown", key);
     return () => {
       dialog.removeEventListener("keydown", key);
+      dialog.removeEventListener("wheel", wheel);
+      document.removeEventListener("fullscreenchange", fullscreen);
+      clearTimeout(hideTimer.current);
+      active.current = false;
+      if (!previousFullscreen && document.fullscreenElement === root)
+        void document.exitFullscreen().catch(() => {});
       if (dialog.open) dialog.close();
     };
   }, []);
@@ -75,6 +127,25 @@ export function PresentationView({
       className="presentation"
       ref={ref}
       aria-label="幻灯片放映"
+      tabIndex={-1}
+      onPointerMove={(event) => {
+        const r = event.currentTarget.getBoundingClientRect(),
+          x = (event.clientX - r.left) / r.width,
+          y = (event.clientY - r.top) / r.height;
+        if (x > 0.2 && x < 0.8 && y > 0.76) {
+          clearTimeout(hideTimer.current);
+          setControls(true);
+        } else {
+          setControls(false);
+        }
+      }}
+      onPointerLeave={() => setControls(false)}
+      onPointerDown={(event) => {
+        if (event.pointerType !== "touch") return;
+        clearTimeout(hideTimer.current);
+        setControls(true);
+        hideTimer.current = setTimeout(() => setControls(false), 2500);
+      }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -93,7 +164,17 @@ export function PresentationView({
           animate
         />
       </div>
-      <div className="presentation-controls">
+      <div
+        className={`presentation-controls ${controls ? "visible" : ""}`}
+        aria-label="放映控制"
+        onPointerLeave={(event) => {
+          if (
+            event.pointerType === "mouse" &&
+            document.activeElement?.closest(".presentation-controls")
+          )
+            ref.current?.focus({ preventScroll: true });
+        }}
+      >
         <button
           aria-label="上一步"
           onClick={() => callbacks.current.previous()}
@@ -110,7 +191,15 @@ export function PresentationView({
         >
           {last ? <X size={18} /> : <ChevronRight size={18} />}
         </button>
-        <span className="presentation-hint">方向键 / 空格继续 · Esc 退出</span>
+        <button
+          aria-label="进入全屏"
+          title="进入全屏"
+          onClick={() =>
+            void document.documentElement.requestFullscreen?.().catch(() => {})
+          }
+        >
+          <Maximize size={18} />
+        </button>
         <button aria-label="退出演示" onClick={onClose}>
           <X size={18} />
         </button>

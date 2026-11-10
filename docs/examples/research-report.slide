@@ -1,0 +1,46 @@
+Deck("研发成果汇报", author: "研发团队")
+Theme(preset: .paper)
+
+Slide(title: "研发成果总览", subtitle: "阶段目标 · 本期交付 · 下一步验证", titleSize: 28, margin: 24, padding: 0, showFooter: false) {
+    VStack(spacing: 20) {
+        Heading("核心模块性能优化", level: 2).frame(height: 60)
+        Columns(spacing: 24) {
+            Metric("−42%", label: "P95 延迟", text: "120 ms → 70 ms")
+            Metric("+80%", label: "吞吐量", text: "1000 → 1800 req/s")
+            Metric("5 轮", label: "重复实验", text: "相同硬件与数据集")
+        }.frame(height: 270)
+        Caption("以上为演示数据，请替换为实际测量结果。")
+    }
+}.notes("先交代研发目标和交付范围，再说明结果的测量口径。")
+
+Slide(title: "成果一｜核心链路性能优化", subtitle: "同负载对比 · 数据为示例", titleSize: 28, margin: 24, padding: 0, titleGap: 8, showFooter: false, autoPages: false) {
+    Image("assets/research-benchmark.png")
+        .frame(width: 860, height: 540)
+        .position(x: 24, y: 24, reference: .bottomLeft, anchor: .bottomLeft, relativeTo: .slide)
+
+    Panel(fill: "#eef2f5", radius: 18) {
+        VStack(spacing: 14) {
+            Heading("主要结论", level: 3).frame(height: 38)
+            Text("**P95 延迟降低 42%**\n吞吐量提升 **80%**。")
+                .font(22).frame(height: 100).appear(.rise, step: 1, duration: 450)
+            Divider()
+            Text("实验条件\n相同硬件、数据规模与并发负载；重复实验 5 次。")
+                .font(16).frame(height: 90)
+            Text("工程价值\n达到目标负载要求，进入灰度验证。")
+                .font(18).frame(height: 90).appear(.fade, step: 2, duration: 450)
+        }
+    }.padding(20).frame(width: 336, height: 470)
+     .position(x: -24, y: -120, reference: .topRight, anchor: .topRight, relativeTo: .slide)
+
+    Caption("图示：优化前后性能对比\n实验编号：替换为你的测量记录")
+        .frame(width: 336, height: 60)
+        .position(x: -24, y: 24, reference: .bottomRight, anchor: .bottomRight, relativeTo: .slide)
+}.notes("先展示左下方完整实验图，再分两次点击解释右上方结论和工程价值。")
+
+Slide(title: "交付与后续验证", subtitle: "让成果对应到可验收的工程动作", titleSize: 28, margin: 24, padding: 8, showFooter: false) {
+    Table(columns: [Column("交付项", width: 2), Column("验收依据", width: 3), Column("下一步", width: 3)], rows: [
+        ["性能优化版本", "固定测试集与回归结果", "完成真实流量灰度"],
+        ["实验复现材料", "脚本、数据版本和参数", "补充边界负载测试"],
+        ["监控与回滚方案", "关键指标与告警阈值", "演练回滚和容量扩展"]
+    ]).tableStyle(rowHeight: 58, zebra: true, borders: .horizontal)
+}

@@ -1,3 +1,4 @@
+import { SavedTemplates } from "./SavedTemplates";
 import { useState } from "react";
 import {
   BookOpen,
@@ -13,6 +14,7 @@ import {
   mathDeck,
   engineeringDeck,
   mathProofDeck,
+  researchDeck,
 } from "../examples";
 import type { Deck } from "../dsl";
 import type { Studio } from "../studio/use-studio";
@@ -56,7 +58,7 @@ export default function StudioDialogs({
         kind === "export"
           ? "导出"
           : kind === "templates"
-            ? "选择示例"
+            ? "示例与我的模板"
             : "DSL 语法指南"
       }
       busy={s.busy}
@@ -168,6 +170,12 @@ export default function StudioDialogs({
               icon: Code2,
             },
             {
+              deck: researchDeck,
+              title: "研发成果汇报",
+              detail: "左下实验大图、右上说明与交付计划",
+              icon: Layers,
+            },
+            {
               deck: engineeringDeck,
               title: "工程汇报",
               detail: "成果、方案与里程碑",
@@ -186,6 +194,7 @@ export default function StudioDialogs({
               </div>
             </button>
           ))}
+          <SavedTemplates studio={s} onClose={onClose} />
         </>
       ) : (
         <>

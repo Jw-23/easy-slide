@@ -6,6 +6,7 @@ import {
   projectArchiveName,
   MANIFEST_FILE,
   ARCHIVE_FILE,
+  LEGACY_ARCHIVE_FILE,
 } from "../src/project-archive";
 import { folderProject, writeFolder, type FolderHandle } from "../src/storage";
 import type { Project } from "../src/dsl";
@@ -220,4 +221,70 @@ describe("project directory interoperability", () => {
     ).toEqual(project);
     expect(await folderProject(directory(new Map()))).toBeNull();
   });
+});
+
+it("overwrites the same project package on repeated folder saves", async () => {
+  const files = new Map<string, Uint8Array>(),
+    dir = directory(files);
+  expect(await writeFolder(dir, project)).toBe(ARCHIVE_FILE);
+  const changed = {
+    ...project,
+    source: project.source.replace('Deck("工程"', 'Deck("更新后的工程"'),
+  };
+  await writeFolder(dir, changed);
+  expect([...files.keys()]).toEqual([ARCHIVE_FILE]);
+  expect(await folderProject(dir)).toEqual(changed);
+});
+it("writes back the opened legacy ZIP filename instead of creating a second package", async () => {
+  const blob = await exportProjectArchive(project),
+    files = new Map([
+      [LEGACY_ARCHIVE_FILE, new Uint8Array(await blob.arrayBuffer())],
+    ]),
+    dir = directory(files);
+  expect(await folderProject(dir)).toEqual(project);
+  const changed = { ...project, source: project.source + "\n// Updated" };
+  expect(await writeFolder(dir, changed)).toBe(LEGACY_ARCHIVE_FILE);
+  expect([...files.keys()]).toEqual([LEGACY_ARCHIVE_FILE]);
+  expect(await folderProject(dir)).toEqual(changed);
+});
+it("recognizes a uniquely named project and preserves that filename when saving", async () => {
+  const blob = await exportProjectArchive(project),
+    files = new Map([
+      ["my-report.easy-slide", new Uint8Array(await blob.arrayBuffer())],
+    ]),
+    dir = directory(files);
+  dir.values = async function* () {
+    for (const name of files.keys())
+      yield { ...dir, ...(await dir.getFileHandle(name)) };
+  };
+  expect(await folderProject(dir)).toEqual(project);
+  expect(await writeFolder(dir, project)).toBe("my-report.easy-slide");
+  expect(files.size).toBe(1);
+});
+it("aborts failed writes and preserves the previously opened package", async () => {
+  const blob = await exportProjectArchive(project),
+    old = new Uint8Array(await blob.arrayBuffer()),
+    files = new Map([[ARCHIVE_FILE, old]]),
+    dir = directory(files);
+  await folderProject(dir);
+  let aborted = false;
+  const original = dir.getFileHandle;
+  dir.getFileHandle = async (name, opts) => {
+    const handle = await original(name, opts);
+    return {
+      ...handle,
+      createWritable: async () => ({
+        write: async () => {
+          throw Error("disk full");
+        },
+        close: async () => {},
+        abort: async () => {
+          aborted = true;
+        },
+      }),
+    };
+  };
+  await expect(writeFolder(dir, project)).rejects.toThrow("disk full");
+  expect(aborted).toBe(true);
+  expect(files.get(ARCHIVE_FILE)).toBe(old);
 });

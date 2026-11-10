@@ -3,7 +3,13 @@ import { formatSource } from "./format-source";
 import { SourceMap, type SceneTarget } from "./source-map";
 import { pasteCanvasText } from "./component-clipboard";
 import { useEffect, useRef, useState } from "react";
-import { parseDeck, serialize, type Deck, type Layout } from "../dsl";
+import {
+  parseDeck,
+  serialize,
+  type Deck,
+  type Layout,
+  type Project,
+} from "../dsl";
 import { exampleAssetsFor } from "../examples";
 import { replaceTheme } from "../theme-source";
 import type { ThemeOptions } from "../themes";
@@ -160,48 +166,45 @@ export function useStudio(draftKey: string) {
       ]),
     );
   }
-  function template(deck: Deck) {
+  function template(deck: Deck | Project) {
     if (!doc.ready || locked.current) return;
     doc.commit(
-      {
-        ...doc.project,
-        source: serialize(deck),
-        assets: exampleAssetsFor(deck),
-      },
+      "format" in deck
+        ? validatePortableProject(deck)
+        : {
+            format: "easy-slide",
+            version: 1,
+            source: serialize(deck),
+            assets: exampleAssetsFor(deck),
+          },
       undefined,
       0,
     );
     setFolder(null);
     setFolderVersion(null);
-    notify("已打开示例，可撤销恢复原工程", "success", true);
+    notify("已打开模板，可撤销恢复原工程", "success", true);
   }
   async function save() {
     if (current.current.error) {
       notify("请先修复 DSL，或导出纯文本保留草稿", "error");
       return;
     }
-    const snapshot = current.current.project,
-      title = current.current.deck.title;
-    await run(folder ? "正在写入文件夹…" : "正在保存工程…", async () => {
-      // ZIP export remains available even when browser storage is unavailable.
+    const snapshot = current.current.project;
+    await run("正在保存工程到文件夹…", async () => {
+      // Request the destination during the save gesture, before asynchronous encoding.
+      const dir = folder || (await chooseFolder());
+      const filename = await writeFolder(dir, snapshot);
+      setFolder(dir);
+      setFolderVersion(snapshot);
       try {
         await current.current.persist();
       } catch {
-        /* The persistent save error remains visible in the status bar. */
+        /* Browser draft status retains its own save error. */
       }
-      if (folder) {
-        await writeFolder(folder, snapshot);
-        setFolderVersion(snapshot);
-        notify("工程已保存到 " + folder.name);
-      } else {
-        download(
-          await exportProjectArchive(snapshot),
-          projectArchiveName(title),
-        );
-        notify("已导出工程 ZIP");
-      }
+      notify(`工程已保存到 ${dir.name}/${filename}`);
     });
   }
+
   async function archive() {
     if (current.current.error) return false;
     const snapshot = current.current.project,
@@ -262,7 +265,7 @@ export function useStudio(draftKey: string) {
     await run("正在导入工程…", async () => {
       if (file.size > MAX_ARCHIVE_BYTES) throw Error("工程文件超过 256 MB");
       let project;
-      if (/\.zip$/i.test(file.name))
+      if (/\.(zip|easy-slide)$/i.test(file.name))
         project = await importProjectArchive(await file.arrayBuffer());
       else if (/\.(slide|swift)$/i.test(file.name)) {
         if (file.size > 2 * 1024 * 1024) throw Error("DSL 源码最多 2 MB");

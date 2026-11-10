@@ -83,7 +83,7 @@ export default function App() {
         <input
           hidden
           type="file"
-          accept=".zip,.json,.slide,.swift"
+          accept=".easy-slide,.zip,.json,.slide,.swift"
           ref={importRef}
           disabled={!s.ready || s.busy}
           onChange={(event) => {
