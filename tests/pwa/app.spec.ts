@@ -84,41 +84,19 @@ test("browser recognises the manifest, icons and offline app shell", async ({
   ).toHaveLength(27);
   expect(errors).toEqual([]);
 });
-test("installation button invokes a captured prompt and hides after appinstalled", async ({
+test("install UI is absent while offline caching remains available", async ({
   page,
 }) => {
   await cached(page);
-  await page.evaluate(() => {
-    (window as any).__installPromptCount = 0;
-    const event = new Event("beforeinstallprompt", { cancelable: true });
-    Object.assign(event, {
-      prompt: async () => {
-        (window as any).__installPromptCount++;
-      },
-      userChoice: Promise.resolve({ outcome: "accepted" }),
-    });
-    window.dispatchEvent(event);
-  });
-  await page.getByRole("button", { name: "安装应用", exact: true }).click();
-  expect(await page.evaluate(() => (window as any).__installPromptCount)).toBe(
-    1,
-  );
-  await page.evaluate(() => window.dispatchEvent(new Event("appinstalled")));
   await expect(
     page.getByRole("button", { name: "安装应用", exact: true }),
   ).toHaveCount(0);
-});
-test("unsupported native prompts show installation instructions and cache readiness", async ({
-  page,
-}) => {
-  await cached(page);
-  await page.getByRole("button", { name: "安装应用", exact: true }).click();
-  const guide = page.getByRole("dialog", { name: "安装 Easy Slide" });
-  await expect(guide).toBeVisible();
-  await expect(guide).toContainText("添加到主屏幕");
-  await expect(guide).toContainText("离线资源已就绪");
-  await page.getByRole("button", { name: "关闭窗口" }).click();
-  await expect(guide).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog", { name: "安装 Easy Slide" }),
+  ).toHaveCount(0);
+  expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(
+    true,
+  );
 });
 test("a waiting version updates only after saving and leaves other windows open", async ({
   page,

@@ -1,3 +1,4 @@
+import { SaveProjectDialog } from "./components/SaveProjectDialog";
 import { ImageEditor } from "./components/ImageEditor";
 import { ContextMenu } from "./components/ContextMenu";
 import { useContextActions } from "./studio/use-context-actions";
@@ -353,6 +354,7 @@ export default function App() {
             </button>
           </div>
         )}
+        {s.saveRequest && <SaveProjectDialog studio={s} />}
         {editingImage && (
           <ImageEditor
             key={editingImage}

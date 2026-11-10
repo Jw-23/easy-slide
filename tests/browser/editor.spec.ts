@@ -212,6 +212,9 @@ test("folder access loads assets and writes a self contained project locally", a
     .click();
   await expect(page.getByRole("status")).toContainText("已连接文件夹");
   await page.getByRole("button", { name: "保存工程", exact: true }).click();
+  const saveDialog = page.getByRole("dialog", { name: "保存项目文件" });
+  await saveDialog.getByLabel("项目文件名").fill("project.easy-slide");
+  await saveDialog.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("已保存到");
   const result = await page.evaluate(() => (window as any).__written);
   const savedProject = await importProjectArchive(
