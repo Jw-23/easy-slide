@@ -256,9 +256,7 @@ it("starts proof below the theorem and fills the remaining column before continu
   expect(proof.y).toBeGreaterThan(theorem.y);
   expect(step.x).toBe(proof.x);
   expect(step.y).toBeGreaterThan(proof.y + proof.h);
-  expect(first.some((e) => e.text?.startsWith("证明（续）") && e.x > 640)).toBe(
-    true,
-  );
+  expect(first.some((e) => e.text === "证明" && e.x > 640)).toBe(true);
   for (let i = 1; i <= 7; i++)
     expect(all.filter((e) => e.text === `正文${i}`)).toHaveLength(1);
   expect(all.filter((e) => e.text === "∎")).toHaveLength(1);
@@ -291,4 +289,29 @@ it("uses the remainder for a long formatted paragraph and keeps atomic blocks in
       .flatMap((s, i) => scene(d, s, i))
       .filter((e) => e.kind === "equation"),
   ).toHaveLength(1);
+});
+
+it("marks continuations only when a proof or nested step crosses a physical page", () => {
+  const d = parseDeck(
+    'Deck("D") DynamicSlide(title:"S",columns:2){Proof{ProofStep("推理"){Text("A") ColumnBreak() Text("B") PageBreak() Text("C") ColumnBreak() Text("D")}}}',
+  );
+  expect(d.slides).toHaveLength(2);
+  const first = scene(d, d.slides[0], 0),
+    next = scene(d, d.slides[1], 1);
+  expect(first.filter((e) => e.text === "证明")).toHaveLength(2);
+  expect(first.some((e) => e.text?.includes("（续）"))).toBe(false);
+  expect(next.filter((e) => e.text === "证明（续）")).toHaveLength(1);
+  expect(next.find((e) => e.text === "证明（续）")!.x).toBeLessThan(640);
+  expect(next.filter((e) => e.text === "证明")).toHaveLength(1);
+  expect(next.find((e) => e.text === "证明")!.x).toBeGreaterThan(640);
+  expect(first.filter((e) => e.text === "步骤 1 · 推理")).toHaveLength(2);
+  expect(next.filter((e) => e.text === "步骤 1 · 推理（续）")).toHaveLength(1);
+  expect(next.filter((e) => e.text === "步骤 1 · 推理")).toHaveLength(1);
+  const all = [...first, ...next];
+  for (const value of ["A", "B", "C", "D"])
+    expect(
+      all.filter((e) => e.text === value && e.source?.scope === "block"),
+    ).toHaveLength(1);
+  expect(all.filter((e) => e.text === "∎")).toHaveLength(1);
+  expect(parseDeck(serialize(d))).toEqual(d);
 });
