@@ -1,7 +1,7 @@
 import { pageGroup, groupMoveTarget } from "./page-groups";
 import { formatSource } from "./format-source";
-import { SourceMap, type SceneTarget } from "./source-map";
-import { pasteCanvasText } from "./component-clipboard";
+import type { SceneTarget } from "./source-map";
+import { addImageAssets } from "./image-import";
 import { useEffect, useRef, useState } from "react";
 import {
   parseDeck,
@@ -21,6 +21,7 @@ import {
   MAX_IMAGE_BYTES,
   projectArchiveName,
   validatePortableProject,
+  validateEditableProject,
 } from "../project-archive";
 import {
   chooseFolder,
@@ -246,7 +247,7 @@ export function useStudio(draftKey: string) {
         const images = await folderImages(dir),
           latest = current.current.project;
         const next = { ...latest, assets: { ...latest.assets, ...images } };
-        validatePortableProject(next);
+        validateEditableProject(next);
         doc.commit(next);
         setFolderVersion(null);
       }
@@ -305,26 +306,7 @@ export function useStudio(draftKey: string) {
         added[`assets/${crypto.randomUUID().slice(0, 8)}-${name}`] =
           await readData(file);
       }
-      const declarations = Object.keys(added).map(
-        (path) => `Image(${JSON.stringify(path)})`,
-      );
-      const source = !insert
-        ? snapshot.source
-        : target
-          ? pasteCanvasText(
-              { ...snapshot, assets: { ...snapshot.assets, ...added } },
-              doc.deck,
-              new SourceMap(snapshot.source),
-              target,
-              declarations.join("\n"),
-            ).source
-          : appendSlideBlocks(snapshot.source, page, declarations);
-      const project = {
-        ...snapshot,
-        source,
-        assets: { ...snapshot.assets, ...added },
-      };
-      validatePortableProject(project);
+      const project = addImageAssets(snapshot, added, page, insert, target);
       doc.commit(project, undefined, page);
       notify(`已添加 ${files.length} 张图片`, "success", true);
     });
@@ -349,7 +331,7 @@ export function useStudio(draftKey: string) {
         next.assets !== expected.assets ||
         next.imageDocuments !== expected.imageDocuments
       )
-        validatePortableProject(next);
+        validateEditableProject(next);
       doc.commit(next, undefined, page);
       return true;
     } catch (problem) {
