@@ -317,6 +317,25 @@ export function paginateSlide(
   streams = paged(blocks, width, height, font, size, gap, columns);
   if (streams.length > limit)
     throw Error(`动态续页需要 ${streams.length} 页，超过 maxPages: ${limit}`);
+  // A continuation label describes crossing a physical page, not a column boundary.
+  const lastPage = new Map<string, number>();
+  const pageLabels = (blocks: Block[], page: number): Block[] =>
+    blocks.map((block) => {
+      let continued = block.continued;
+      if (block.type === "math" && block.sourcePath) {
+        const key = block.sourcePath.join(".");
+        const previous = lastPage.get(key);
+        continued = previous !== undefined && previous < page;
+        lastPage.set(key, page);
+      }
+      return {
+        ...block,
+        ...(block.type === "math" ? { continued } : {}),
+        ...(block.children
+          ? { children: pageLabels(block.children, page) }
+          : {}),
+      };
+    });
   return streams.map((cols, part) => ({
     ...slide,
     title: part ? `${slide.title}（续 ${part + 1}）` : slide.title,
@@ -325,7 +344,7 @@ export function paginateSlide(
       type: "vstack",
       flowGenerated: true,
       measured: true,
-      children,
+      children: pageLabels(children, part),
       gap,
       size,
       w: width,
