@@ -1,3 +1,4 @@
+import { validateImageDocuments, type ImageDocument } from "./image-edit";
 import { pageStyleKeys, pageGeometry } from "./page-layout";
 import {
   mathEnvironments,
@@ -226,6 +227,7 @@ export type Deck = {
   slides: Slide[];
 };
 export type Project = {
+  imageDocuments?: Record<string, ImageDocument>;
   format: "easy-slide";
   version: 1;
   source: string;
@@ -606,6 +608,7 @@ export function validateProject(p: unknown): Project {
       !/^data:image\/(png|jpeg|webp|gif);base64,/.test(data)
     )
       fail("工程内包含不支持的图片");
+  validateImageDocuments(v.imageDocuments, v.assets);
   return v;
 }
 

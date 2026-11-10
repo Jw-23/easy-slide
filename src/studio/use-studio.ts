@@ -334,14 +334,19 @@ export function useStudio(draftKey: string) {
     if (!editable || locked.current) return false;
     if (
       expected.source !== current.current.project.source ||
-      expected.assets !== current.current.project.assets
+      expected.assets !== current.current.project.assets ||
+      expected.imageDocuments !== current.current.project.imageDocuments
     ) {
       notify("工程已变更，请重新打开菜单后操作", "error");
       return false;
     }
     try {
       parseDeck(next.source);
-      if (next.assets !== expected.assets) validatePortableProject(next);
+      if (
+        next.assets !== expected.assets ||
+        next.imageDocuments !== expected.imageDocuments
+      )
+        validatePortableProject(next);
       doc.commit(next, undefined, page);
       return true;
     } catch (problem) {
@@ -365,7 +370,8 @@ export function useStudio(draftKey: string) {
     folderDirty:
       !!folder &&
       (folderVersion?.source !== doc.project.source ||
-        folderVersion?.assets !== doc.project.assets),
+        folderVersion?.assets !== doc.project.assets ||
+        folderVersion?.imageDocuments !== doc.project.imageDocuments),
     field,
     layout,
     theme,

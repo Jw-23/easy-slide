@@ -52,7 +52,23 @@ export function renameImage(
   const assets = { ...project.assets, [next]: project.assets[path] };
   delete assets[path];
   try {
-    return validatePortableProject({ ...project, source, assets });
+    const imageDocuments = project.imageDocuments
+      ? Object.fromEntries(
+          Object.entries(project.imageDocuments).map(([key, doc]) => [
+            key === path ? next : key,
+            {
+              ...doc,
+              originalPath: doc.originalPath === path ? next : doc.originalPath,
+            },
+          ]),
+        )
+      : undefined;
+    return validatePortableProject({
+      ...project,
+      source,
+      assets,
+      ...(imageDocuments ? { imageDocuments } : {}),
+    });
   } catch {
     throw Error(
       "存在无法自动更新的计算图片引用；请先将对应 Image 路径改为直接字符串，再重命名。工程未修改。",

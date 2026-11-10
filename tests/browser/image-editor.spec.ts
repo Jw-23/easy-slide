@@ -107,8 +107,8 @@ test("samples RGB and hex, annotates, crops and saves actual PNG pixels", async 
     )
     .toBe("255,255,255,255");
   await dialog.getByRole("button", { name: "添加文字", exact: true }).click();
-  await dialog.getByLabel("标注文字").fill("A");
   await canvas.click({ position: { x: 10, y: 10 } });
+  await dialog.getByLabel("标注文字").fill("A");
   await dialog.getByRole("button", { name: "裁剪", exact: true }).click();
   const box = (await canvas.boundingBox())!;
   await page.mouse.move(box.x, box.y);
@@ -124,4 +124,78 @@ test("samples RGB and hex, annotates, crops and saves actual PNG pixels", async 
   await expect
     .poll(() => image.evaluate((i: HTMLImageElement) => i.naturalHeight))
     .toBe(60);
+});
+
+test("text objects remain directly editable and transformable after saving and reopening", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByText("已保存在此浏览器", { exact: true }),
+  ).toBeVisible();
+  const data = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 600;
+    c.height = 400;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, 600, 400);
+    return c.toDataURL();
+  });
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "text.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: "easy-slide",
+          version: 1,
+          source:
+            'Deck("D") Slide(title:"S"){Image("assets/result.png").frame(width:600,height:400)}',
+          assets: { "assets/result.png": data },
+        }),
+      ),
+    });
+  await page
+    .locator(".preview-wrap [data-image-asset=true]")
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "编辑图片 / 重命名" }).click();
+  const dialog = page.getByRole("dialog", { name: "编辑图片" }),
+    canvas = dialog.getByLabel("图片编辑画布");
+  await expect(canvas).toHaveAttribute("width", "600");
+  await dialog.getByRole("button", { name: "添加文字", exact: true }).click();
+  await canvas.click({ position: { x: 80, y: 90 } });
+  await dialog.getByLabel("标注文字").fill("Editable");
+  await dialog.getByLabel("字体", { exact: true }).fill("Georgia, serif");
+  await dialog.getByLabel("字号", { exact: true }).fill("32");
+  await dialog.getByLabel("文字旋转角度").fill("30");
+  const object = dialog.locator(".image-text-object.selected");
+  await expect(object).toHaveCSS("font-family", "Georgia, serif");
+  await object.dblclick();
+  await dialog.getByLabel("标注文字").fill("Revised");
+  await dialog.getByLabel("标注文字").press("Control+Enter");
+  const box = (await object.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    box.x + box.width / 2 + 40,
+    box.y + box.height / 2 + 25,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+  await expect(dialog.getByRole("button", { name: "缩放文字" })).toBeVisible();
+  await dialog.getByRole("button", { name: "保存图片与名称" }).click();
+  await expect(dialog).toBeHidden();
+  await page
+    .locator(".preview-wrap [data-image-asset=true]")
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "编辑图片 / 重命名" }).click();
+  await dialog.locator(".image-text-object").dblclick();
+  await expect(dialog.getByLabel("标注文字")).toHaveValue("Revised");
+  await expect(dialog.getByLabel("文字旋转角度")).toHaveValue("30");
+  await expect(dialog.getByLabel("字体", { exact: true })).toHaveValue(
+    "Georgia, serif",
+  );
 });
