@@ -58,7 +58,9 @@ export const readData = (file: File) =>
     r.readAsDataURL(file);
   });
 const projectFiles = new WeakMap<FolderHandle, string>();
-async function projectFilename(dir: FolderHandle): Promise<string | null> {
+export async function projectFilename(
+  dir: FolderHandle,
+): Promise<string | null> {
   const known = projectFiles.get(dir);
   if (known) return known;
   for (const name of [ARCHIVE_FILE, LEGACY_ARCHIVE_FILE]) {
@@ -155,9 +157,33 @@ export async function folderImages(
   }
   return result;
 }
-export async function writeFolder(dir: FolderHandle, p: Project) {
+export function projectFileName(name: string) {
+  name = name.trim();
+  if (
+    !name ||
+    name.length > 180 ||
+    /[\\/:*?"<>|\x00-\x1f]/.test(name) ||
+    name === "." ||
+    name === ".."
+  )
+    throw Error("请输入有效文件名，不含路径或特殊字符");
+  name = name.replace(/\.easy-slide(?:\.zip)?$/i, "");
+  if (!name || name === "." || name === "..") throw Error("请输入项目文件名称");
+  const filename = name + ".easy-slide";
+  if (new TextEncoder().encode(filename).byteLength > 240)
+    throw Error("文件名过长，请缩短名称");
+  return filename;
+}
+export async function writeFolder(
+  dir: FolderHandle,
+  p: Project,
+  name?: string,
+) {
+  const filename =
+    name !== undefined
+      ? projectFileName(name)
+      : (await projectFilename(dir)) || ARCHIVE_FILE;
   const archive = await exportProjectArchive(p);
-  const filename = (await projectFilename(dir)) || ARCHIVE_FILE;
   const file = await dir.getFileHandle(filename, {
     create: true,
   });

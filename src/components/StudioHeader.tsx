@@ -105,6 +105,14 @@ export function StudioHeader({
         </button>
         <button
           role="menuitem"
+          disabled={!s.editable}
+          onClick={() => command(() => void s.saveAs())}
+        >
+          <Save size={15} />
+          工程另存为…
+        </button>
+        <button
+          role="menuitem"
           disabled={!s.ready || s.busy}
           onClick={() => command(onImport)}
         >

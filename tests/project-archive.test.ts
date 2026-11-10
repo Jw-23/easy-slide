@@ -8,7 +8,12 @@ import {
   ARCHIVE_FILE,
   LEGACY_ARCHIVE_FILE,
 } from "../src/project-archive";
-import { folderProject, writeFolder, type FolderHandle } from "../src/storage";
+import {
+  folderProject,
+  writeFolder,
+  projectFileName,
+  type FolderHandle,
+} from "../src/storage";
 import type { Project } from "../src/dsl";
 
 const png =
@@ -287,4 +292,34 @@ it("aborts failed writes and preserves the previously opened package", async () 
   await expect(writeFolder(dir, project)).rejects.toThrow("disk full");
   expect(aborted).toBe(true);
   expect(files.get(ARCHIVE_FILE)).toBe(old);
+});
+
+it("normalizes named project files and rejects invalid names before writing", () => {
+  expect(projectFileName(" 我的汇报 ")).toBe("我的汇报.easy-slide");
+  expect(projectFileName("report.easy-slide")).toBe("report.easy-slide");
+  expect(projectFileName("report.easy-slide.zip")).toBe("report.easy-slide");
+  for (const name of [
+    "",
+    ".",
+    "..",
+    "../report",
+    "a/b",
+    "a:b",
+    ".easy-slide",
+    "..easy-slide",
+  ])
+    expect(() => projectFileName(name)).toThrow();
+});
+it("Save As changes the next overwrite target while preserving the original file", async () => {
+  const files = new Map<string, Uint8Array>(),
+    dir = directory(files);
+  await writeFolder(dir, project, "原项目");
+  const original = files.get("原项目.easy-slide");
+  const updated = { ...project, source: project.source + "\n// Save As" };
+  expect(await writeFolder(dir, updated, "新项目")).toBe("新项目.easy-slide");
+  const latest = { ...updated, source: updated.source + "\n// Next Ctrl+S" };
+  expect(await writeFolder(dir, latest)).toBe("新项目.easy-slide");
+  expect([...files.keys()]).toEqual(["原项目.easy-slide", "新项目.easy-slide"]);
+  expect(files.get("原项目.easy-slide")).toBe(original);
+  expect(await folderProject(dir)).toEqual(latest);
 });

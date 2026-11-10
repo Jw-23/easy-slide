@@ -6,12 +6,11 @@ export function useShortcuts(studio: Studio, present: () => void) {
   useEffect(() => {
     const frames = new Set<number>();
     const key = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        document.querySelector("dialog[open]") ||
-        !(event.metaKey || event.ctrlKey)
-      )
+      if (event.defaultPrevented || !(event.metaKey || event.ctrlKey)) return;
+      if (document.querySelector("dialog[open]")) {
+        if (event.key.toLowerCase() === "s") event.preventDefault();
         return;
+      }
       const target = event.target instanceof HTMLElement ? event.target : null;
       const local = target?.closest<HTMLInputElement>("[data-local-undo]");
       // Commit the locally edited project name before taking a save/presentation
@@ -32,7 +31,9 @@ export function useShortcuts(studio: Studio, present: () => void) {
       if (name === "s") {
         event.preventDefault();
         afterCommit(() => {
-          void current.current.studio.save();
+          void (event.shiftKey
+            ? current.current.studio.saveAs()
+            : current.current.studio.save());
         });
       }
       if (name === "z" && !local) {

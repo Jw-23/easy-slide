@@ -28,6 +28,8 @@ import {
   folderProject,
   readData,
   writeFolder,
+  projectFilename,
+  projectFileName,
   type FolderHandle,
 } from "../storage";
 import { useDocument } from "./use-document";
@@ -56,6 +58,11 @@ export function useStudio(draftKey: string) {
     [folderVersion, setFolderVersion] = useState<typeof doc.project | null>(
       null,
     );
+  const [saveRequest, setSaveRequest] = useState<{
+    project: Project;
+    folder: FolderHandle | null;
+    name: string;
+  } | null>(null);
   const locked = useRef(false),
     current = useRef(doc);
   current.current = doc;
@@ -184,22 +191,52 @@ export function useStudio(draftKey: string) {
     setFolderVersion(null);
     notify("已打开模板，可撤销恢复原工程", "success", true);
   }
-  async function save() {
+  async function save(asNew = false) {
     if (current.current.error) {
       notify("请先修复 DSL，或导出纯文本保留草稿", "error");
       return;
     }
     const snapshot = current.current.project;
-    await run("正在保存工程到文件夹…", async () => {
-      // Request the destination during the save gesture, before asynchronous encoding.
-      const dir = folder || (await chooseFolder());
-      const filename = await writeFolder(dir, snapshot);
-      setFolder(dir);
+    await run("正在保存工程…", async () => {
+      const existing = folder && !asNew ? await projectFilename(folder) : null;
+      if (!existing) {
+        const title =
+          current.current.deck.title
+            .replace(/[\\/:*?"<>|\x00-\x1f]/g, "_")
+            .slice(0, 60) || "未命名";
+        setSaveRequest({
+          project: snapshot,
+          folder,
+          name: projectFileName(title),
+        });
+        return;
+      }
+      const filename = await writeFolder(folder!, snapshot);
       setFolderVersion(snapshot);
       try {
         await current.current.persist();
       } catch {
-        /* Browser draft status retains its own save error. */
+        /* Draft status retains its own error. */
+      }
+      notify(`工程已保存到 ${folder!.name}/${filename}`);
+    });
+  }
+  async function confirmSave(name: string, chooseOther = false) {
+    const request = saveRequest;
+    if (!request) return false;
+    return run("正在保存项目文件…", async () => {
+      const filename = projectFileName(name);
+      if (current.current.project !== request.project)
+        throw Error("工程已变更，请关闭保存窗口后重试");
+      const dir = (!chooseOther && request.folder) || (await chooseFolder());
+      await writeFolder(dir, request.project, filename);
+      setFolder(dir);
+      setFolderVersion(request.project);
+      setSaveRequest(null);
+      try {
+        await current.current.persist();
+      } catch {
+        /* Draft status retains its own error. */
       }
       notify(`工程已保存到 ${dir.name}/${filename}`);
     });
@@ -388,6 +425,10 @@ export function useStudio(draftKey: string) {
     insertImage,
     template,
     save,
+    saveAs: () => save(true),
+    saveRequest,
+    confirmSave,
+    cancelSave: () => setSaveRequest(null),
     archive,
     pptx,
     sourceFile,

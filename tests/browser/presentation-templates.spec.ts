@@ -135,6 +135,18 @@ test("Ctrl+S selects a folder once and overwrites its dedicated project file wit
     };
   });
   await page.keyboard.press("Control+s");
+  const saveDialog = page.getByRole("dialog", { name: "保存项目文件" });
+  await expect(saveDialog).toBeVisible();
+  await saveDialog.getByRole("button", { name: "取消", exact: true }).click();
+  expect(await page.evaluate(() => (window as any).__saveStats())).toEqual({
+    picks: 0,
+    writes: 0,
+    names: [],
+  });
+  await page.keyboard.press("Control+s");
+  await saveDialog.getByLabel("项目文件名").fill("我的项目");
+  await saveDialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(saveDialog).toBeHidden();
   await expect
     .poll(() => page.evaluate(() => (window as any).__saveStats().writes))
     .toBe(1);
@@ -145,7 +157,23 @@ test("Ctrl+S selects a folder once and overwrites its dedicated project file wit
   expect(await page.evaluate(() => (window as any).__saveStats())).toEqual({
     picks: 1,
     writes: 2,
-    names: ["project.easy-slide"],
+    names: ["我的项目.easy-slide"],
   });
   expect(downloads).toBe(0);
+  await page.keyboard.press("Control+Shift+s");
+  await expect(saveDialog).toBeVisible();
+  await saveDialog.getByLabel("项目文件名").fill("另存副本");
+  await saveDialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(saveDialog).toBeHidden();
+  await page.keyboard.press("Control+s");
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__saveStats().writes))
+    .toBe(4);
+  expect(
+    await page.evaluate(() => (window as any).__saveStats().names),
+  ).toEqual(["我的项目.easy-slide", "另存副本.easy-slide"]);
+  expect(downloads).toBe(0);
+  await expect(
+    page.getByRole("button", { name: "安装应用", exact: true }),
+  ).toHaveCount(0);
 });
