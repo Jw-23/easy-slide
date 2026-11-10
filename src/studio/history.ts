@@ -19,7 +19,9 @@ export type HistoryAction =
   | { type: "undo" }
   | { type: "redo" };
 export const sameProject = (a: Project, b: Project) =>
-  a.source === b.source && a.assets === b.assets;
+  a.source === b.source &&
+  a.assets === b.assets &&
+  a.imageDocuments === b.imageDocuments;
 export const historyState = (value: Revision): History => ({
   past: [],
   present: value,
@@ -34,7 +36,9 @@ function bounded(past: Revision[], present: Revision) {
     sourceBytes = 0,
     start = past.length;
   for (let i = past.length - 1; i >= 0 && past.length - i <= 50; i--) {
-    sourceBytes += past[i].project.source.length * 2;
+    sourceBytes +=
+      past[i].project.source.length * 2 +
+      JSON.stringify(past[i].project.imageDocuments || {}).length * 2;
     for (const data of Object.values(past[i].project.assets))
       if (!images.has(data)) {
         bytes += data.length * 2;

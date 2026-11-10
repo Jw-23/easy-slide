@@ -21,6 +21,7 @@ type Manifest = {
   version: 1;
   source: string;
   assets: Record<string, { file: string; mime: string }>;
+  imageDocuments?: Project["imageDocuments"];
 };
 export type ProjectFileReader = (
   path: string,
@@ -114,6 +115,9 @@ export async function exportProjectArchive(input: Project): Promise<Blob> {
     version: 1,
     source: SOURCE_FILE,
     assets: Object.create(null),
+    ...(project.imageDocuments
+      ? { imageDocuments: project.imageDocuments }
+      : {}),
   };
   zip.file(SOURCE_FILE, project.source);
   for (const [path, data] of Object.entries(project.assets)) {
@@ -122,7 +126,10 @@ export async function exportProjectArchive(input: Project): Promise<Blob> {
     // Images already have compression; store their exact bytes without recompressing them.
     zip.file(path, bytes, { compression: "STORE", createFolders: false });
   }
-  zip.file(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
+  const manifestJson = JSON.stringify(manifest, null, 2);
+  if (encoder.encode(manifestJson).byteLength > MAX_MANIFEST)
+    throw Error("图片编辑图层或工程清单过大，请减少图层后导出");
+  zip.file(MANIFEST_FILE, manifestJson);
   return zip.generateAsync({
     type: "blob",
     mimeType: "application/zip",
@@ -183,6 +190,7 @@ export async function readProjectManifest(
     version: 1,
     source,
     assets,
+    ...(value.imageDocuments ? { imageDocuments: value.imageDocuments } : {}),
   });
 }
 function readEntry(

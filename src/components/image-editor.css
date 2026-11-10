@@ -29,7 +29,7 @@
   background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50%/20px 20px;
   border: 1px solid var(--line);
   text-align: center;
-  padding: 8px;
+  padding: 32px;
 }
 .image-edit-surface {
   position: relative;
@@ -79,4 +79,124 @@
 .slide-frame[data-image-draggable="true"] [data-image-asset="true"] {
   cursor: grab;
   touch-action: none;
+}
+.image-text-object {
+  position: absolute;
+  transform-origin: top left;
+  line-height: 1.3;
+  white-space: pre;
+  touch-action: none;
+  user-select: none;
+  cursor: move;
+  box-sizing: border-box;
+  z-index: 1;
+}
+.image-text-object.selected {
+  outline: 1px solid #287ad5;
+}
+.image-text-object textarea {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  resize: none;
+  white-space: pre;
+  overflow: hidden;
+  box-sizing: border-box;
+  outline: 1px solid #287ad5;
+  user-select: text;
+  cursor: text;
+}
+.image-text-object span {
+  white-space: pre;
+}
+.image-text-handle {
+  position: absolute !important;
+  padding: 0 !important;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  background: white;
+  color: #287ad5;
+  border: 1px solid #287ad5 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.image-text-handle.scale {
+  right: -11px;
+  bottom: -11px;
+  cursor: nwse-resize;
+}
+.image-text-handle.rotate {
+  left: calc(50% - 11px);
+  top: -28px;
+  cursor: grab;
+  border-radius: 50%;
+}
+.image-text-settings,
+.image-brush-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.image-text-settings input[type="number"],
+.image-brush-settings input[type="number"] {
+  width: 75px;
+}
+.image-text-settings input[list] {
+  width: 200px;
+}
+.image-editor-toolbar .image-filename {
+  width: 180px;
+  min-width: 60px;
+}
+.image-editor-toolbar {
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 6px;
+}
+.image-tools {
+  border-right: 1px solid var(--line);
+  padding-right: 6px;
+}
+.image-save {
+  margin-left: auto;
+  color: var(--accent);
+}
+.image-editor-status {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.image-crop-box {
+  z-index: 2;
+}
+@media (max-width: 600px) {
+  .image-editor-toolbar .image-filename {
+    width: 120px;
+  }
+  .image-text-settings input[list] {
+    width: 140px;
+  }
+  .image-edit-viewport {
+    max-height: 60vh;
+  }
 }

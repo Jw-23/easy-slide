@@ -327,7 +327,9 @@ export function Inspector({
             <DslEditor
               value={s.project.source}
               onChange={s.text}
-              assets={Object.keys(s.project.assets)}
+              assets={Object.keys(s.project.assets).filter(
+                (path) => !path.startsWith("assets/.image-original/"),
+              )}
               onFormat={s.format}
               onHelp={onHelp}
               onUndo={s.undo}
@@ -344,7 +346,14 @@ export function Inspector({
           <div className="inspector-content">
             <div className="panel-heading">
               <h3>素材</h3>
-              <span>{Object.keys(s.project.assets).length} 张</span>
+              <span>
+                {
+                  Object.keys(s.project.assets).filter(
+                    (path) => !path.startsWith("assets/.image-original/"),
+                  ).length
+                }{" "}
+                张
+              </span>
             </div>
             <button
               className="upload-zone"
@@ -356,27 +365,36 @@ export function Inspector({
               <small>支持粘贴 · 每张 ≤ 20 MB</small>
             </button>
             <div className="asset-list">
-              {Object.entries(s.project.assets).map(([path, src]) => (
-                <div key={path} className="asset-entry">
-                  <button
-                    disabled={locked}
-                    onClick={() => s.insertImage(path)}
-                    title={`插入 ${path}`}
-                  >
-                    <img src={src} alt={path.split("/").pop()} loading="lazy" />
-                    <small>{path.split("/").pop()}</small>
-                  </button>
-                  <div className="asset-actions">
-                    <button disabled={locked} onClick={() => onEditImage(path)}>
-                      编辑 / 重命名
+              {Object.entries(s.project.assets)
+                .filter(([path]) => !path.startsWith("assets/.image-original/"))
+                .map(([path, src]) => (
+                  <div key={path} className="asset-entry">
+                    <button
+                      disabled={locked}
+                      onClick={() => s.insertImage(path)}
+                      title={`插入 ${path}`}
+                    >
+                      <img
+                        src={src}
+                        alt={path.split("/").pop()}
+                        loading="lazy"
+                      />
+                      <small>{path.split("/").pop()}</small>
                     </button>
+                    <div className="asset-actions">
+                      <button
+                        disabled={locked}
+                        onClick={() => onEditImage(path)}
+                      >
+                        编辑 / 重命名
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
-            {!Object.keys(s.project.assets).length && (
-              <p className="empty-state">尚未添加图片</p>
-            )}
+            {!Object.keys(s.project.assets).filter(
+              (path) => !path.startsWith("assets/.image-original/"),
+            ).length && <p className="empty-state">尚未添加图片</p>}
             <p className="muted">PNG / JPG / WebP / GIF</p>
           </div>
         )}
