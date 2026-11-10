@@ -1,7 +1,8 @@
 import JSZip from "jszip";
 import { parseDeck, validateProject, type Block, type Project } from "./dsl";
 
-export const ARCHIVE_FILE = "project.easy-slide.zip";
+export const ARCHIVE_FILE = "project.easy-slide";
+export const LEGACY_ARCHIVE_FILE = "project.easy-slide.zip";
 export const MANIFEST_FILE = "project.easy-slide.json";
 export const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const SOURCE_FILE = "slides.slide";

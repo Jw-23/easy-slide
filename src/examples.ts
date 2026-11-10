@@ -1,3 +1,5 @@
+import researchSource from "../docs/examples/research-report.slide?raw";
+import { researchAssets } from "./research-assets";
 import type { Deck } from "./dsl";
 import { showcaseDeck } from "./showcase";
 import { exampleAssets } from "./example-assets";
@@ -326,14 +328,19 @@ export function exampleAssetsFor(deck: Deck): Record<string, string> {
   const result: Record<string, string> = {};
   const collect = (blocks: import("./dsl").Block[]) => {
     for (const b of blocks) {
-      if (b.type === "image" && b.src && exampleAssets[b.src])
-        result[b.src] = exampleAssets[b.src];
+      if (
+        b.type === "image" &&
+        b.src &&
+        (exampleAssets[b.src] || researchAssets[b.src])
+      )
+        result[b.src] = exampleAssets[b.src] || researchAssets[b.src];
       collect(b.children || []);
     }
   };
   deck.slides.forEach((s) => collect(s.blocks));
   return result;
 }
+export const researchDeck = parseDeck(researchSource);
 export const mathProofDeck = parseDeck(mathProofSource);
 export const initialSource = serialize(showcaseDeck);
 export const initialAssets = exampleAssetsFor(showcaseDeck);

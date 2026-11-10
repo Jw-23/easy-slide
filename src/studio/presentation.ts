@@ -25,3 +25,27 @@ export function previousPosition(
       ? { page: position.page - 1, step: Math.max(0, ...previousStages) }
       : position;
 }
+
+/** One action per wheel gesture; inertial tails extend the quiet period. */
+export function wheelNavigator() {
+  let last = -Infinity,
+    total = 0,
+    lastFire = -Infinity,
+    fired = false;
+  return (delta: number, time: number, mode = 0): -1 | 0 | 1 => {
+    if (!Number.isFinite(delta) || delta === 0) return 0;
+    if (time - last > 180) {
+      total = 0;
+      fired = false;
+    }
+    last = time;
+    if (fired) return 0;
+    total += delta * (mode === 1 ? 16 : mode === 2 ? 720 : 1);
+    if (Math.abs(total) < 45 || time - lastFire < 350) return 0;
+    const direction = total > 0 ? 1 : -1;
+    total = 0;
+    lastFire = time;
+    fired = true;
+    return direction;
+  };
+}

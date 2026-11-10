@@ -1,7 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import JSZip from "jszip";
 import { readFile } from "node:fs/promises";
 import { importProjectArchive, ARCHIVE_FILE } from "../../src/project-archive";
+async function exportBackup(page: Page) {
+  await page.getByRole("button", { name: "导出", exact: true }).click();
+  await page.getByRole("button", { name: /工程压缩包/ }).click();
+}
 test("edit, persist, stage content, export and reimport a portable project", async ({
   page,
 }) => {
@@ -25,7 +29,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   await page.locator(".tabs").getByRole("tab", { name: "DSL" }).click();
   const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
   const backup = page.waitForEvent("download");
-  await page.getByRole("button", { name: "保存工程", exact: true }).click();
+  await exportBackup(page);
   const source = (
     await importProjectArchive(await readFile((await (await backup).path())!))
   ).source;
@@ -41,7 +45,7 @@ test("edit, persist, stage content, export and reimport a portable project", asy
   await expect(formula).toHaveCSS("opacity", "1");
   await page.keyboard.press("Escape");
   const projectDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "保存工程", exact: true }).click();
+  await exportBackup(page);
   const p = await projectDownload;
   expect(p.suggestedFilename()).toMatch(/\.easy-slide\.zip$/);
   const archive = await readFile((await p.path())!);
@@ -114,7 +118,7 @@ test("ZIP project restores clipboard images in a clean browser and rejects missi
   await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
   await expect(page.locator(".asset-list img")).toHaveCount(2);
   const dl = page.waitForEvent("download");
-  await page.getByRole("button", { name: "保存工程", exact: true }).click();
+  await exportBackup(page);
   const exported = await dl,
     archive = await readFile((await exported.path())!);
   const p = await importProjectArchive(archive);
@@ -437,7 +441,7 @@ test("the full startup tour renders without missing assets or clipped text and c
       });
   }
   await page.getByRole("button", { name: "工程", exact: true }).click();
-  await page.getByRole("menuitem", { name: "切换示例", exact: true }).click();
+  await page.getByRole("menuitem", { name: "示例与模板", exact: true }).click();
   await page.locator(".template-card").filter({ hasText: "数学论坛" }).click();
   await page
     .locator(".modal")
@@ -447,7 +451,7 @@ test("the full startup tour renders without missing assets or clipped text and c
   await page.locator(".tabs").getByRole("tab", { name: "素材" }).click();
   await expect(page.locator(".asset-list img")).toHaveCount(0);
   await page.getByRole("button", { name: "工程", exact: true }).click();
-  await page.getByRole("menuitem", { name: "切换示例", exact: true }).click();
+  await page.getByRole("menuitem", { name: "示例与模板", exact: true }).click();
   await page.locator(".template-card").filter({ hasText: "功能示例" }).click();
   await page
     .locator(".modal")
@@ -461,7 +465,7 @@ test("the full startup tour renders without missing assets or clipped text and c
   await page.reload();
   await expect(page.locator(".slide-item")).toHaveCount(27);
   const dl = page.waitForEvent("download");
-  await page.getByRole("button", { name: "保存工程", exact: true }).click();
+  await exportBackup(page);
   const p = await importProjectArchive(
     await readFile((await (await dl).path())!),
   );

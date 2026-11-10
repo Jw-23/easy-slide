@@ -2,6 +2,7 @@ import { get, set } from "idb-keyval";
 import type { Project } from "./dsl";
 import {
   ARCHIVE_FILE,
+  LEGACY_ARCHIVE_FILE,
   MAX_ARCHIVE_BYTES,
   MAX_IMAGE_BYTES,
   MAX_PROJECT_BYTES,
@@ -38,13 +39,15 @@ type FileHandle = {
 };
 export async function chooseFolder(): Promise<FolderHandle> {
   const w = window as unknown as {
-    showDirectoryPicker?: () => Promise<FolderHandle>;
+    showDirectoryPicker?: (options?: {
+      mode: "readwrite";
+    }) => Promise<FolderHandle>;
   };
   if (!w.showDirectoryPicker)
     throw Error(
       "此浏览器不支持直接读写文件夹，请使用 Chrome / Edge，或导入导出工程文件。",
     );
-  return w.showDirectoryPicker();
+  return w.showDirectoryPicker({ mode: "readwrite" });
 }
 export const readData = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -54,15 +57,36 @@ export const readData = (file: File) =>
     r.onabort = () => reject(new DOMException("图片读取已取消", "AbortError"));
     r.readAsDataURL(file);
   });
+const projectFiles = new WeakMap<FolderHandle, string>();
+async function projectFilename(dir: FolderHandle): Promise<string | null> {
+  const known = projectFiles.get(dir);
+  if (known) return known;
+  for (const name of [ARCHIVE_FILE, LEGACY_ARCHIVE_FILE]) {
+    try {
+      await dir.getFileHandle(name);
+      return name;
+    } catch (e) {
+      if ((e as Error).name !== "NotFoundError") throw e;
+    }
+  }
+  const candidates: string[] = [];
+  for await (const entry of dir.values())
+    if (entry.kind === "file" && /\.easy-slide(?:\.zip)?$/i.test(entry.name))
+      candidates.push(entry.name);
+  if (candidates.length > 1)
+    throw Error("文件夹中有多个项目压缩文件，请为每个工程使用单独的文件夹");
+  return candidates[0] || null;
+}
 export async function folderProject(
   dir: FolderHandle,
 ): Promise<Project | null> {
-  try {
-    const file = await (await dir.getFileHandle(ARCHIVE_FILE)).getFile();
+  const filename = await projectFilename(dir);
+  if (filename) {
+    const file = await (await dir.getFileHandle(filename)).getFile();
     if (file.size > MAX_ARCHIVE_BYTES) throw Error("工程压缩包超过 256 MB");
-    return importProjectArchive(await file.arrayBuffer());
-  } catch (e) {
-    if ((e as DOMException).name !== "NotFoundError") throw e;
+    const project = await importProjectArchive(await file.arrayBuffer());
+    projectFiles.set(dir, filename);
+    return project;
   }
   let file: File;
   try {
@@ -133,13 +157,16 @@ export async function folderImages(
 }
 export async function writeFolder(dir: FolderHandle, p: Project) {
   const archive = await exportProjectArchive(p);
-  const file = await dir.getFileHandle(ARCHIVE_FILE, {
+  const filename = (await projectFilename(dir)) || ARCHIVE_FILE;
+  const file = await dir.getFileHandle(filename, {
     create: true,
   });
   const writer = await file.createWritable();
   try {
     await writer.write(archive);
     await writer.close();
+    projectFiles.set(dir, filename);
+    return filename;
   } catch (error) {
     try {
       await writer.abort?.();
