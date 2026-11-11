@@ -273,6 +273,15 @@ for (const [name, description, field, type, template, kind] of [
       p(field, type, description, { stringKind: kind }),
       named(field, type, description, { stringKind: kind }),
       named("title", string, "Block title"),
+      ...(name === "Text"
+        ? [
+            named(
+              "indent",
+              number,
+              "First-line indentation in full-width characters, 0–8",
+            ),
+          ]
+        : []),
       ...(name === "Metric"
         ? [
             named("label", string, "Metric label"),
@@ -589,6 +598,15 @@ for (const [name, type, detail, snippet] of [
           ? ["Slide", "DynamicSlide", ...views]
           : views,
   );
+add(
+  "indent",
+  "modifier",
+  "Indent each prose paragraph by 0–8 full-width characters; display math stays centered",
+  [p("value", number, "First-line indent, 0–8")],
+  "indent(${2})",
+  unknown,
+  ["Text"],
+);
 add(
   "frame",
   "modifier",

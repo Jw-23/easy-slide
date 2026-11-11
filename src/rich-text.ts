@@ -333,3 +333,15 @@ export function richRuns(
   visit(document.children, initial);
   return runs;
 }
+
+/** Display formulas own their line; a source newline beside them is not an extra blank paragraph. */
+export function flowRuns(document: RichDocument): RichRun[] {
+  const runs = richRuns(document);
+  return runs.filter(
+    (run, index) =>
+      run.kind !== "break" ||
+      ![runs[index - 1], runs[index + 1]].some(
+        (adjacent) => adjacent?.kind === "math" && adjacent.node.display,
+      ),
+  );
+}

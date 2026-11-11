@@ -161,10 +161,14 @@ test("Ctrl+S selects a folder once and overwrites its dedicated project file wit
   });
   expect(downloads).toBe(0);
   await page.keyboard.press("Control+Shift+s");
-  await expect(saveDialog).toBeVisible();
-  await saveDialog.getByLabel("项目文件名").fill("另存副本");
-  await saveDialog.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(saveDialog).toBeHidden();
+  const saveAsDialog = page.getByRole("dialog", { name: "工程另存为" });
+  await expect(saveAsDialog).toBeVisible();
+  await expect(saveAsDialog.getByLabel("项目文件名")).toHaveValue(
+    "我的项目.easy-slide",
+  );
+  await saveAsDialog.getByLabel("项目文件名").fill("另存副本");
+  await saveAsDialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(saveAsDialog).toBeHidden();
   await page.keyboard.press("Control+s");
   await expect
     .poll(() => page.evaluate(() => (window as any).__saveStats().writes))
@@ -176,4 +180,113 @@ test("Ctrl+S selects a folder once and overwrites its dedicated project file wit
   await expect(
     page.getByRole("button", { name: "安装应用", exact: true }),
   ).toHaveCount(0);
+});
+
+test("reload retains the saved project filename; only Save As opens the naming dialog", async ({
+  page,
+}) => {
+  await ready(page);
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "proof.slide",
+      mimeType: "text/plain",
+      buffer: Buffer.from('Deck("保存测试") Slide(title:"S"){Text("正文")}'),
+    });
+  await expect(page.locator(".preview-wrap")).toContainText("正文");
+  await page.evaluate(async () => {
+    const folder = await (
+      await navigator.storage.getDirectory()
+    ).getDirectoryHandle("save-regression", { create: true });
+    (window as any).showDirectoryPicker = async () => folder;
+  });
+  await page.keyboard.press("Control+s");
+  const first = page.getByRole("dialog", { name: "保存项目文件" });
+  await first.getByLabel("项目文件名").fill("原工程");
+  await first.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator(".toast.success")).toContainText(
+    "原工程.easy-slide",
+  );
+  // Wait for the structured-cloned FileSystemDirectoryHandle to reach IndexedDB.
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        return new Promise<string | undefined>((resolve, reject) => {
+          const open = indexedDB.open("keyval-store");
+          open.onsuccess = () => {
+            const db = open.result;
+            const read = db
+              .transaction("keyval")
+              .objectStore("keyval")
+              .get("draft:save-location");
+            read.onsuccess = () => {
+              resolve(read.result?.filename);
+              db.close();
+            };
+            read.onerror = () => {
+              reject(read.error);
+              db.close();
+            };
+          };
+          open.onerror = () => reject(open.error);
+        });
+      }),
+    )
+    .toBe("原工程.easy-slide");
+  await page.reload();
+  await expect(page.locator(".preview-wrap")).toContainText("正文");
+  await page.keyboard.press("Control+s");
+  await expect(page.locator(".toast.success")).toContainText(
+    "原工程.easy-slide",
+  );
+  await expect(page.getByRole("dialog", { name: "保存项目文件" })).toHaveCount(
+    0,
+  );
+  await page.keyboard.press("Control+Shift+s");
+  const saveAs = page.getByRole("dialog", { name: "工程另存为" });
+  await expect(saveAs.getByLabel("项目文件名")).toHaveValue(
+    "原工程.easy-slide",
+  );
+  await saveAs.getByLabel("项目文件名").fill("副本");
+  await saveAs.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator(".toast.success")).toContainText("副本.easy-slide");
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        return new Promise<string | undefined>((resolve, reject) => {
+          const open = indexedDB.open("keyval-store");
+          open.onsuccess = () => {
+            const db = open.result;
+            const read = db
+              .transaction("keyval")
+              .objectStore("keyval")
+              .get("draft:save-location");
+            read.onsuccess = () => {
+              resolve(read.result?.filename);
+              db.close();
+            };
+            read.onerror = () => {
+              reject(read.error);
+              db.close();
+            };
+          };
+          open.onerror = () => reject(open.error);
+        });
+      }),
+    )
+    .toBe("副本.easy-slide");
+  await page.reload();
+  await expect(page.locator(".preview-wrap")).toContainText("正文");
+  await page.keyboard.press("Control+s");
+  await expect(page.locator(".toast.success")).toContainText("副本.easy-slide");
+  const names = await page.evaluate(async () => {
+    const folder = await (
+      await navigator.storage.getDirectory()
+    ).getDirectoryHandle("save-regression");
+    const names: string[] = [];
+    for await (const name of (folder as any).keys()) names.push(name);
+    return names.sort();
+  });
+  expect(names).toEqual(["副本.easy-slide", "原工程.easy-slide"]);
 });

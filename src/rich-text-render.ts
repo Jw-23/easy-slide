@@ -1,5 +1,5 @@
 import { mathAsset } from "./math";
-import { richRuns, type RichDocument, type RichRun } from "./rich-text";
+import { flowRuns, type RichDocument, type RichRun } from "./rich-text";
 export const escapeXml = (text: string) =>
   text.replace(
     /[&<>"']/g,
@@ -25,7 +25,7 @@ export function runStyle(run: RichRun): string {
 }
 /** Only AST-generated tags and locally rendered SVG data URLs are emitted. User HTML stays escaped. */
 export function richHtml(document: RichDocument, color = "#192c2a"): string {
-  return richRuns(document)
+  return flowRuns(document)
     .map((run, index) => {
       if (run.kind === "break") return "\n";
       const style = runStyle(run),

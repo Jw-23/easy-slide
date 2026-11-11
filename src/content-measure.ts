@@ -1,6 +1,7 @@
+import { indentProse } from "./prose";
 import type { Block } from "./dsl";
 import { mathAsset } from "./math";
-import { parseRichText, richRuns, type RichRun } from "./rich-text";
+import { parseRichText, flowRuns, type RichRun } from "./rich-text";
 import { mathHeading, proofEnds } from "./math-environments";
 const LINE = 1.42;
 let context: CanvasRenderingContext2D | null | undefined;
@@ -24,13 +25,15 @@ function width(
     (n, c) =>
       n +
       size *
-        (/\s/u.test(c)
-          ? 0.4
-          : /[\u0000-\u00ff]/u.test(c)
-            ? /[MW@]/.test(c)
-              ? 1.05
-              : 0.72
-            : 1.05),
+        (c === "\u3000"
+          ? 1.05
+          : /\s/u.test(c)
+            ? 0.4
+            : /[\u0000-\u00ff]/u.test(c)
+              ? /[MW@]/.test(c)
+                ? 1.05
+                : 0.72
+              : 1.05),
     0,
   );
 }
@@ -48,7 +51,7 @@ export function textLines(
     lines.push({ runs: [], height: size * LINE + 3 });
     used = 0;
   };
-  for (const run of richRuns(parseRichText(text))) {
+  for (const run of flowRuns(parseRichText(text))) {
     if (run.kind === "break") {
       newline();
       continue;
@@ -175,7 +178,9 @@ export function contentHeight(
   ) {
     height =
       textHeight(
-        b.type === "code" ? escapeText(b.text || "") : b.text || "",
+        b.type === "code"
+          ? escapeText(b.text || "")
+          : indentProse(b.text || "", b.indent),
         Math.max(
           1,
           inner - (b.type === "code" ? 48 : b.type === "quote" ? 28 : 0),
@@ -290,7 +295,7 @@ export function splitText(
   const pad = b.padding ?? 0,
     overhead = pad * 2 + (b.title ? 54 : 0) + 6,
     lines = textLines(
-      b.text || "",
+      indentProse(b.text || "", b.indent),
       Math.max(1, w - pad * 2 - (b.type === "quote" ? 28 : 0)),
       fontSize(b, size),
       font,
@@ -317,6 +322,7 @@ export function splitText(
       text: c.map((l) => encoded(l.runs)).join("\n"),
       size: fontSize(b, size),
       h: Math.ceil(c.reduce((s, l) => s + l.height, 0) + overhead),
+      indent: undefined,
       fragment: true,
       measured: true,
       continued: i > 0,

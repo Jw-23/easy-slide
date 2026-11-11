@@ -121,7 +121,7 @@ test("backtick strings keep single LaTeX backslashes through completion and form
     .filter({ hasText: "\\frac" })
     .first()
     .click();
-  await expect(editor).toContainText("`\\frac{分子}{分母}");
+  await expect(editor).toContainText("`\\frac{numerator}{denominator}");
   await expect(editor).not.toContainText("`\\\\frac");
   await editor.fill(
     'Deck("Raw") Slide(title:"A"){Text(`**误差**为 $\\frac{1}{n}$`) Equation(`\\nabla f(x)`)}',
@@ -167,4 +167,53 @@ test("position reference and scale keep the bottom-left point and preview coordi
     'Deck("Position") Slide(title:"S"){Text("X").frame(x:10,y:20)}',
   );
   await expect(page.locator(".editor-diagnostic")).toContainText("position");
+});
+
+test("long proofs indent paragraphs and keep display equations at the body font size", async ({
+  page,
+}, testInfo) => {
+  await open(page);
+  const proof =
+    'Deck("KKT") Theme(preset:.paper) DynamicSlide(title:"KKT 条件",fontSize:22){Proof{Text(`\n    设 $\\lambda\\ge0$，考虑下列驻点条件。\n    $$Hx+q+G^T\\lambda+E^T\\nu=0$$\n    由**互补松弛**可得 $\\lambda_i(G_ix-h_i)=0$。\n`).indent(2) Equation(`\\lambda\\ge0`).frame(height:100) Equation(`Hx+q+G^T\\lambda+E^T\\nu=0`).frame(height:100)}}';
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "proof.slide",
+      mimeType: "text/plain",
+      buffer: Buffer.from(proof),
+    });
+  const preview = page.locator(".preview-wrap");
+  await expect(preview).toContainText("　　设");
+  await expect(preview.locator("img[data-inline-math]")).toHaveCount(3);
+  const sizes = await preview
+    .locator("[data-scene-element]")
+    .evaluateAll((elements) => {
+      const standalone = elements.filter((el) =>
+        el.querySelector("img:not([data-inline-math])"),
+      );
+      const embedded = elements
+        .flatMap((el) =>
+          Array.from(
+            el.querySelectorAll<HTMLImageElement>("img[data-inline-math]"),
+          ),
+        )
+        .filter((img) => img.style.display === "block");
+      return {
+        standalone: standalone.map((el) => ({
+          w: parseFloat((el as HTMLElement).style.width),
+          h: parseFloat((el as HTMLElement).style.height),
+        })),
+        embedded: embedded.map((img) => ({
+          w: img.offsetWidth,
+          h: img.offsetHeight,
+        })),
+      };
+    });
+  expect(sizes.standalone).toHaveLength(2);
+  expect(sizes.embedded).toHaveLength(1);
+  expect(Math.abs(sizes.standalone[1].w - sizes.embedded[0].w)).toBeLessThan(2);
+  expect(Math.abs(sizes.standalone[1].h - sizes.embedded[0].h)).toBeLessThan(2);
+  expect(sizes.standalone[0].h).toBeLessThan(40);
+  await preview.screenshot({ path: testInfo.outputPath("proof.png") });
 });
