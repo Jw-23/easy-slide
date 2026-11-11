@@ -154,7 +154,7 @@ export default function StudioDialogs({
             {
               deck: showcaseDeck,
               title: "功能示例",
-              detail: "27 页 · 组件、主题、公式与动画",
+              detail: `${showcaseDeck.slides.length} 页 · 数学讲解、证明与组件用法`,
               icon: BookOpen,
             },
             {

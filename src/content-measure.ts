@@ -120,7 +120,7 @@ export function mathMetrics(b: Block, w: number, font: string, inherited = 22) {
     reason = b.reason
       ? textHeight("依据：" + b.reason, inner, Math.max(8, size - 2), font) + 10
       : 0,
-    footer = proofEnds(b) ? 30 : 0;
+    footer = proofEnds(b) ? 36 : 0;
   return {
     pad,
     inset,

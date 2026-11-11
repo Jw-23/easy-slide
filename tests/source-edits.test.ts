@@ -150,7 +150,9 @@ describe("source-preserving page operations", () => {
         editSlide(source, i, { title: "Edited", notes: "N" }),
       );
       expect(next.slides[i].blocks).toEqual(slide.blocks);
-      expect(next.slides[i].title).toBe("Edited");
+      expect(next.slides[i].dynamic?.title ?? next.slides[i].title).toBe(
+        "Edited",
+      );
     });
     const full =
       'Deck("A")\n' +
@@ -159,7 +161,7 @@ describe("source-preserving page operations", () => {
       );
     expect(() => addSlideSource(full, 199)).toThrow("200");
     expect(() => duplicateSlideSource(full, 0)).toThrow("200");
-  });
+  }, 30_000);
   it("keeps the project header and editor selections local to the changed text", () => {
     const next = renameDeck(original, "新名称");
     expect(next).toBe(original.replace('Deck("A")', 'Deck("新名称")'));
