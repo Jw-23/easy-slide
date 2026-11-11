@@ -1,3 +1,4 @@
+import { mathTeachingSlides } from "./math-teaching";
 import { parseDeck } from "./dsl";
 /** The startup document is authored in the same flat DSL that users edit. */
 export const showcaseDeck = parseDeck(
@@ -30,11 +31,13 @@ let demoCosts = [120, 180, 95, 240]
 
 Slide(title: "Easy Slide\n功能示例", eyebrow: "01 / OVERVIEW", subtitle: "布局、公式、素材、主题与动画") {
     Cover {
-        Text("27 页示例 · 在 DSL 面板中查看和修改源码").font(18)
+        Text("组件用法 · 数学讲解 · 完整证明").font(18)
         Equation(#"x_{k+1}=x_k-\eta\nabla f(x_k)"#)
             .glass(blur: 28, opacity: 0.62, radius: 28).padding(26)
     }
-}.notes("此工程展示现有的全部组件与编排方式。上方主题菜单提供 10 套样式，切换时保留所有页面源码。Theme(preset: .aurora) 可在 DSL 中声明主题，页面和组件的显式颜色优先。右键内容与 DSL 可以双向定位。Ctrl / ⌘ + Shift + F 格式化长参数并保留注释。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
+}.notes("封面之后是推荐写法、最小值题讲解、完整解答、凸性定理与长证明。教学内容推荐 DynamicSlide 和 Text 花括号自然书写；后半部分展示全部组件与编排方式。上方主题菜单提供 10 套样式，切换时保留所有页面源码。Theme(preset: .aurora) 可在 DSL 中声明主题，页面和组件的显式颜色优先。右键内容与 DSL 可以双向定位。Ctrl / ⌘ + Shift + F 格式化长参数并保留注释。右侧 DSL 面板可以查看源码，Ctrl / ⌘ + Space 呼出补全；所有示例均可直接导出 PPTX。演示中的数据与图表仅用于说明功能。")
+
+${mathTeachingSlides}
 
 Slide(title: "页面与布局\n分别声明", eyebrow: "02 / STRUCTURE", subtitle: "Deck、Theme 与 Slide 并列；布局由独立组件负责") {
     Section {
@@ -331,8 +334,8 @@ Slide(title: "正文中的公式与强调", eyebrow: "26 / RICH TEXT", subtitle:
     VStack(spacing: 24) {
         Panel {
             VStack(spacing: 20) {
-                Text(#"**主要结论**：当 $0 < \eta < 2/L$ 时，*梯度下降* 的更新为 \(x_{k+1}=x_k-\eta\nabla f(x_k)\)。"#).font(25)
-                Text(#"误差满足 **$\|x_k-x^*\| \le C/k$**；~~旧估计~~ 已替换。"#).font(25)
+                Text(#"**主要结论**：当 $0 < \eta \le 1/L$ 时，*梯度下降* 的更新为 \(x_{k+1}=x_k-\eta\nabla f(x_k)\)。"#).font(25)
+                Text(#"函数值误差满足 **$f(x_k)-f(x^*) \le C/k$**；~~旧估计~~ 已替换。"#).font(25)
             }
         }.frame(height: 210).appear(.rise, step: 1, duration: 600)
         Text(#"行内代码 ${"`"}**原样保留** $x$${"`"}；文字中的 \*星号\* 与价格 \$20 使用反斜杠转义。"#).font(21)

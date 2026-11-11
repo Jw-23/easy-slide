@@ -498,7 +498,7 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
           innerX,
           cursor + 6,
           m.inner,
-          24,
+          30,
           20,
           accent,
           true,

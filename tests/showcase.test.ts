@@ -24,7 +24,9 @@ describe("startup feature tour", () => {
       assets: initialAssets,
     });
     expect(parseDeck(p.source)).toEqual(showcaseDeck);
-    expect(showcaseDeck.slides).toHaveLength(27);
+    expect(showcaseDeck.slides.length).toBeGreaterThanOrEqual(34);
+    expect(initialSource).toContain("Text {");
+    expect(initialSource).toContain("columns: 2");
     expect(Object.keys(p.assets)).toEqual(["assets/convergence.png"]);
     expect(p.assets["assets/convergence.png"]).toMatch(
       /^data:image\/png;base64,/,
@@ -69,6 +71,7 @@ describe("startup feature tour", () => {
       "circle",
       "badge",
       "progress",
+      "math",
     ])
       expect(blocks.some((b) => b.type === type)).toBe(true);
     expect(
