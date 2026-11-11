@@ -322,6 +322,30 @@ export function parseEditorAst(source: string): EditorAst {
           close: close?.from,
           to: close?.to ?? peek().from,
         });
+      } else if (
+        peek().prose &&
+        ["Text", "text"].includes(node.name ?? "") &&
+        (node.kind === "call" || node.kind === "identifier")
+      ) {
+        const token = take();
+        const literal = make("literal", token.from, [], {
+          to: token.to,
+          token,
+          value: token.value,
+        });
+        const argument = make("argument", token.from, [literal], {
+          to: token.to,
+          name: "text",
+        });
+        if (node.kind === "identifier")
+          node = make("call", node.from, [node], {
+            name: "Text",
+            callee: node,
+            args: [],
+          });
+        node.args!.push(argument);
+        node.children.push(argument);
+        node.to = token.to;
       } else if (at("[")) {
         take();
         const index = expression();

@@ -1,3 +1,5 @@
+import { indentProse } from "./prose";
+import { fitMath } from "./math";
 import { pageGeometry } from "./page-layout";
 import { contentHeight, mathMetrics, textHeight } from "./content-measure";
 import { mathHeading, proofEnds } from "./math-environments";
@@ -737,10 +739,8 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
       push({
         kind: "equation",
         text: b.text || "",
-        x,
-        y,
-        w,
-        h,
+        ...fitMath(b.text || "", c, b.size ?? 24, { x, y, w, h }),
+        size: b.size ?? 24,
         color: c,
         step,
       });
@@ -929,7 +929,18 @@ export function scene(deck: Deck, s: Slide, index: number): Element[] {
         step,
         true,
       );
-    } else text(b.text || "", x, y, w, h, b.size || 24, c, false, step);
+    } else
+      text(
+        indentProse(b.text || "", b.indent),
+        x,
+        y,
+        w,
+        h,
+        b.size || 24,
+        c,
+        false,
+        step,
+      );
   }
   function renderLayout(
     preset: import("./dsl").Layout,

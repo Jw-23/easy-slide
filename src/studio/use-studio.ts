@@ -30,6 +30,9 @@ import {
   writeFolder,
   projectFilename,
   projectFileName,
+  loadProjectLocation,
+  saveProjectLocation,
+  ensureFolderWritePermission,
   type FolderHandle,
 } from "../storage";
 import { useDocument } from "./use-document";
@@ -54,6 +57,8 @@ export function useStudio(draftKey: string) {
   const doc = useDocument(draftKey);
   const [operation, setOperation] = useState(""),
     [notice, setNotice] = useState<Notice | null>(null);
+  const [locationReady, setLocationReady] = useState(false);
+  const [locationVersion, setLocationVersion] = useState(0);
   const [folder, setFolder] = useState<FolderHandle | null>(null),
     [folderVersion, setFolderVersion] = useState<typeof doc.project | null>(
       null,
@@ -62,11 +67,47 @@ export function useStudio(draftKey: string) {
     project: Project;
     folder: FolderHandle | null;
     name: string;
+    asNew: boolean;
   } | null>(null);
   const locked = useRef(false),
     current = useRef(doc);
   current.current = doc;
-  const busy = !!operation,
+  const locationWrites = useRef(Promise.resolve());
+  useEffect(() => {
+    let cancelled = false;
+    setLocationReady(false);
+    loadProjectLocation(draftKey)
+      .then((dir) => {
+        if (!cancelled) setFolder(dir);
+      })
+      .catch((error) => {
+        if (!cancelled)
+          notify(
+            "无法恢复保存位置：" +
+              (error instanceof Error ? error.message : String(error)),
+            "error",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setLocationReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey]);
+  useEffect(() => {
+    if (!locationReady) return;
+    locationWrites.current = locationWrites.current
+      .then(() => saveProjectLocation(folder, draftKey))
+      .catch((error) => {
+        notify(
+          "保存位置未能记住：" +
+            (error instanceof Error ? error.message : String(error)),
+          "error",
+        );
+      });
+  }, [folder, locationReady, locationVersion, draftKey]);
+  const busy = !!operation || !locationReady,
     editable = doc.ready && !doc.error && !busy;
   function notify(
     message: string,
@@ -84,7 +125,8 @@ export function useStudio(draftKey: string) {
     return () => clearTimeout(timeout);
   }, [notice]);
   async function run(label: string, job: () => Promise<void>) {
-    if (locked.current || !current.current.ready) return false;
+    if (locked.current || !current.current.ready || !locationReady)
+      return false;
     locked.current = true;
     setNotice(null);
     setOperation(label);
@@ -198,8 +240,9 @@ export function useStudio(draftKey: string) {
     }
     const snapshot = current.current.project;
     await run("正在保存工程…", async () => {
-      const existing = folder && !asNew ? await projectFilename(folder) : null;
-      if (!existing) {
+      if (folder && !asNew) await ensureFolderWritePermission(folder);
+      const existing = folder ? await projectFilename(folder) : null;
+      if (asNew || !existing) {
         const title =
           current.current.deck.title
             .replace(/[\\/:*?"<>|\x00-\x1f]/g, "_")
@@ -207,7 +250,8 @@ export function useStudio(draftKey: string) {
         setSaveRequest({
           project: snapshot,
           folder,
-          name: projectFileName(title),
+          name: existing || projectFileName(title),
+          asNew,
         });
         return;
       }
@@ -229,15 +273,17 @@ export function useStudio(draftKey: string) {
       if (current.current.project !== request.project)
         throw Error("工程已变更，请关闭保存窗口后重试");
       const dir = (!chooseOther && request.folder) || (await chooseFolder());
+      await ensureFolderWritePermission(dir);
       await writeFolder(dir, request.project, filename);
+      setLocationVersion((version) => version + 1);
       setFolder(dir);
       setFolderVersion(request.project);
-      setSaveRequest(null);
       try {
         await current.current.persist();
       } catch {
         /* Draft status retains its own error. */
       }
+      setSaveRequest(null);
       notify(`工程已保存到 ${dir.name}/${filename}`);
     });
   }

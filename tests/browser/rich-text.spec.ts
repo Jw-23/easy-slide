@@ -121,7 +121,7 @@ test("backtick strings keep single LaTeX backslashes through completion and form
     .filter({ hasText: "\\frac" })
     .first()
     .click();
-  await expect(editor).toContainText("`\\frac{分子}{分母}");
+  await expect(editor).toContainText("`\\frac{numerator}{denominator}");
   await expect(editor).not.toContainText("`\\\\frac");
   await editor.fill(
     'Deck("Raw") Slide(title:"A"){Text(`**误差**为 $\\frac{1}{n}$`) Equation(`\\nabla f(x)`)}',
@@ -167,4 +167,129 @@ test("position reference and scale keep the bottom-left point and preview coordi
     'Deck("Position") Slide(title:"S"){Text("X").frame(x:10,y:20)}',
   );
   await expect(page.locator(".editor-diagnostic")).toContainText("position");
+});
+
+test("long proofs indent paragraphs and keep display equations at the body font size", async ({
+  page,
+}, testInfo) => {
+  await open(page);
+  const proof =
+    'Deck("KKT") Theme(preset:.paper) DynamicSlide(title:"KKT 条件",fontSize:22){Proof{Text(`\n    设 $\\lambda\\ge0$，考虑下列驻点条件。\n    $$Hx+q+G^T\\lambda+E^T\\nu=0$$\n    由**互补松弛**可得 $\\lambda_i(G_ix-h_i)=0$。\n`).indent(2) Equation(`\\lambda\\ge0`).frame(height:100) Equation(`Hx+q+G^T\\lambda+E^T\\nu=0`).frame(height:100)}}';
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "proof.slide",
+      mimeType: "text/plain",
+      buffer: Buffer.from(proof),
+    });
+  const preview = page.locator(".preview-wrap");
+  await expect(preview).toContainText("　　设");
+  await expect(preview.locator("img[data-inline-math]")).toHaveCount(3);
+  const sizes = await preview
+    .locator("[data-scene-element]")
+    .evaluateAll((elements) => {
+      const standalone = elements.filter((el) =>
+        el.querySelector("img:not([data-inline-math])"),
+      );
+      const embedded = elements
+        .flatMap((el) =>
+          Array.from(
+            el.querySelectorAll<HTMLImageElement>("img[data-inline-math]"),
+          ),
+        )
+        .filter((img) => img.style.display === "block");
+      return {
+        standalone: standalone.map((el) => ({
+          w: parseFloat((el as HTMLElement).style.width),
+          h: parseFloat((el as HTMLElement).style.height),
+        })),
+        embedded: embedded.map((img) => ({
+          w: img.offsetWidth,
+          h: img.offsetHeight,
+        })),
+      };
+    });
+  expect(sizes.standalone).toHaveLength(2);
+  expect(sizes.embedded).toHaveLength(1);
+  expect(Math.abs(sizes.standalone[1].w - sizes.embedded[0].w)).toBeLessThan(2);
+  expect(Math.abs(sizes.standalone[1].h - sizes.embedded[0].h)).toBeLessThan(2);
+  expect(sizes.standalone[0].h).toBeLessThan(40);
+  await preview.screenshot({ path: testInfo.outputPath("proof.png") });
+});
+
+test("Text bodies join source wraps, preserve paragraphs and formulas, and export the same content", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  await open(page);
+  const source = String.raw`Deck("自然正文")
+Theme(preset:.paper)
+DynamicSlide(title:"非负性证明",fontSize:22) {
+    Proof {
+        Text {
+            设 $x>0$，
+            下面证明**非负性**。
+
+            $$\frac{x^2}{2}\ge0$$
+
+            由此可得结论。
+        }.indent(2)
+    }
+}`;
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "body.slide",
+      mimeType: "text/plain",
+      buffer: Buffer.from(source),
+    });
+  const preview = page.locator(".preview-wrap");
+  await expect(preview).toContainText("下面证明非负性");
+  const body = preview
+    .locator("[data-scene-element]")
+    .filter({ hasText: "下面证明" });
+  const text = await body.textContent();
+  expect(text).toContain("　　设");
+  expect(text).not.toMatch(/设[^\n]*\n[^\n]*下面证明/);
+  await expect(body.locator("img[data-inline-math]")).toHaveCount(2);
+  await expect(
+    body.locator("[data-rich-run]").filter({ hasText: /^非负性$/ }),
+  ).toHaveCSS("font-weight", "650");
+  await page
+    .locator(".tabs")
+    .getByRole("tab", { name: "DSL", exact: true })
+    .click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  await editor.focus();
+  await page.keyboard.press("Control+Shift+f");
+  await expect(editor).toContainText("Text {");
+  await expect(editor).toContainText("下面证明**非负性**");
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
+  await expect(body).toContainText("下面证明非负性");
+  await body.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "定位到 DSL", exact: true }).click();
+  await expect(editor).toBeFocused();
+  for (const mode of ["保留版式", "可编辑文字"]) {
+    await page.getByRole("button", { name: "导出", exact: true }).click();
+    await page.getByRole("radio", { name: mode }).check();
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: /PowerPoint/ }).click();
+    const zip = await JSZip.loadAsync(
+      await readFile((await (await downloaded).path())!),
+    );
+    const svg = (
+      await Promise.all(
+        Object.keys(zip.files)
+          .filter((p) => p.startsWith("ppt/media/") && p.endsWith(".svg"))
+          .map((p) => zip.file(p)!.async("string")),
+      )
+    ).find((value) => value.includes("下面证明"));
+    expect(svg).toBeDefined();
+    expect(svg).toContain("非负性");
+    expect(svg).toContain("由此可得结论");
+    expect(svg).not.toContain("foreignObject");
+  }
+  await preview.screenshot({ path: testInfo.outputPath("text-body.png") });
 });

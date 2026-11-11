@@ -92,3 +92,24 @@ export function mathAsset(
     return null;
   }
 }
+
+/** Natural em dimensions at the text font size; fit down without ever enlarging. */
+export function fitMath(
+  tex: string,
+  color: string,
+  size: number,
+  box: { x: number; y: number; w: number; h: number },
+) {
+  const asset = mathAsset(tex, color, true);
+  if (!asset) return box;
+  const naturalW = asset.widthEm * size,
+    naturalH = asset.heightEm * size;
+  const scale = Math.min(
+    1,
+    box.w / Math.max(1, naturalW),
+    box.h / Math.max(1, naturalH),
+  );
+  const w = naturalW * scale,
+    h = naturalH * scale;
+  return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
+}

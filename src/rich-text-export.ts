@@ -1,6 +1,6 @@
 import { TEXT_LINE_HEIGHT, type Element } from "./scene";
 import { richHtml, escapeXml, mathRunAsset } from "./rich-text-render";
-import { richRuns, type RichStyle } from "./rich-text";
+import { flowRuns, type RichStyle } from "./rich-text";
 import { svgData } from "./materials";
 export type StyledRun = RichStyle & { text: string };
 export type RichTextLine = { text: string; top: number; runs: StyledRun[] };
@@ -54,7 +54,7 @@ export async function measureRichText(
       Array.from(probe.querySelectorAll("img")).map((img) => img.decode()),
     );
     const origin = probe.getBoundingClientRect(),
-      runs = richRuns(e.rich!),
+      runs = flowRuns(e.rich!),
       fragments: RichFragment[] = [];
     for (const node of probe.querySelectorAll<HTMLElement>("[data-rich-run]")) {
       const run = runs[Number(node.dataset.richRun)],

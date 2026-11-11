@@ -16,6 +16,12 @@ import {
 export const loadDraft = (key = "draft") => get<Project>(key);
 export const saveDraft = (p: Project, key = "draft") => set(key, p);
 export type FolderHandle = {
+  queryPermission?: (options: {
+    mode: "readwrite";
+  }) => Promise<PermissionState>;
+  requestPermission?: (options: {
+    mode: "readwrite";
+  }) => Promise<PermissionState>;
   name: string;
   getFileHandle: (
     name: string,
@@ -78,6 +84,40 @@ export async function projectFilename(
   if (candidates.length > 1)
     throw Error("文件夹中有多个项目压缩文件，请为每个工程使用单独的文件夹");
   return candidates[0] || null;
+}
+/** Persist the handle separately from portable project data; never include it in archives. */
+export async function saveProjectLocation(
+  dir: FolderHandle | null,
+  key = "draft",
+) {
+  const filename = dir ? await projectFilename(dir) : null;
+  await set(
+    `${key}:save-location`,
+    dir && filename ? { folder: dir, filename } : null,
+  );
+}
+export async function loadProjectLocation(
+  key = "draft",
+): Promise<FolderHandle | null> {
+  const location = await get<{ folder: FolderHandle; filename: string }>(
+    `${key}:save-location`,
+  );
+  if (!location) return null;
+  if (
+    !location.folder ||
+    typeof location.folder.getFileHandle !== "function" ||
+    typeof location.filename !== "string" ||
+    !/^[^\\/\x00-\x1f]+\.easy-slide(?:\.zip)?$/i.test(location.filename)
+  )
+    throw Error("保存位置记录无效，请重新选择工程文件夹");
+  projectFiles.set(location.folder, location.filename);
+  return location.folder;
+}
+export async function ensureFolderWritePermission(dir: FolderHandle) {
+  if (!dir.queryPermission || !dir.requestPermission) return;
+  if ((await dir.queryPermission({ mode: "readwrite" })) === "granted") return;
+  if ((await dir.requestPermission({ mode: "readwrite" })) !== "granted")
+    throw Error("没有工程文件夹的写入权限，请允许访问后重试，或使用工程另存为");
 }
 export async function folderProject(
   dir: FolderHandle,

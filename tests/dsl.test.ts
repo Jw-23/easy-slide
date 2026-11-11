@@ -90,10 +90,11 @@ Deck("研究") {
       size: 28,
       color: "#16766d",
     });
-    expect(e.find((x) => x.kind === "equation")).toMatchObject({
-      step: 2,
-      x: 514,
-    });
+    const equation = e.find((x) => x.kind === "equation")!;
+    expect(equation.step).toBe(2);
+    // The formula sits within its column at its natural font size.
+    expect(equation.x).toBeGreaterThan(514);
+    expect(equation.w).toBeLessThan(100);
     expect(parseDeck(serialize(d))).toEqual(d);
   });
   it("rejects executable expressions and unknown modifiers with useful errors", () => {

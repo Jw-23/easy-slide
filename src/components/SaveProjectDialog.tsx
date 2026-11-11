@@ -6,7 +6,11 @@ export function SaveProjectDialog({ studio: s }: { studio: Studio }) {
   const [name, setName] = useState(request.name),
     [chooseOther, setChooseOther] = useState(false);
   return (
-    <Dialog title="保存项目文件" onClose={s.cancelSave} busy={s.busy}>
+    <Dialog
+      title={request.asNew ? "工程另存为" : "保存项目文件"}
+      onClose={s.cancelSave}
+      busy={s.busy}
+    >
       <form
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {

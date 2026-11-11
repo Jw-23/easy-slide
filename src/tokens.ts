@@ -1,3 +1,4 @@
+import { textBodyEnd } from "./text-body";
 import { DslError } from "./diagnostics";
 export type Token = {
   from: number;
@@ -7,6 +8,7 @@ export type Token = {
   line: number;
   col: number;
   raw?: boolean;
+  prose?: boolean;
   closed?: boolean;
   contentFrom?: number;
   contentTo?: number;
@@ -30,6 +32,29 @@ export function tokenize(
   };
   const error = (m: string): never => {
     throw new DslError(m, i, i + 1, line, col);
+  };
+  // Inspect tokens rather than source text so strings/comments cannot open a Text body.
+  const textHeader = (): Token | undefined => {
+    let at = ts.length - 1;
+    const previous = () => {
+      while (ts[at]?.kind === "comment") at--;
+      return ts[at];
+    };
+    if (previous()?.kind === "punct" && ts[at].value === ")") {
+      let depth = 0;
+      while (at >= 0) {
+        const token = ts[at--];
+        if (token.kind !== "punct") continue;
+        if (token.value === ")") depth++;
+        if (token.value === "(" && --depth === 0) break;
+      }
+    }
+    const name = previous();
+    if (name?.kind !== "id" || !["Text", "text"].includes(name.value)) return;
+    at--;
+    const before = previous();
+    if (before?.value === "." || before?.value === "func") return;
+    return name;
   };
   while (i < source.length) {
     if (/\s/.test(source[i])) {
@@ -55,6 +80,39 @@ export function tokenize(
     const start = i;
     const l = line,
       c = col;
+    if (source[i] === "{") {
+      const header = textHeader();
+      if (header) {
+        const contentFrom = i + 1;
+        const close = textBodyEnd(source, contentFrom);
+        if (close === undefined && !options.tolerant)
+          throw new DslError(
+            "Text 正文缺少结束 }",
+            start,
+            start + 1,
+            l,
+            c,
+            "在正文后添加 }；公式中的花括号需要配对，正文中的单个花括号可写成 \\{ 或 \\}。",
+          );
+        const contentTo = close ?? source.length;
+        while (i < (close === undefined ? source.length : close + 1)) advance();
+        header.value = "Text";
+        ts.push({
+          kind: "string",
+          prose: true,
+          raw: true,
+          closed: close !== undefined,
+          value: source.slice(contentFrom, contentTo),
+          from: start,
+          to: i,
+          line: l,
+          col: c,
+          contentFrom,
+          contentTo,
+        });
+        continue;
+      }
+    }
     if (
       source[i] === '"' ||
       source[i] === "`" ||

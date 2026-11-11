@@ -34,7 +34,7 @@ const cache = new Map<string, RichDocument>();
 let cachedSize = 0;
 const white = (c: string | undefined) => c === undefined || /\s/u.test(c);
 const punct = (c: string | undefined) => !!c && /[\p{P}\p{S}]/u.test(c);
-const escapable = new Set("\\`*_~$[]()".split(""));
+const escapable = new Set("\\`*_~$[](){}".split(""));
 
 export function parseRichText(source: string): RichDocument {
   const cached = cache.get(source);
@@ -332,4 +332,16 @@ export function richRuns(
   }
   visit(document.children, initial);
   return runs;
+}
+
+/** Display formulas own their line; a source newline beside them is not an extra blank paragraph. */
+export function flowRuns(document: RichDocument): RichRun[] {
+  const runs = richRuns(document);
+  return runs.filter(
+    (run, index) =>
+      run.kind !== "break" ||
+      ![runs[index - 1], runs[index + 1]].some(
+        (adjacent) => adjacent?.kind === "math" && adjacent.node.display,
+      ),
+  );
 }

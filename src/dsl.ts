@@ -1,3 +1,4 @@
+import { dedentProse } from "./prose";
 import { validateImageDocuments, type ImageDocument } from "./image-edit";
 import { pageStyleKeys, pageGeometry } from "./page-layout";
 import {
@@ -97,6 +98,7 @@ export const layoutComponents: Record<Layout, string> = {
   focus: "Focus",
 };
 export type Block = {
+  indent?: number;
   environment?: MathEnvironment;
   number?: string | number;
   numbered?: boolean;
@@ -421,6 +423,14 @@ export function validateDeck(input: unknown, allowLongContent = false): Deck {
         (!Number.isInteger(b.start) || b.start < 1 || b.start > 100000)
       )
         fail(`${p}：start 范围为 1–100000 的整数`);
+      if (
+        b.indent !== undefined &&
+        (b.type !== "text" ||
+          !Number.isInteger(b.indent) ||
+          b.indent < 0 ||
+          b.indent > 8)
+      )
+        fail(`${p}：indent 仅用于 Text，范围为 0–8 的整数`);
       if (b.type === "table") validateTable(b.rows || [], b.table);
       if (
         b.type === "math" &&
@@ -724,6 +734,9 @@ const apply = (
       } else if (m.name === "notes" && kind === "slide") {
         plain(m, []);
         target.notes = m.args[0];
+      } else if (kind === "block" && m.name === "indent") {
+        plain(m, []);
+        target.indent = m.args[0];
       } else if (kind === "block" && m.name === "font") {
         plain(m, []);
         target.size = m.args[0];
@@ -835,6 +848,7 @@ function compileBlock(c: Call): Block {
         "qed",
         "keepTogether",
         "repeat",
+        ...(type === "text" ? ["indent"] : []),
         ...(type === "table" ? tableKeys : []),
       ]);
     const b: Record<string, unknown> = c.custom
@@ -889,6 +903,8 @@ function compileBlock(c: Call): Block {
                   ? "progress"
                   : "text";
     if (!c.custom && c.args.length) b[field] = c.args[0];
+    if (type === "text" && typeof b.text === "string")
+      b.text = dedentProse(b.text);
     if (type === "progress" && c.named.value !== undefined) {
       b.progress = c.named.value;
       delete b.value;
@@ -1059,6 +1075,7 @@ function modifiers(b: Block): string {
       out += `.tableStyle(${styles.map(([k, v]) => `${k}: ${k === "borders" ? "." + v : str(v)}`).join(", ")})`;
   }
   if (b.stagger !== undefined) out += `.stagger(${b.stagger})`;
+  if (b.indent !== undefined) out += `.indent(${b.indent})`;
   if (b.size !== undefined) out += `.font(${b.size})`;
   if (b.color) out += `.foreground(${str(b.color)})`;
   if (b.appear)
