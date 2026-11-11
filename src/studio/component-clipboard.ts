@@ -6,7 +6,7 @@ import {
   type Deck,
   type Project,
 } from "../dsl";
-import { validatePortableProject } from "../project-archive";
+import { validateEditableProject } from "../project-archive";
 import {
   SourceMap,
   targetContains,
@@ -226,7 +226,7 @@ export function pasteComponent(
     assets: Object.keys(clip.assets).length ? assets : project.assets,
   };
   try {
-    validatePortableProject(result);
+    validateEditableProject(result);
   } catch (problem) {
     if (
       materialized ||
@@ -241,7 +241,7 @@ export function pasteComponent(
       serializeBlock(snapshot(clip.block, paths)),
       point.inside,
     );
-    validatePortableProject(result);
+    validateEditableProject(result);
   }
   return { project: result, materialized };
 }
@@ -279,6 +279,6 @@ export function pasteCanvasText(
     point.inside,
   );
   const result = { ...project, source };
-  validatePortableProject(result);
+  validateEditableProject(result);
   return result;
 }

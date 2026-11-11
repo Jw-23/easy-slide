@@ -57,8 +57,8 @@ function validateAssetPath(path: string) {
   if (!assetPath(path)) throw Error(`素材路径无效：${path}`);
 }
 
-/** Validate content before changing the current project, and never silently omit an image. */
-export function validatePortableProject(input: unknown): Project {
+/** Validate editable content; image references may still be waiting for import. */
+export function validateEditableProject(input: unknown): Project {
   const project = validateProject(input),
     keys = Object.keys(project.assets);
   if (encoder.encode(project.source).byteLength > MAX_SOURCE)
@@ -72,6 +72,12 @@ export function validatePortableProject(input: unknown): Project {
     total += bytes.byteLength;
     if (total > MAX_PROJECT_BYTES) throw Error("工程内容超过 200 MB");
   }
+  return project;
+}
+
+/** Archives must contain every referenced image, including those in nested layouts. */
+export function validatePortableProject(input: unknown): Project {
+  const project = validateEditableProject(input);
   const blocks = parseDeck(project.source).slides.flatMap(
     (slide) => slide.blocks,
   );
