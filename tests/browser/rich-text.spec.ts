@@ -217,3 +217,79 @@ test("long proofs indent paragraphs and keep display equations at the body font 
   expect(sizes.standalone[0].h).toBeLessThan(40);
   await preview.screenshot({ path: testInfo.outputPath("proof.png") });
 });
+
+test("Text bodies join source wraps, preserve paragraphs and formulas, and export the same content", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  await open(page);
+  const source = String.raw`Deck("自然正文")
+Theme(preset:.paper)
+DynamicSlide(title:"非负性证明",fontSize:22) {
+    Proof {
+        Text {
+            设 $x>0$，
+            下面证明**非负性**。
+
+            $$\frac{x^2}{2}\ge0$$
+
+            由此可得结论。
+        }.indent(2)
+    }
+}`;
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "body.slide",
+      mimeType: "text/plain",
+      buffer: Buffer.from(source),
+    });
+  const preview = page.locator(".preview-wrap");
+  await expect(preview).toContainText("下面证明非负性");
+  const body = preview
+    .locator("[data-scene-element]")
+    .filter({ hasText: "下面证明" });
+  const text = await body.textContent();
+  expect(text).toContain("　　设");
+  expect(text).not.toMatch(/设[^\n]*\n[^\n]*下面证明/);
+  await expect(body.locator("img[data-inline-math]")).toHaveCount(2);
+  await expect(
+    body.locator("[data-rich-run]").filter({ hasText: /^非负性$/ }),
+  ).toHaveCSS("font-weight", "650");
+  await page
+    .locator(".tabs")
+    .getByRole("tab", { name: "DSL", exact: true })
+    .click();
+  const editor = page.getByRole("textbox", { name: "DSL 编辑器" });
+  await editor.focus();
+  await page.keyboard.press("Control+Shift+f");
+  await expect(editor).toContainText("Text {");
+  await expect(editor).toContainText("下面证明**非负性**");
+  await expect(page.locator(".editor-diagnostic")).toHaveCount(0);
+  await expect(body).toContainText("下面证明非负性");
+  await body.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "定位到 DSL", exact: true }).click();
+  await expect(editor).toBeFocused();
+  for (const mode of ["保留版式", "可编辑文字"]) {
+    await page.getByRole("button", { name: "导出", exact: true }).click();
+    await page.getByRole("radio", { name: mode }).check();
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: /PowerPoint/ }).click();
+    const zip = await JSZip.loadAsync(
+      await readFile((await (await downloaded).path())!),
+    );
+    const svg = (
+      await Promise.all(
+        Object.keys(zip.files)
+          .filter((p) => p.startsWith("ppt/media/") && p.endsWith(".svg"))
+          .map((p) => zip.file(p)!.async("string")),
+      )
+    ).find((value) => value.includes("下面证明"));
+    expect(svg).toBeDefined();
+    expect(svg).toContain("非负性");
+    expect(svg).toContain("由此可得结论");
+    expect(svg).not.toContain("foreignObject");
+  }
+  await preview.screenshot({ path: testInfo.outputPath("text-body.png") });
+});

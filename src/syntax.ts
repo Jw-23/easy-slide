@@ -1,3 +1,4 @@
+import { bodyProse } from "./prose";
 import { DslError } from "./diagnostics";
 import { builtinComponentNames } from "./component-names";
 import { tokenize, type Token } from "./tokens";
@@ -325,6 +326,19 @@ export function readSyntax(source: string): Call {
         take();
       }
       take(")");
+    }
+    if (peek().prose) {
+      const body = take();
+      if (args.length || Object.hasOwn(named, "text"))
+        fail("Text 正文已写在 { } 中，请不要同时传入 text 参数或字符串", body);
+      try {
+        args.push(bodyProse(body.value));
+      } catch (problem) {
+        fail(
+          problem instanceof Error ? problem.message : String(problem),
+          body,
+        );
+      }
     }
     const children: Call[] = [],
       childScope = name === "Deck" ? scope : new Scope(scope);

@@ -26,8 +26,35 @@ export const slideLanguage = StreamLanguage.define({
       stringPrefixes: ["#"],
     },
   },
-  startState: () => ({ end: "" }),
+  startState: () => ({
+    end: "",
+    textHeader: false,
+    textParens: 0,
+    proseDepth: 0,
+    proseCode: "",
+    declarationName: false,
+  }),
   token(stream, state) {
+    if (state.proseDepth) {
+      while (!stream.eol()) {
+        if (stream.peek() === "`") {
+          stream.eatWhile("`");
+          const marker = stream.string
+            .slice(stream.start, stream.pos)
+            .match(/`+$/)![0];
+          if (state.proseCode === marker) state.proseCode = "";
+          else if (!state.proseCode) state.proseCode = marker;
+          continue;
+        }
+        const c = stream.next();
+        if (!state.proseCode) {
+          if (c === "\\") stream.next();
+          else if (c === "{") state.proseDepth++;
+          else if (c === "}" && --state.proseDepth === 0) break;
+        }
+      }
+      return "string";
+    }
     if (state.end) {
       while (!stream.eol()) {
         if (stream.match(state.end)) {
@@ -56,11 +83,34 @@ export const slideLanguage = StreamLanguage.define({
         return "string";
       }
     if (stream.match(/^-?\d+(\.\d+)?/)) return "number";
-    if (stream.match(/^\.[A-Za-z_]\w*/)) return "atom";
-    if (stream.match(/^(?:let|func|true|false|null)\b/)) return "keyword";
-    if (stream.match(/^[A-Za-z_]\w*/))
-      return /^[A-Z]/.test(stream.current()) ? "keyword" : "propertyName";
-    stream.next();
+    if (stream.match(/^\.[A-Za-z_]\w*/)) {
+      state.textHeader = false;
+      return "atom";
+    }
+    if (stream.match(/^(?:let|func|true|false|null)\b/)) {
+      state.declarationName = stream.current() === "func";
+      return "keyword";
+    }
+    if (stream.match(/^[A-Za-z_]\w*/)) {
+      const name = stream.current();
+      if (!state.textHeader || !state.textParens)
+        state.textHeader =
+          !state.declarationName && ["Text", "text"].includes(name);
+      state.declarationName = false;
+      return /^[A-Z]/.test(name) || name === "text"
+        ? "keyword"
+        : "propertyName";
+    }
+    const punctuation = stream.next();
+    if (state.textHeader) {
+      if (punctuation === "(") state.textParens++;
+      else if (punctuation === ")") state.textParens--;
+      else if (punctuation === "{" && !state.textParens) {
+        state.proseDepth = 1;
+        state.textHeader = false;
+      } else if (punctuation !== ":" && !state.textParens)
+        state.textHeader = false;
+    }
     return "punctuation";
   },
 });

@@ -289,7 +289,9 @@ for (const [name, description, field, type, template, kind] of [
           ]
         : []),
     ],
-    `${name}(${template}${name === "Metric" ? ', label: "${Availability}"' : ""})`,
+    name === "Text"
+      ? "Text {\n    ${Body}\n}"
+      : `${name}(${template}${name === "Metric" ? ', label: "${Availability}"' : ""})`,
   );
 add("Spacer", "view", "Flexible space", [], "Spacer");
 const cell: ValueType = union([number, string, boolean, { kind: "null" }]);

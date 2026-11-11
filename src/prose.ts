@@ -41,3 +41,34 @@ export function indentProse(text: string, indent = 0): string {
     })
     .join("\n");
 }
+
+/** Text { ... } follows prose paragraphs: soft wraps join, blank lines become hard breaks. */
+export function bodyProse(source: string): string {
+  const text = dedentProse(source).trim();
+  const document = parseRichText(text);
+  const protectedNodes = [
+    ...richRuns(document)
+      .filter((run) => run.kind === "math" || run.node.kind === "code")
+      .map((run) => run.node),
+    ...document.pendingMath,
+  ].sort((a, b) => a.from - b.from);
+  let index = 0;
+  return text.replace(
+    /[ \t]*\n[ \t]*(?:\n[ \t]*)*/g,
+    (breaks: string, from: number) => {
+      while (protectedNodes[index] && protectedNodes[index].to <= from) index++;
+      const node = protectedNodes[index];
+      if (node && node.from <= from && node.to > from) return breaks;
+      const count = breaks.split("\n").length - 1;
+      if (count > 1) return "\n".repeat(count - 1);
+      const before = text[from - 1] || "",
+        after = text[from + breaks.length] || "";
+      // CJK line wrapping needs no invented word space; Latin words retain a separator.
+      return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}，。！？；：、（）]/u.test(
+        before + after,
+      )
+        ? ""
+        : " ";
+    },
+  );
+}

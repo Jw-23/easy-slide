@@ -63,6 +63,8 @@ export class SourceMap {
         current: Token[] = [],
         depth = 0;
       const groups: Token[][] = [];
+      if (tokens[start + 1]?.prose)
+        return { groups, end: tokens[start + 1].to, endIndex: start + 1 };
       if (tokens[start + 1]?.value !== "(") return { groups, end, endIndex };
       for (let i = start + 2; i < tokens.length; i++) {
         const token = tokens[i];
@@ -82,6 +84,10 @@ export class SourceMap {
           if ([")", "]", "}"].includes(token.value)) depth--;
         }
         current.push(token);
+      }
+      if (tokens[endIndex + 1]?.prose) {
+        endIndex++;
+        end = tokens[endIndex].to;
       }
       return { groups, end, endIndex };
     };

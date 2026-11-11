@@ -34,7 +34,7 @@ const cache = new Map<string, RichDocument>();
 let cachedSize = 0;
 const white = (c: string | undefined) => c === undefined || /\s/u.test(c);
 const punct = (c: string | undefined) => !!c && /[\p{P}\p{S}]/u.test(c);
-const escapable = new Set("\\`*_~$[]()".split(""));
+const escapable = new Set("\\`*_~$[](){}".split(""));
 
 export function parseRichText(source: string): RichDocument {
   const cached = cache.get(source);
