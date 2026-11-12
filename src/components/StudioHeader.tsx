@@ -8,6 +8,7 @@ import {
   Play,
   Redo2,
   Save,
+  Search,
   Undo2,
   Upload,
 } from "lucide-react";
@@ -19,6 +20,7 @@ export function StudioHeader({
   onTemplates,
   onExport,
   onPresent,
+  onSearch,
   children,
 }: {
   studio: Studio;
@@ -27,6 +29,7 @@ export function StudioHeader({
   onTemplates: () => void;
   onExport: () => void;
   onPresent: () => void;
+  onSearch: () => void;
   children: ReactNode;
 }) {
   const id = useId(),
@@ -172,6 +175,14 @@ export function StudioHeader({
       </div>
       <div className="top-actions">
         {children}
+        <button
+          className="icon-button"
+          title="全局搜索替换（Ctrl / ⌘ + F）"
+          aria-label="全局搜索替换"
+          onClick={onSearch}
+        >
+          <Search size={16} />
+        </button>
         <button
           className="icon-button help-action"
           title="DSL 使用指南"
