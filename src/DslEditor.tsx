@@ -1,3 +1,9 @@
+import {
+  studioSearch,
+  openStudioSearch,
+  navigateStudioSearch,
+  type SearchRequest,
+} from "./studio/search-panel";
 import { whitespaceSelection } from "./studio/format-source";
 import { dslEditingKeymap, toggleDslComment } from "./studio/editor-commands";
 import type {
@@ -38,7 +44,14 @@ import {
   signatureHelp,
   semanticHover,
 } from "./editor-language";
-import { BookOpen, Code2, MapPin, MessageSquare, Sparkles } from "lucide-react";
+import {
+  BookOpen,
+  Code2,
+  MapPin,
+  MessageSquare,
+  Search,
+  Sparkles,
+} from "lucide-react";
 const externalChange = Annotation.define<boolean>();
 export function DslEditor({
   value,
@@ -51,6 +64,8 @@ export function DslEditor({
   readOnly = false,
   session,
   reveal,
+  searchRequest,
+  onSearchHandled,
   onContextMenu,
   clipboard,
   onMessage,
@@ -65,6 +80,8 @@ export function DslEditor({
   readOnly?: boolean;
   session?: { anchor: number; head: number; scrollTop: number };
   reveal?: RevealRequest | null;
+  searchRequest?: SearchRequest;
+  onSearchHandled?: () => void;
   onContextMenu?: (context: EditorContext) => void;
   clipboard?: StudioClipboard;
   onMessage?: (message: string) => void;
@@ -117,6 +134,7 @@ export function DslEditor({
       state: EditorState.create({
         doc: value,
         extensions: [
+          studioSearch,
           basicSetup,
           EditorView.domEventHandlers({
             contextmenu(event, editor) {
@@ -207,6 +225,19 @@ export function DslEditor({
           readOnlyConfig.current.of(EditorState.readOnly.of(readOnly)),
           Prec.highest(
             keymap.of([
+              { key: "Mod-f", run: (view) => openStudioSearch(view) },
+              { key: "Mod-h", run: (view) => openStudioSearch(view, true) },
+              { key: "Mod-Alt-f", run: (view) => openStudioSearch(view, true) },
+              { key: "F3", run: (view) => navigateStudioSearch(view, 1) },
+              {
+                key: "Shift-F3",
+                run: (view) => navigateStudioSearch(view, -1),
+              },
+              { key: "Mod-g", run: (view) => navigateStudioSearch(view, 1) },
+              {
+                key: "Mod-Shift-g",
+                run: (view) => navigateStudioSearch(view, -1),
+              },
               ...dslEditingKeymap(() => format.current()),
               {
                 key: "Mod-z",
@@ -301,7 +332,11 @@ export function DslEditor({
             )
               change.current(
                 update.state.doc.toString(),
-                update.transactions.some((t) => t.isUserEvent("input.comment")),
+                update.transactions.some(
+                  (t) =>
+                    t.isUserEvent("input.comment") ||
+                    t.isUserEvent("input.replace"),
+                ),
               );
           }),
         ],
@@ -372,6 +407,12 @@ export function DslEditor({
     });
     editor.focus();
   }, [reveal, value]);
+  useEffect(() => {
+    if (view.current && searchRequest) {
+      openStudioSearch(view.current, searchRequest.replace);
+      onSearchHandled?.();
+    }
+  }, [searchRequest]);
   const jump = () => {
     const editor = view.current;
     if (!editor || !error) return;
@@ -387,6 +428,16 @@ export function DslEditor({
       <div className="dsl-heading">
         <span>slides.slide</span>
         <div>
+          <button
+            aria-label="全局搜索替换"
+            title="全局搜索替换（Ctrl / ⌘ + F）"
+            className="icon-button"
+            onClick={() => {
+              if (view.current) openStudioSearch(view.current);
+            }}
+          >
+            <Search size={15} />
+          </button>
           <button
             title="代码提示（Ctrl / ⌘ + Space）"
             className="icon-button"

@@ -1,3 +1,4 @@
+import type { SearchRequest } from "./studio/search-panel";
 import { SaveProjectDialog } from "./components/SaveProjectDialog";
 import { ImageEditor } from "./components/ImageEditor";
 import { ContextMenu } from "./components/ContextMenu";
@@ -44,7 +45,12 @@ export default function App() {
   const importRef = useRef<HTMLInputElement>(null),
     imageRef = useRef<HTMLInputElement>(null),
     inspectorRef = useRef<HTMLDivElement>(null);
-  useShortcuts(s, () => setPlaying(true));
+  const [searchRequest, setSearchRequest] = useState<SearchRequest>();
+  function searchProject(replace = false) {
+    onTab("dsl");
+    setSearchRequest({ id: Date.now(), replace });
+  }
+  useShortcuts(s, () => setPlaying(true), searchProject);
   const drag = useRef<{ x: number; width: number } | null>(null);
   function onTab(value: InspectorTab) {
     setTab(value);
@@ -110,6 +116,7 @@ export default function App() {
           onHelp={() => setDialog("help")}
           onTemplates={() => setDialog("templates")}
           onExport={() => setDialog("export")}
+          onSearch={() => searchProject()}
           onPresent={() => setPlaying(true)}
         >
           <PwaControls
@@ -270,6 +277,8 @@ export default function App() {
               onHelp={() => setDialog("help")}
               onImages={() => imageRef.current?.click()}
               reveal={context.reveal}
+              searchRequest={searchRequest}
+              onSearchHandled={() => setSearchRequest(undefined)}
               onEditorContext={context.editor}
               clipboard={context.clipboard}
             />

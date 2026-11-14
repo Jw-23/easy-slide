@@ -1,3 +1,4 @@
+import type { SearchRequest } from "../studio/search-panel";
 import type {
   EditorContext,
   RevealRequest,
@@ -19,6 +20,8 @@ export function Inspector({
   onHelp,
   onImages,
   reveal,
+  searchRequest,
+  onSearchHandled,
   onEditorContext,
   clipboard,
   onEditImage,
@@ -30,6 +33,8 @@ export function Inspector({
   onHelp: () => void;
   onImages: () => void;
   reveal?: RevealRequest | null;
+  searchRequest?: SearchRequest;
+  onSearchHandled?: () => void;
   onEditorContext?: (context: EditorContext) => void;
   clipboard?: StudioClipboard;
 }) {
@@ -337,6 +342,8 @@ export function Inspector({
               readOnly={!s.ready || s.busy}
               session={session.current}
               reveal={reveal}
+              searchRequest={searchRequest}
+              onSearchHandled={onSearchHandled}
               onContextMenu={onEditorContext}
               clipboard={clipboard}
               onMessage={(message) => s.notify(message)}

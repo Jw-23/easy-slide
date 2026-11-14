@@ -1,8 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { Studio } from "./use-studio";
-export function useShortcuts(studio: Studio, present: () => void) {
-  const current = useRef({ studio, present });
-  current.current = { studio, present };
+export function useShortcuts(
+  studio: Studio,
+  present: () => void,
+  search?: (replace: boolean) => void,
+) {
+  const current = useRef({ studio, present, search });
+  current.current = { studio, present, search };
   useEffect(() => {
     const frames = new Set<number>();
     const key = (event: KeyboardEvent) => {
@@ -28,6 +32,15 @@ export function useShortcuts(studio: Studio, present: () => void) {
         frames.add(frame);
       };
       const name = event.key.toLowerCase();
+      if (
+        !event.shiftKey &&
+        (name === "f" || (name === "h" && !event.altKey)) &&
+        current.current.search
+      ) {
+        event.preventDefault();
+        current.current.search(name === "h" || event.altKey);
+        return;
+      }
       if (name === "s") {
         event.preventDefault();
         afterCommit(() => {
@@ -50,6 +63,23 @@ export function useShortcuts(studio: Studio, present: () => void) {
         afterCommit(() => current.current.present());
       }
     };
+    const find = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.shiftKey ||
+        document.querySelector("dialog[open]") ||
+        !current.current.search
+      )
+        return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest(".cm-editor")) return;
+      const name = event.key.toLowerCase();
+      if (name === "f" || (name === "h" && !event.altKey)) {
+        event.preventDefault();
+        current.current.search(name === "h" || event.altKey);
+      }
+    };
     const paste = (event: ClipboardEvent) => {
       if (event.defaultPrevented || document.querySelector("dialog[open]"))
         return;
@@ -61,9 +91,11 @@ export function useShortcuts(studio: Studio, present: () => void) {
         void current.current.studio.addImages(images);
       }
     };
+    window.addEventListener("keydown", find, true);
     window.addEventListener("keydown", key);
     window.addEventListener("paste", paste);
     return () => {
+      window.removeEventListener("keydown", find, true);
       window.removeEventListener("keydown", key);
       window.removeEventListener("paste", paste);
       frames.forEach(cancelAnimationFrame);
